@@ -1,0 +1,21 @@
+<NotepadPlus>
+    <Project name="BERRY">
+        <File name="__init__.py" />
+        <File name="SDK.py" />
+        <File name="Berry.py" />
+        <File name="Event.py" />
+        <File name="Globs.py" />
+        <File name="Httpd.py" />
+        <File name="Sound.py" />
+        <File name="Voice.py" />
+        <File name="Worker.py" />
+        <File name="AMatisGPIO.py" />
+        <File name="config.json" />
+        <Folder name="www" />
+        <Folder name="modules">
+            <File name="modules\__init__.py" />
+            <File name="modules\Test.py" />
+            <File name="modules\Clock.py" />
+        </Folder>
+    </Project>
+</NotepadPlus>

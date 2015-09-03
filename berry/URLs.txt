@@ -1,0 +1,48 @@
+
+/startpage.html
+GET:
+	-- Startseite ändern --
+	edit=startpage
+	
+	-- Abschnitt ändern --
+	secEdt=<uuid>
+	
+	-- Abschnitt hinzufügen --
+	secAdd=<uuid>
+	
+	-- Aufgabe ändern --
+	sec=<uuid>
+	artEdt=<uuid>
+	
+	-- Aufgabe hinzufügen --
+	sec=<uuid>
+	artAdd=<uuid>
+	
+POST:
+	-- Abschnitt --
+	sec=<uuid>			- Referenzierung des Abschnitts
+	del=sec				- Referenzierten Abschnitt löschen
+	submit=save			- Angezeigtes Element ändern
+	secPrimary (check)
+	
+	-- Aufgaben --
+	sec=<uuid>			\
+	art=<uuid>			- Referenzierung der Aufgabe
+	del=art				- Referenzierte Aufgabe löschen
+	btnEdt=<uuid>		- Aufgabe speichern und Schaltfläche editieren
+	btnAdd=<uuid>		- Aufgabe speichern und Schaltfläche anlegen
+	submit=save			- Angezeigtes Element ändern
+	artTitle=<str>
+	artContent<str>
+	artType=(success|error|warning|info)
+	
+	-- Schaltflächen --
+	sec=<uuid>			\
+	art=<uuid>			- Referenzierung der Schaltfläche
+	btn=<uuid>			/
+	del=btn				- Referenzierte Schaltfläche löschen
+	submit=save			- Angezeigtes Element ändern
+	btnTitle=<str>
+	btnHRef=<str>
+	btnIcon=<str>
+	btnColor=<str>

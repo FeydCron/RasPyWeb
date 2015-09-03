@@ -1,0 +1,53 @@
+﻿<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<!-- #BeginTemplate "../dynamic.dwt" -->
+<head>
+	<meta charset="utf-8"/>
+	<!-- #BeginEditable "doctitle" -->
+	<title>Fehler</title>
+
+	<!-- #EndEditable -->
+
+	<!-- Mobile viewport optimisation -->
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+	<!-- (en) Add your meta data here -->
+	<!-- (de) Fuegen Sie hier ihre Meta-Daten ein -->
+
+	<link href="../css/flexible-columns.css" rel="stylesheet" type="text/css"/>
+	<!--[if lte IE 7]>
+	<link href="../../yaml/core/iehacks.css" rel="stylesheet" type="text/css" />
+	<![endif]-->
+
+	<!--[if lt IE 9]>
+	<script src="../../lib/html5shiv/html5shiv.js"></script>
+	<![endif]-->
+</head>
+<body>
+	<main>
+	<!-- #BeginEditable "content" -->
+	<div class="box info">
+		<h3>Installation</h3>
+		<p>Hier kann ein neues Python3 Modul installiert und eingerichtet werden.</p>
+	    <form class="ym-form ym-full" method="post" enctype="multipart/form-data" action="">
+	    <!-- form row wrapper -->
+	    <div class="ym-fbox">
+		    <label for="ModuleFile">Modul (Python3-Datei)</label>
+		    <input type="file" name="ModuleFile" id="ModuleFile" accept="text/*"/>
+		</div>
+		<div class="ym-fbox">
+		    <label for="ModuleClass">Hauptklasse</label>
+		    <input type="text" name="ModuleClass" id="ModuleClass" placeholder="Klassenname" />
+	    </div>
+        <div class="ym-fbox-footer">
+		    <!-- custom buttons -->
+		    <button type="reset" class="reset ym-delete ym-warning" id="reset">Zurücksetzen</button>
+		    <button type="submit" class="save ym-save ym-success" id="submit">Installieren</button>
+	    </div>
+	    </form>
+	</div>
+	<!-- #EndEditable -->
+	</main>
+</body>
+<!-- #EndTemplate -->
+</html>

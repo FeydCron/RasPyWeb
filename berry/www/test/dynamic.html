@@ -1,0 +1,79 @@
+﻿<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<!-- #BeginTemplate "../dynamic.dwt" -->
+<head>
+	<meta charset="utf-8"/>
+	<!-- #BeginEditable "doctitle" -->
+	<title>Test</title>
+
+	<style type="text/css">
+.auto-style1 {
+	text-align: left;
+}
+</style>
+
+	<!-- #EndEditable -->
+
+	<!-- Mobile viewport optimisation -->
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+	<!-- (en) Add your meta data here -->
+	<!-- (de) Fuegen Sie hier ihre Meta-Daten ein -->
+
+	<link href="../css/flexible-columns.css" rel="stylesheet" type="text/css"/>
+	<!--[if lte IE 7]>
+	<link href="../../yaml/core/iehacks.css" rel="stylesheet" type="text/css" />
+	<![endif]-->
+
+	<!--[if lt IE 9]>
+	<script src="../../lib/html5shiv/html5shiv.js"></script>
+	<![endif]-->
+</head>
+<body>
+	<main>
+	<!-- #BeginEditable "content" -->
+	<div class="box warning">
+		<h3>Test</h3>
+		<p>Wenn dieser Text erscheint, war der Test erfolgreich.</p>
+		<a class="ym-reply ym-button ym-primary" href="dynamic.html">Erneut versuchen</a>
+	</div>
+	<form class="ym-form ym-full" method="post" enctype="multipart/form-data" action="">
+	    <!-- form row wrapper -->
+	    <fieldset>
+	    <legend>Legende</legend>
+		<table>
+		<thead>
+		<tr>
+		<th>Aktiv</th><th>Name</th><th>Aktion(en)</th>
+		</tr>
+		</thead>
+		<tbody>
+		<tr>
+		<td><input type="checkbox" name="checkEnable" id="your-id1"/></td>
+		<td class="auto-style1">
+			Das ist der Name
+		</td>
+		<td>
+			<a class="ym-button ym-warning" href="dynamic.html">&#x0270E;</a>
+			<a class="ym-button ym-danger" href="dynamic.html">&#x02718;</a>
+		</td>
+		</tr>
+		<tr>
+		<td><input type="checkbox" name="checkEnable" id="your-id1"/></td>
+		<td>
+			Das hier ist ein besonders langer Name
+		</td>
+		<td style="white-space:nowrap">
+			<a class="ym-button ym-warning" title="Bearbeiten" href="dynamic.html">&#x0270E;</a>
+			<a class="ym-button ym-danger" title="Deinstallieren" href="dynamic.html">&#x02718;</a>
+		</td>
+		</tr>
+		</tbody>
+		</table>
+		</fieldset>
+	</form>
+	<!-- #EndEditable -->
+	</main>
+</body>
+<!-- #EndTemplate -->
+</html>

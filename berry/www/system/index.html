@@ -1,0 +1,102 @@
+﻿<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<!-- #BeginTemplate "../raspberry.dwt" -->
+<head>
+	<meta charset="utf-8"/>
+	<title>Raspberry Web Interface</title>
+
+	<!-- Mobile viewport optimisation -->
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<!-- (en) Add your meta data here -->
+	<!-- (de) Fuegen Sie hier ihre Meta-Daten ein -->
+
+	<link rel="shortcut icon" type="image/png" href="/favicon.png"/>
+
+	<link href="../css/flexible-columns.css" rel="stylesheet" type="text/css"/>
+	<!--[if lte IE 7]>
+	<link href="../yaml/core/iehacks.css" rel="stylesheet" type="text/css" />
+	<![endif]-->
+	</head>
+<body>
+<ul class="ym-skiplinks">
+	<li><a class="ym-skip" href="#nav">Skip to navigation (Press Enter)</a></li>
+	<li><a class="ym-skip" href="#main">Skip to main content (Press Enter)</a></li>
+</ul>
+
+<header>
+	<div class="ym-wrapper">
+		<div class="ym-wbox">
+			<h1>Raspberry Web Interface <sup><sup><sup>(BETA)</sup></sup></sup></h1>
+		</div>
+	</div>
+</header>
+<nav id="nav">
+	<div class="ym-hlist" >
+		<!-- #BeginEditable "navigation" -->
+		<div>
+			<ul>
+				<li><a href="../index.html">Start</a></li>
+				<li class="active"><strong>System</strong></li>
+			</ul>
+		</div>
+		<!-- #EndEditable -->
+		<form class="ym-searchform" method="post" action="">
+			<input class="ym-searchfield" name="speak" type="text" placeholder="Text to speech..." />
+			<input class="ym-searchbutton" type="submit" value="Sprechen" />
+		</form>
+	</div>
+</nav>
+<main>
+	<div class="ym-column linearize-level-1">
+		<div class="ym-col1">
+			<!-- #BeginEditable "content" -->
+					<div class="ym-cbox">
+						<iframe name="iFrameDynamic" border="0" frameborder="0" src="values.html" style="height: 600px" width="100%" class="flexible bordered">
+								Your browser does not support inline frames or is currently configured not to display inline frames.
+						</iframe>
+					</div>
+		<!-- #EndEditable -->
+		</div>
+		<aside class="ym-col3" style="left: 0px; top: 0px">
+			<!-- #BeginEditable "sidebar" -->
+		<div class="ym-cbox">
+			<nav class="ym-vlist">
+				<h6 class="ym-vtitle">Systemmenü</h6>
+				<ul>
+					<li><a href="values.html" target="iFrameDynamic">&#x02764; Systemwerte anzeigen</a></li>
+					<li><a href="modules.html" target="iFrameDynamic">&#x025B6; Module anzeigen</a></li>
+					<li><a href="install.html" target="iFrameDynamic">&#x0271A; Module installieren</a></li>
+					<li><span>Protokollierung</span>
+						<ul>
+							<li><a href="logging.html" target="iFrameDynamic">&#x1F4DC; Anzeigen</a></li>
+							<li><a href="logging.html?mode=update" target="iFrameDynamic">&#x1F502; Abrufen</a></li>
+							<li><a href="logging.html?mode=edit" target="iFrameDynamic">&#x1F527; Ändern</a></li>
+						</ul>
+					</li>
+					<li><span>Problembehebung</span>
+						<ul>
+							<li><a href="../exit/ask_boot.html">&#x02737; Neustart des Systems</a></li>
+						</ul>
+					</li>
+					<li><span>Systemwartung</span>
+						<ul>
+							<li><a href="../exit/ask_exit.html">&#x026A0; Programm beenden</a></li>
+							<li><a href="../exit/ask_halt.html">&#x0270B; System herunterfahren</a></li>
+						</ul>
+					</li>
+				</ul>
+			</nav>
+		</div>
+		<!-- #EndEditable -->
+		</aside>
+	</div>
+</main>
+<footer>
+	<p>© M. Wangerow &ndash; Layout based on <a href="http://www.yaml.de">YAML</a></p>
+</footer>
+
+<!-- full skip link functionality in webkit browsers -->
+<script src="../../yaml/core/js/yaml-focusfix.js"></script>
+</body>
+<!-- #EndTemplate -->
+</html>

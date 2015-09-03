@@ -1,0 +1,98 @@
+﻿<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<!-- #BeginTemplate "../raspberry.dwt" -->
+<head>
+	<meta charset="utf-8"/>
+	<title>Raspberry Web Interface</title>
+
+	<!-- Mobile viewport optimisation -->
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<!-- (en) Add your meta data here -->
+	<!-- (de) Fuegen Sie hier ihre Meta-Daten ein -->
+
+	<link rel="shortcut icon" type="image/png" href="/favicon.png"/>
+
+	<link href="../css/flexible-columns.css" rel="stylesheet" type="text/css"/>
+	<!--[if lte IE 7]>
+	<link href="../yaml/core/iehacks.css" rel="stylesheet" type="text/css" />
+	<![endif]-->
+	</head>
+<body>
+<ul class="ym-skiplinks">
+	<li><a class="ym-skip" href="#nav">Skip to navigation (Press Enter)</a></li>
+	<li><a class="ym-skip" href="#main">Skip to main content (Press Enter)</a></li>
+</ul>
+
+<header>
+	<div class="ym-wrapper">
+		<div class="ym-wbox">
+			<h1>Raspberry Web Interface <sup><sup><sup>(BETA)</sup></sup></sup></h1>
+		</div>
+	</div>
+</header>
+<nav id="nav">
+	<div class="ym-hlist" >
+		<!-- #BeginEditable "navigation" -->
+		<div>
+			<ul>
+				<li><a href="../index.html">Start</a></li>
+				<li class="active"><strong>System</strong></li>
+		</div>
+		<!-- #EndEditable -->
+		<form class="ym-searchform" method="post" action="">
+			<input class="ym-searchfield" name="speak" type="text" placeholder="Text to speech..." />
+			<input class="ym-searchbutton" type="submit" value="Sprechen" />
+		</form>
+	</div>
+</nav>
+<main>
+	<div class="ym-column linearize-level-1">
+		<div class="ym-col1">
+			<!-- #BeginEditable "content" -->
+			<div class="ym-cbox">
+				<section class="box error">
+					<h2>Programm beenden</h2>
+					<p>Soll das Programm wirklich beendet werden?</p>
+					<p>Das Web-Interface steht erst wieder zur Verfügung, wenn das Programm neu gestartet wurde.</p>
+					<a class="ym-warnsign ym-button ym-danger" href="exit.html?exit=term">Beenden</a>
+					<a class="ym-next ym-button ym-primary" href="../system/index.html">Abbrechen</a>
+
+				</section>
+			</div>
+		<!-- #EndEditable -->
+		</div>
+		<aside class="ym-col3" style="left: 0px; top: 0px">
+			<!-- #BeginEditable "sidebar" -->
+			<div class="ym-cbox">
+				<h2>Sidebar</h2>
+				<h4>Advertisement</h4>
+				<div class="ym-contain-dt">
+					<img src="http://dummyimage.com/128x128/cccccc/fff.png" alt="ads" class="float-left bordered"/>
+					<img src="http://dummyimage.com/128x128/cccccc/fff.png" alt="ads" class="float-left bordered"/>
+					<img src="http://dummyimage.com/128x128/cccccc/fff.png" alt="ads" class="float-left bordered"/>
+					<img src="http://dummyimage.com/128x128/cccccc/fff.png" alt="ads" class="float-left bordered"/>
+					<img src="http://dummyimage.com/128x128/cccccc/fff.png" alt="ads" class="float-left bordered"/>
+					<img src="http://dummyimage.com/128x128/cccccc/fff.png" alt="ads" class="float-left bordered"/>
+				</div>
+				<h4>Widget</h4>
+				<ul>
+					<li>Item 1</li>
+					<li>Item 2</li>
+					<li>Item 3</li>
+					<li>Item 4</li>
+					<li>Item 5</li>
+				</ul>
+			</div>
+		<!-- #EndEditable -->
+		</aside>
+	</div>
+</main>
+<footer>
+	<p>© M. Wangerow &ndash; Layout based on <a href="http://www.yaml.de">YAML</a></p>
+</footer>
+
+<!-- full skip link functionality in webkit browsers -->
+<script src="../../yaml/core/js/yaml-focusfix.js"></script>
+</body>
+<!-- #EndTemplate -->
+</html>

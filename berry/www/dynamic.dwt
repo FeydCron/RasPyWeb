@@ -1,0 +1,36 @@
+﻿<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<meta charset="utf-8"/>
+	<!-- #BeginEditable "doctitle" -->
+	<title>Raspberry Web Interface</title>
+
+	<!-- #EndEditable -->
+
+	<!-- Mobile viewport optimisation -->
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+	<!-- (en) Add your meta data here -->
+	<!-- (de) Fuegen Sie hier ihre Meta-Daten ein -->
+
+	<link href="css/flexible-columns.css" rel="stylesheet" type="text/css"/>
+	<!--[if lte IE 7]>
+	<link href="../yaml/core/iehacks.css" rel="stylesheet" type="text/css" />
+	<![endif]-->
+
+	<!--[if lt IE 9]>
+	<script src="../lib/html5shiv/html5shiv.js"></script>
+	<![endif]-->
+</head>
+<body>
+	<main>
+	<!-- #BeginEditable "content" -->
+	<div class="box error">
+		<h3>Fehler</h3>
+		<p>Bei der Generierung von dynamischen Inhalten ist ein Fehler aufgetreten.</p>
+		<a class="ym-reply ym-button ym-primary" href="#">Erneut versuchen</a>
+	</div>
+	<!-- #EndEditable -->
+	</main>
+</body>
+</html>

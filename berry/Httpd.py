@@ -5,6 +5,7 @@ import re
 import threading
 import traceback
 import uuid
+import html
 
 from http.server import BaseHTTPRequestHandler
 from http.server import SimpleHTTPRequestHandler
@@ -564,102 +565,21 @@ class TaskDisplaySystem(FutureTask):
 		return  strDesc
 		
 	def do(self):
+		if (self.m_strFxn and self.m_strFxn == "edit" and self.m_strArg):
+			if self.createForm():
+				return
+		elif (self.m_strFxn and self.m_strArg):
+			if not self.updateValue():
+				return
+		self.displayValues()
+		return
+		
+	def displayValues(self):
 		dt = datetime.today()
-		if (self.m_strFxn and self.m_strFxn == "edit"):
-			if (self.m_strArg and self.m_strArg == "date"):
-				self.m_oHtmlPage.createBox("Datum", "Datum einstellen", bClose=False)
-				self.m_oHtmlPage.openForm(dictTargets={"target" : "date"})
-				self.m_oHtmlPage.appendForm("date",
-					strInput="%s" % (dt.strftime("%d.%m.%Y")),
-					strTitle="Datum")
-				self.m_oHtmlPage.closeForm()
-				self.m_oHtmlPage.closeBox()
-				return
-			if (self.m_strArg and self.m_strArg == "time"):
-				self.m_oHtmlPage.createBox("Uhrzeit", "Uhrzeit einstellen", bClose=False)
-				self.m_oHtmlPage.openForm(dictTargets={"target" : "time"})
-				self.m_oHtmlPage.appendForm("time",
-					strInput="%s" % (dt.strftime("%H:%M:%S")),
-					strTitle="Uhrzeit")
-				self.m_oHtmlPage.closeForm()
-				self.m_oHtmlPage.closeBox()
-				return
-			if (self.m_strArg and self.m_strArg == "test"):
-				self.m_oHtmlPage.createBox("Testmodus", "Testmodus ein- oder ausschalten", bClose=False)
-				self.m_oHtmlPage.openForm(dictTargets={"target" : "test"})
-				self.m_oHtmlPage.appendForm("test",
-					strInput="True",
-					strTitle="Testmodus",
-					bSelected=Globs.s_bTestMode,
-					bCheck=True)
-				self.m_oHtmlPage.closeForm()
-				self.m_oHtmlPage.closeBox()
-				return
-			if (self.m_strArg):
-				varVal = Globs.getSetting("System", self.m_strArg)
-				if not varVal == None:
-					self.m_oHtmlPage.createBox(
-						"Einstellung \"%s\" ändern" % (self.m_strArg),
-						"Der aktuelle Wert der Einstellung ist \"%s\" und ist vom Typ \"%s\"" % (
-							varVal, type(varVal)),
-						bClose=False)
-					self.m_oHtmlPage.openForm(dictTargets={"target" : self.m_strArg})
-					self.m_oHtmlPage.appendForm(self.m_strArg,
-						strInput="%s" % (varVal),
-						strTitle="IP-Adresse")
-					self.m_oHtmlPage.closeForm()
-					self.m_oHtmlPage.closeBox()
-					return
-		if (self.m_strFxn and self.m_strFxn == "date" and self.m_strArg):
-			try:
-				strResult = SDK.setDate(self.m_strArg, "%d.%m.%Y")
-				self.m_oHtmlPage.createBox("Datum",
-					"Das Datum \"%s\" wurde übernommen und angewendet: %s" % (
-						self.m_strArg, strResult))
-				return
-			except:
-				Globs.exc("Datum einstellen")
-			self.m_oHtmlPage.createBox("Datum",
-				"Das Datum \"%s\" konnte nicht übernommen werden. Die Eingabe muss in der Form \"DD.MM.YYYY\" erfolgen." % (
-					self.m_strArg))
-			return
-		if (self.m_strFxn and self.m_strFxn == "time" and self.m_strArg):
-			try:
-				strResult = SDK.setTime(self.m_strArg, "%H:%M:%S")
-				self.m_oHtmlPage.createBox("Uhrzeit",
-					"Die Uhrzeit \"%s\" wurde übernommen und angewendet: %s" % (
-						self.m_strArg, strResult))
-				return
-			except:
-				Globs.exc("Uhrzeit einstellen")
-			self.m_oHtmlPage.createBox("Uhrzeit",
-				"Die Uhrzeit \"%s\" konnte nicht übernommen werden. Die Eingabe muss in der Form \"HH:MM:SS\" erfolgen." % (
-					self.m_strArg))
-			return
-		if (self.m_strFxn and self.m_strFxn == "test"):
-			if (self.m_strArg and self.m_strArg == "True"):
-				Globs.s_bTestMode = True
-				self.m_oHtmlPage.createBox("Testmodus", "Der Testmodus ist jetzt eingeschaltet.")
-			else:
-				Globs.s_bTestMode = False
-				self.m_oHtmlPage.createBox("Testmodus", "Der Testmodus ist jetzt ausgeschaltet.")
-			Globs.saveSettings()
-			return
-		if (self.m_strFxn):
-			if Globs.setSetting("System", self.m_strFxn, self.m_strArg):
-				self.m_oHtmlPage.createBox(self.m_strFxn,
-					"Der Wert \"%s\" wurde übernommen." % (
-					self.m_strArg))
-				Globs.saveSettings()
-				return	
-			self.m_oHtmlPage.createBox(self.m_strFxn,
-				"Der Wert \"%s\" konnte nicht übernommen werden." % (
-					self.m_strArg))
-			return
 		# Tabelle öffnen und Systeminformationen eintragen
 		self.m_oHtmlPage.openTable(
 			"Aktuelle Systemwerte",
-			["System", "&nbsp;"], True, True)
+			["System", ""], True, True)
 		self.m_oHtmlPage.appendTable([
 			"Datum", "<a href=\"%s\">&#x0270E; %s</a>" % (
 				"/system/values.html?edit=date",
@@ -670,8 +590,8 @@ class TaskDisplaySystem(FutureTask):
 				dt.strftime("%H:%M:%S"))], bFirstIsHead=True)
 		self.m_oHtmlPage.appendTable([
 			"Testmodus", "<a href=\"%s\">&#x0270E; %s</a>" % (
-				"/system/values.html?edit=test",
-				Globs.s_bTestMode)], bFirstIsHead=True)
+				"/system/values.html?edit=bTestMode",
+				Globs.getSetting("System", "bTestMode", "True|False", False))], bFirstIsHead=True)
 		self.m_oHtmlPage.appendTable([
 			"Web-Server IP-Adresse", "<a href=\"%s\">&#x0270E; %s</a>" % (
 				"/system/values.html?edit=strHttpIp",
@@ -683,14 +603,95 @@ class TaskDisplaySystem(FutureTask):
 		# Alle Sektionen durchgehen
 		for (strHeader, dictSection) in sorted(Globs.s_dictSystemValues.items()):
 			# Tabelle mit dem nächsten Tabellenkopf fortsetzen
-			self.m_oHtmlPage.appendHeader([strHeader, "&nbsp;"])
+			self.m_oHtmlPage.appendHeader([strHeader, ""])
 			# Alle Werte durchgehen
 			for (strName, strValue) in sorted(dictSection.items()):
 				self.m_oHtmlPage.appendTable(
-					[strName, strValue], bFirstIsHead=True)
+					[html.escape(strName), html.escape(strValue)], bFirstIsHead=True)
 		# Tabelle schließen
 		self.m_oHtmlPage.closeTable()
 		return
+		
+	def createForm(self):
+		dt = datetime.today()
+		varVal = None
+		if self.m_strArg == "date":
+			varVal = "%s" % (dt.strftime("%d.%m.%Y"))
+			self.m_oHtmlPage.createBox(
+				"Datum",
+				"Das Datum kann unabhängig von der Uhrzeit eingestellt werden, wobei " +
+				"die Angabe im Format DD.MM.YYYY (Tag, Monat, Jahr, z.B. %s) erwartet wird." % (varVal),
+				bClose=False)
+		elif self.m_strArg == "time":
+			varVal = "%s" % (dt.strftime("%H:%M:%S"))
+			self.m_oHtmlPage.createBox(
+				"Uhrzeit",
+				"Die Uhrzeit kann unabhängig vom Datum eingestellt werden, wobei " +
+				"die Angabe im Format HH:MM:SS (Stunde, Minute, Sekunde, z.B. %s) erwartet wird." % (varVal),
+				bClose=False)
+		elif self.m_strArg == "test":
+			varVal = Globs.getSetting("System", "bTestMode", "True|False", False)
+			self.m_oHtmlPage.createBox(
+				"Testmodus",
+				"Der Testmodus kann ein- oder ausgeschaltet werden.",
+				bClose=False)
+		else:
+			varVal = Globs.getSetting("System", self.m_strArg)
+			if varVal == None:
+				return False
+			self.m_oHtmlPage.createBox(
+				"Parameter \"%s\" ändern" % (self.m_strArg),
+				"Die Einstellung kann nur übernommen werden, wenn die Angabe dem " +
+				"zugrunde liegendem Datentyp entspricht.",
+				bClose=False)
+		
+		self.m_oHtmlPage.openForm(dictTargets={"target" : self.m_strArg})
+		if isinstance(varVal, bool):
+			self.m_oHtmlPage.appendForm(self.m_strArg,
+				strInput="%s" % (varVal),
+				strTitle=self.m_strArg,
+				dictChoice = {
+					"Ein"	: "True",
+					"Aus"	: "False"
+				})
+		else:
+			self.m_oHtmlPage.appendForm(self.m_strArg,
+				strInput="%s" % (varVal),
+				strTitle=self.m_strArg)	
+		self.m_oHtmlPage.closeForm()
+		self.m_oHtmlPage.closeBox()
+		return True
+		
+	def updateValue(self):
+		strResult = ""
+		if (self.m_strFxn == "date"):
+			try:
+				strResult = SDK.setDate(self.m_strArg, "%d.%m.%Y")
+				self.m_oHtmlPage.createBox("Datum",
+					"Das Datum \"%s\" wurde übernommen und mit folgendem Ergebnis angewendet: %s" % (
+						self.m_strArg, strResult))
+				return False
+			except Exception as ex:
+				Globs.exc("Datum einstellen")
+				strResult = " %s" % (ex)
+		elif (self.m_strFxn == "time"):
+			try:
+				strResult = SDK.setTime(self.m_strArg, "%H:%M:%S")
+				self.m_oHtmlPage.createBox("Uhrzeit",
+					"Die Uhrzeit \"%s\" wurde übernommen und mit folgendem Ergebnis angewendet: %s" % (
+						self.m_strArg, strResult))
+				return False
+			except Exception as ex:
+				Globs.exc("Uhrzeit einstellen")
+				strResult = " %s" % (ex)
+		elif Globs.setSetting("System", self.m_strFxn, self.m_strArg):
+			Globs.saveSettings()
+			return True
+		self.m_oHtmlPage.createBox(self.m_strFxn,
+			"Die Einstellung \"%s\" konnte nicht auf den Wert \"%s\" geändert werden.%s" % (
+			self.m_strFxn, self.m_strArg, strResult),
+			strType="warning")
+		return False
 
 class TaskDisplayLogMem(FutureTask):
 	
@@ -732,16 +733,20 @@ class TaskDisplayLogMem(FutureTask):
 			nIndex = int(self.m_strMode)
 			if (nIndex >= 0 and nIndex < len(lstLogMem)):
 				oLogEntry = lstLogMem[nIndex]
-				strDesc = "%s" % (oLogEntry.m_strText)
-				if (oLogEntry.m_lstTB):
-					strDesc += "<ul>"
-					for (filename, line, function, text) in oLogEntry.m_lstTB:
-						strDesc += "<li>File \"%s\", line %s, in %s %s</li>" % (
-							filename, line, function, text)
-					strDesc += "</ul>"
 				self.m_oHtmlPage.createBox(
 					"%s - %s" % (oLogEntry.m_strType, oLogEntry.m_strDate),
-					strDesc)
+					"%s" % (oLogEntry.m_strText), bClose=False)
+				if (oLogEntry.m_lstTB):
+					self.m_oHtmlPage.append("<ul>")
+					for (filename, line, function, text) in oLogEntry.m_lstTB:
+						self.m_oHtmlPage.append("<li>File \"%s\", line %s, in %s %s</li>" % (
+							html.escape(filename),
+							line,
+							html.escape(function),
+							html.escape(text)))
+					self.m_oHtmlPage.append("</ul>")
+				self.m_oHtmlPage.createButton("OK")
+				self.m_oHtmlPage.closeBox()
 			else:
 				self.m_oHtmlPage.createBox(
 					"Protokollierung",
@@ -768,9 +773,9 @@ class TaskDisplayLogMem(FutureTask):
 					"<a class=\"%s %s\" href=\"%s?mode=%s\">%s</a>" % (
 						"ym-button ym-xsmall", strType,
 						self.m_oHtmlPage.m_strPath, nIndex,
-						oLogEntry.m_strType),
-					"%s" % (oLogEntry.m_strDate),
-					"%s" % (oLogEntry.m_strText)], bFirstIsHead=True)
+						html.escape(oLogEntry.m_strType)),
+					"%s" % (html.escape(oLogEntry.m_strDate)),
+					"%s" % (html.escape(oLogEntry.m_strText))], bFirstIsHead=True)
 				nIndex += 1
 		# Tabelle schließen
 		self.m_oHtmlPage.closeTable()

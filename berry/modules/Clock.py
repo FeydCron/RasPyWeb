@@ -24,7 +24,7 @@ class Clock(ModuleBase):
 				self.speakTime()
 				return True
 			# Default: Aktustische Zeitanzeige
-			if Globs.s_bTestMode:
+			if Globs.getSetting("System", "bTestMode", "True|False", False):
 				TaskSpeak(self.getWorker(), "Entschuldigung. Test.").start()
 				self.gong()
 				self.speakTime()
@@ -63,7 +63,7 @@ class Clock(ModuleBase):
 			else:
 				nCount = self.m_nMinutes / Globs.s_nTellTimeInt
 		# Testmodus berücksichtigen
-		if (nCount == 0 and Globs.s_bTestMode):
+		if (nCount == 0 and Globs.getSetting("System", "bTestMode", "True|False", False)):
 			nCount = 1
 		# Ggf. Sound abspielen
 		if (nCount >= 1):

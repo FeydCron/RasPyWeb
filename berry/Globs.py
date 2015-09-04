@@ -92,9 +92,42 @@ class Globs:
 		# {"<Eigenschaft>" : "<Wert>"}
 		"System" : {
 			"strLogLvl" : "DBG",		# Aktuelles Log-Level
-			"bTestMode" : True,			# Aktivierung des Testmodus
+			"bTestMode" : False,		# Aktivierung des Testmodus
 			"strHttpIp" : "0.0.0.0",	# IP-Adresse für den HTTP-Server
 			"nHttpPort" : 8081			# Portnummer für den HTTP-Server
+		},
+		# Parameterdefinitionen
+		# {"<Schlüssel>" : {"<Name>" : {"" : ""}}}
+		"ParamDef" : {
+			"System" : {
+				"strLogLvl" : {
+					"title" 		: "Log-Level",
+					"description" 	: "",
+					"default"		: "DBG",
+					"choices"		: {
+						"Ausnahmen"	: "EXC",
+						"Fehler"	: "ERR",
+						"Warnungen"	: "WRN",
+						"Hinweise"	: "INF",
+						"Debugging" : "DBG"
+					},
+				},
+				"bTestMode" : {
+					"title"			: "Testmodus",
+					"description"	: "",
+					"default"		: "False"
+				},
+				"strHttpIp" : {
+					"title"			: "Web-Server IP-Adresse",
+					"description"	: "",
+					"default"		: "0.0.0.0"
+				},
+				"nHttpPort" : {
+					"title"			: "Web-Server TCP-Portnummer",
+					"description"	: "",
+					"default"		: "8081"
+				}
+			},
 		},
 		# HTTP-Weiterleitungen
 		# {"<ID>" : "<URL>"}
@@ -215,8 +248,6 @@ class Globs:
 		if ("System" in Globs.s_dictSettings):
 			if ("strLogLvl" in Globs.s_dictSettings["System"]):
 				Globs.setLogLvl(Globs.s_dictSettings["System"]["strLogLvl"])
-			if ("bTestMode" in Globs.s_dictSettings["System"]):
-				Globs.s_bTestMode = (Globs.s_dictSettings["System"]["bTestMode"] == True)
 				
 		#Startseite lesen
 		try:
@@ -225,6 +256,9 @@ class Globs:
 		except:
 			Globs.exc("Laden der Startseite von %s" % (
 				Globs.s_strStartPageFile))
+				
+		Globs.log("Konfiguration: %r" % (Globs.s_dictSettings))
+		Globs.log("Startseite: %r" % (Globs.s_oStartPage))
 		return
 		
 	def saveSettings():
@@ -234,8 +268,7 @@ class Globs:
 			Globs.s_dictSettings.update({"System" : {}})
 		# Konfigurationsparameter synchronisieren
 		Globs.s_dictSettings["System"].update({
-			"strLogLvl" : Globs.getLogLvl(),
-			"bTestMode" : Globs.s_bTestMode
+			"strLogLvl" : Globs.getLogLvl()
 		})
 		
 		# Einstellungen speichern
@@ -438,20 +471,28 @@ class Globs:
 			primitives = (bool, int, float, str)
 			if strKeyName in Globs.s_dictSettings:
 				if strValName in Globs.s_dictSettings[strKeyName]:
-					if isinstance(varValue, type(Globs.s_dictSettings[strKeyName][strValName])):
-						Globs.s_dictSettings[strKeyName][strValName] = varValue
-						bResult = True
+					varOldVal = Globs.s_dictSettings[strKeyName][strValName]
+					oOldType = type(varOldVal)
+					oSetType = type(varValue)
+					varNewVal = None					
+					oNewType = oSetType
+					if isinstance(varValue, oOldType):
+						varNewVal = varValue
 					elif isinstance(varValue, primitives):
-						oType = type(Globs.s_dictSettings[strKeyName][strValName])
-						Globs.s_dictSettings[strKeyName][strValName] = oType("%s" % (varValue))
-						bResult = True
+						if isinstance(varOldVal, bool):
+							varNewVal = (("%s" % (varValue)) == "True")
+							oNewType = type(varNewVal)
+						else:
+							varNewVal = oTypeTarget("%s" % (varValue))
+							oNewType = type(varNewVal)
+					if varNewVal == None:
+						Globs.err("Konfiguration \"%s\".\"%s\" von \"%s\" %r auf \"%s\" %r ändern: Unverträgliche Datentypen!" % (
+							strKeyName, strValName, varOldVal, oOldType, varValue, oSetType))
 					else:
-						Globs.err("Konfigurationseinstellung setzen: \"%s\".\"%s\"=\"%s\" -> \"%s\" - Erwartet wurde Typ \"%s\" jedoch liegt Typ \"%s\" vor" % (
-							strKeyName, strValName,
-							Globs.s_dictSettings[strKeyName][strValName],
-							varValue,
-							type(Globs.s_dictSettings[strKeyName][strValName]),
-							type(varDefault)))
+						Globs.s_dictSettings[strKeyName][strValName] = varNewVal
+						bResult = True
+						Globs.log("Konfiguration \"%s\".\"%s\" von \"%s\" %r auf \"%s\" %r geändert." % (
+							strKeyName, strValName, varOldVal, oOldType, varNewVal, oNewType))
 				else:
 					Globs.err("Konfigurationseinstellung setzen: \"%s\".\"%s\" -> \"%s\" - Adressierter Wert existiert nicht" % (
 						strKeyName, strValName, varValue))

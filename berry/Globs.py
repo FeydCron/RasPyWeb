@@ -7,6 +7,7 @@ import pickle
 import threading
 
 from collections import deque
+from collections import OrderedDict
 from datetime import datetime
 
 class LogEntry:
@@ -39,30 +40,6 @@ class LogEntry:
 
 class Globs:
 	
-	# -------------------------------------
-	# Allgemeine Einstellungen der Ruhezeit
-	# -------------------------------------
-	#
-	# Anfang der Ruhezeit, Stunde 0...23
-	s_nSilenceFrom = 19
-	#
-	# Ende der Ruhezeit, Stunde 0...23
-	s_nSilenceTo   = 6
-	
-	# --------------------
-	# Uhrzeiteinstellungen
-	# --------------------
-	#
-	# Intervall der akustischen Zeitanzeige/-ansage in Minuten
-	s_nTellTimeInt = 30
-	
-	# -----------------------------
-	# Test- und Debug-Einstellungen
-	# -----------------------------
-	# True 	- Testmodus ein
-	# False	- Testmodus aus
-	s_bTestMode	 = True
-	
 	# ------------------------------------------------
 	# Signalisierung der Art der  Programmterminierung
 	# ------------------------------------------------
@@ -91,43 +68,14 @@ class Globs:
 		# Systemeinstellungen
 		# {"<Eigenschaft>" : "<Wert>"}
 		"System" : {
-			"strLogLvl" : "DBG",		# Aktuelles Log-Level
-			"bTestMode" : False,		# Aktivierung des Testmodus
-			"strHttpIp" : "0.0.0.0",	# IP-Adresse für den HTTP-Server
-			"nHttpPort" : 8081			# Portnummer für den HTTP-Server
-		},
-		# Parameterdefinitionen
-		# {"<Schlüssel>" : {"<Name>" : {"" : ""}}}
-		"ParamDef" : {
-			"System" : {
-				"strLogLvl" : {
-					"title" 		: "Log-Level",
-					"description" 	: "",
-					"default"		: "DBG",
-					"choices"		: {
-						"Ausnahmen"	: "EXC",
-						"Fehler"	: "ERR",
-						"Warnungen"	: "WRN",
-						"Hinweise"	: "INF",
-						"Debugging" : "DBG"
-					},
-				},
-				"bTestMode" : {
-					"title"			: "Testmodus",
-					"description"	: "",
-					"default"		: "False"
-				},
-				"strHttpIp" : {
-					"title"			: "Web-Server IP-Adresse",
-					"description"	: "",
-					"default"		: "0.0.0.0"
-				},
-				"nHttpPort" : {
-					"title"			: "Web-Server TCP-Portnummer",
-					"description"	: "",
-					"default"		: "8081"
-				}
-			},
+			"strLogLvl" 		: "DBG",		# Aktuelles Log-Level
+			"bTestMode" 		: False,		# Aktivierung des Testmodus
+			"strHttpIp" 		: "0.0.0.0",	# IP-Adresse für den HTTP-Server
+			"nHttpPort" 		: 8081,			# Portnummer für den HTTP-Server
+			"strNetInfoName"	: "google.com",	# Computername zum ermitteln der eigenen IP-Adresse
+			"fCpuTempA" 		: 60.0,			# Abschalt-Temperaturgrenze
+			"fCpuTempB" 		: 56.0,			# Kritische Temperaturgrenze
+			"fCpuTempC" 		: 53.0,			# Warn-Temperaturgrenze
 		},
 		# HTTP-Weiterleitungen
 		# {"<ID>" : "<URL>"}
@@ -141,6 +89,78 @@ class Globs:
 			"nTellTimeInt" : 30,
 		}
 	}
+	
+	# Parameterdefinitionen
+	# {"<Schlüssel>" : {"<Name>" : {"" : ""}}}
+	# 
+	# Die Initialisierung über ein normales dict, mit chaotischer Sortierung
+	# macht an dieser Stelle nur deshalb Sinn, weil das Dictionary auf
+	# oberster Ebene nur einen Schlüssel enthält.
+	#
+	s_dictUserSettings = OrderedDict({
+		"System" : {
+			"bTestMode" : {
+				"title"			: "Testmodus",
+				"description"	: ("Der Testmodus ist eine Eigenschaft, die von anderen Modulen "+
+									"oder Programmteilen für Testzwecke verwendet werden kann, "+
+									"um zum Beispiel spezielle Testfunktionen ein- oder auszuschalten."),
+				"default"		: "Aus"
+			},
+			"strHttpIp" : {
+				"title"			: "Web-Server IP-Adresse",
+				"description"	: ("Wenn der Raspberry über mehrere Netzwerkschnittstellen "+
+									"verfügt, kann hier die IP-Adresse eingestellt werden, "+
+									"unter welcher das Web-Interface erreichbar sein soll. "+
+									"ACHTUNG: Eine falsche Einstellung kann das Web-Interface "+
+									"unerreichbar machen!"),
+				"default"		: "0.0.0.0"
+			},
+			"nHttpPort" : {
+				"title"			: "Web-Server TCP-Portnummer",
+				"description"	: ("Die TCP-Portnummer, unter welcher das Web-Interface "+
+									"erreichbar sein soll, kann geändert werden, wenn die "+
+									"Standardeinstellung in Konflikt mit einem anderen Programm "+
+									"steht, welches die TCP-Portnummer für sich  beansprucht. "+
+									"ACHTUNG: Eine falsche Einstellung kann das Web-Interface "+
+									"unerreichbar machen!"),
+				"default"		: "8081"
+			},
+			"strNetInfoName" : {
+				"title"			: "Referenz-Computername",
+				"description"	: ("Die Einstellung legt den Computernamen bzw. dessen "+
+									"IP-Adresse fest, um damit die eigene IP-Adresse "+
+									"ermitteln zu können. Bei vorhandener Internetverbindung "+
+									"kann der Standard beibehalten oder ein anderer "+
+									"namhafter Internet-Host verwendet werden. Steht kein "+
+									"Internet zur Verfügung, muss sich der betreffende "+
+									"Computer im gleichen Netzwerk befinden und erreichbar "+
+									"sein. Ist der Raspberry netzwerktechnisch eine einsame "+
+									"Insel, muss auf localhost bzw. 127.0.0.1 zurückgegriffen werden."),
+				"default"		: "google.com"
+			},
+			"fCpuTempA" : {
+				"title"			: "Temperaturgrenze Notabschaltung",
+				"description"	: ("Legt die Temperaturgrenze für die CPU in Grad Celsius fest, "+
+									"bei deren Überschreitung über einen längeren Zeitraum "+
+									"die Notabschaltung des Systems zu veranlassen ist."),
+				"default"		: "60.0"
+			},
+			"fCpuTempB" : {
+				"title"			: "Temperaturgrenze Kritisch",
+				"description"	: ("Legt die Temperaturgrenze für die CPU in Grad Celsius fest, "+
+									"bei deren Überschreitung jeweils Meldung über die kritische "+
+									"Betriebstemperatur der CPU zu veranlassen ist."),
+				"default"		: "56.0"
+			},
+			"fCpuTempC" : {
+				"title"			: "Temperaturgrenze Warnung",
+				"description"	: ("Legt die Temperaturgrenze für die CPU in Grad Celsius fest, "+
+									"bei deren Überschreitung jeweils Meldung über die hohe "+
+									"Betriebstemperatur der CPU zu veranlassen ist."),
+				"default"		: "53.0"
+			}
+		},
+	})
 	
 	s_dictSystemValues = {
 		"CPU" : {
@@ -483,7 +503,7 @@ class Globs:
 							varNewVal = (("%s" % (varValue)) == "True")
 							oNewType = type(varNewVal)
 						else:
-							varNewVal = oTypeTarget("%s" % (varValue))
+							varNewVal = oOldType("%s" % (varValue))
 							oNewType = type(varNewVal)
 					if varNewVal == None:
 						Globs.err("Konfiguration \"%s\".\"%s\" von \"%s\" %r auf \"%s\" %r ändern: Unverträgliche Datentypen!" % (

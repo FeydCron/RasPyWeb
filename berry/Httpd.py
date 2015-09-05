@@ -270,16 +270,17 @@ class Article(OrderedDict):
 					"Gelb" 		: "warning",
 					"Info" 		: "info",
 					"Neutral"	: ""})
-			for (btnName, oButton) in sorted(self.items()):
+			oHtmlPage.append("<div class=\"ym-fbox\"><span class=\"ym-label\">Schaltflächen bearbeiten</span></div>")
+			for (btnName, oButton) in self.items():
 				oHtmlPage.appendForm("btnEdt",
 					strInput=btnName,
-					strTitle=(oButton.m_strTitle + " <i>(Schaltfläche bearbeiten)</i>"),
+					strTitle=(oButton.m_strTitle),
 					bButton=True,
 					strClass=("%s %s" % (oButton.m_strIcon, oButton.m_strColor)))
 		else:
 			oHtmlPage.createBox(self.m_strTitle, self.m_strMsg,
 				strType=self.m_strType, bClose = False)
-			for (btnName, oButton) in sorted(self.items()):
+			for (btnName, oButton) in self.items():
 				oButton.writeToPage(oHtmlPage)
 			oHtmlPage.closeBox()
 		return
@@ -588,18 +589,6 @@ class TaskDisplaySystem(FutureTask):
 			"Uhrzeit", "<a href=\"%s\">&#x0270E; %s</a>" % (
 				"/system/values.html?edit=time",
 				dt.strftime("%H:%M:%S"))], bFirstIsHead=True)
-		self.m_oHtmlPage.appendTable([
-			"Testmodus", "<a href=\"%s\">&#x0270E; %s</a>" % (
-				"/system/values.html?edit=bTestMode",
-				Globs.getSetting("System", "bTestMode", "True|False", False))], bFirstIsHead=True)
-		self.m_oHtmlPage.appendTable([
-			"Web-Server IP-Adresse", "<a href=\"%s\">&#x0270E; %s</a>" % (
-				"/system/values.html?edit=strHttpIp",
-				Globs.getSetting("System", "strHttpIp"))], bFirstIsHead=True)
-		self.m_oHtmlPage.appendTable([
-			"Web-Server TCP-Portnummer", "<a href=\"%s\">&#x0270E; %s</a>" % (
-				"/system/values.html?edit=nHttpPort",
-				Globs.getSetting("System", "nHttpPort"))], bFirstIsHead=True)
 		# Alle Sektionen durchgehen
 		for (strHeader, dictSection) in sorted(Globs.s_dictSystemValues.items()):
 			# Tabelle mit dem nächsten Tabellenkopf fortsetzen
@@ -629,35 +618,13 @@ class TaskDisplaySystem(FutureTask):
 				"Die Uhrzeit kann unabhängig vom Datum eingestellt werden, wobei " +
 				"die Angabe im Format HH:MM:SS (Stunde, Minute, Sekunde, z.B. %s) erwartet wird." % (varVal),
 				bClose=False)
-		elif self.m_strArg == "test":
-			varVal = Globs.getSetting("System", "bTestMode", "True|False", False)
-			self.m_oHtmlPage.createBox(
-				"Testmodus",
-				"Der Testmodus kann ein- oder ausgeschaltet werden.",
-				bClose=False)
 		else:
-			varVal = Globs.getSetting("System", self.m_strArg)
-			if varVal == None:
-				return False
-			self.m_oHtmlPage.createBox(
-				"Parameter \"%s\" ändern" % (self.m_strArg),
-				"Die Einstellung kann nur übernommen werden, wenn die Angabe dem " +
-				"zugrunde liegendem Datentyp entspricht.",
-				bClose=False)
+			return False
 		
 		self.m_oHtmlPage.openForm(dictTargets={"target" : self.m_strArg})
-		if isinstance(varVal, bool):
-			self.m_oHtmlPage.appendForm(self.m_strArg,
-				strInput="%s" % (varVal),
-				strTitle=self.m_strArg,
-				dictChoice = {
-					"Ein"	: "True",
-					"Aus"	: "False"
-				})
-		else:
-			self.m_oHtmlPage.appendForm(self.m_strArg,
-				strInput="%s" % (varVal),
-				strTitle=self.m_strArg)	
+		self.m_oHtmlPage.appendForm(self.m_strArg,
+			strInput="%s" % (varVal),
+			strTitle=self.m_strArg)	
 		self.m_oHtmlPage.closeForm()
 		self.m_oHtmlPage.closeBox()
 		return True
@@ -684,12 +651,138 @@ class TaskDisplaySystem(FutureTask):
 			except Exception as ex:
 				Globs.exc("Uhrzeit einstellen")
 				strResult = " %s" % (ex)
-		elif Globs.setSetting("System", self.m_strFxn, self.m_strArg):
-			Globs.saveSettings()
-			return True
 		self.m_oHtmlPage.createBox(self.m_strFxn,
 			"Die Einstellung \"%s\" konnte nicht auf den Wert \"%s\" geändert werden.%s" % (
 			self.m_strFxn, self.m_strArg, strResult),
+			strType="warning")
+		return False
+		
+class TaskDisplaySettings(FutureTask):
+	
+	def __init__(self, oWorker, oHtmlPage, strFxn = "", strVal = "", strKey = ""):
+		super(TaskDisplaySettings, self).__init__(oWorker)
+		self.m_oHtmlPage = oHtmlPage
+		self.m_strFxn = strFxn
+		self.m_strVal = strVal
+		self.m_strKey = strKey
+		return
+		
+	def __str__(self):
+		strDesc = "Darstellen der Konfiguration"
+		return  strDesc
+		
+	def do(self):
+		if (self.m_strFxn and self.m_strFxn == "edit" and self.m_strVal and self.m_strKey):
+			if self.createForm():
+				return
+		elif (self.m_strFxn and self.m_strVal and self.m_strKey):
+			if not self.updateValue():
+				return
+		self.displayValues()
+		return
+		
+	def displayValues(self):
+		# >>> Critical Section
+		Globs.s_oSettingsLock.acquire()
+		try:
+			bOpened = False
+			for (strKey, dictValues) in Globs.s_dictUserSettings.items():
+				if strKey in Globs.s_dictSettings and Globs.s_dictSettings[strKey]:
+					if bOpened:
+						self.m_oHtmlPage.appendHeader([strKey, ""])
+					else:
+						bOpened = True
+						self.m_oHtmlPage.openTable("Konfigurationseinstellungen",
+							[strKey, ""], True, True)
+					for (strValueName, dictProperties) in sorted(dictValues.items()):
+						if strValueName in Globs.s_dictSettings[strKey]:
+							strTitle = strValueName
+							if ("title" in dictProperties):
+								strTitle = dictProperties["title"]
+							self.m_oHtmlPage.appendTable([
+								strTitle,
+								"<a href=\"%s?edit=%s&key=%s\">&#x0270E; %s</a>" % (
+									"/system/settings.html", strValueName, strKey, Globs.s_dictSettings[strKey][strValueName])
+								], bFirstIsHead=True)
+			if bOpened:
+				self.m_oHtmlPage.closeTable()
+		except:
+			Globs.exc("Darstellen der Konfiguration")
+		Globs.s_oSettingsLock.release()
+		# <<< Critical Section
+		return
+		
+	def createForm(self):
+		dictValue = None
+		dictProperties = None
+		dictChoices = {}
+		strTitle = self.m_strVal
+		strDesc = ""
+		strDefault = ""
+		varVal = None
+		# >>> Critical Section
+		Globs.s_oSettingsLock.acquire()
+		try:
+			if (self.m_strKey in Globs.s_dictUserSettings
+				and self.m_strKey in Globs.s_dictSettings
+				and self.m_strVal in Globs.s_dictSettings[self.m_strKey]
+				and self.m_strKey not in (
+				"dictModules", "listInactiveModules", "Redirects")):
+				dictValues = Globs.s_dictUserSettings[self.m_strKey]
+				varVal = Globs.s_dictSettings[self.m_strKey][self.m_strVal]
+				strDefault = "%s" % (varVal)
+			if dictValues and self.m_strVal in dictValues:
+				dictProperties = dictValues[self.m_strVal]
+			if dictProperties:
+				if "title" in dictProperties:
+					strTitle = dictProperties["title"]
+				if "description" in dictProperties:
+					strDesc = dictProperties["description"]
+				if "default" in dictProperties:
+					strDefault = dictProperties["default"]
+				if "choices" in dictProperties:
+					dictChoices = dictProperties["choices"]
+		except:
+			Globs.exc("Ändern der Konfiguration")
+			varVal = None
+		Globs.s_oSettingsLock.release()
+		# <<< Critical Section
+		if varVal == None:
+			return False
+		if strDesc:
+			strDesc += " "
+		strDesc += "Der Standardwert für die Einstellung ist %s." % (strDefault)
+		self.m_oHtmlPage.createBox(
+			strTitle, strDesc, bClose=False)
+		self.m_oHtmlPage.openForm(dictTargets={
+			"target" 	: self.m_strVal,
+			"key" 		: self.m_strKey
+		})
+		if isinstance(varVal, bool):
+			self.m_oHtmlPage.appendForm(self.m_strVal,
+				strInput="%s" % (varVal),
+				strTitle=strTitle,
+				dictChoice = {
+					"Ein"	: "True",
+					"Aus"	: "False"
+				})
+		else:
+			self.m_oHtmlPage.appendForm(self.m_strVal,
+				strInput="%s" % (varVal),
+				strTitle=strTitle,
+				dictChoice = dictChoices)	
+		self.m_oHtmlPage.closeForm()
+		self.m_oHtmlPage.closeBox()
+		return True
+		
+	def updateValue(self):
+		strResult = ""
+		if Globs.setSetting(self.m_strKey, self.m_strFxn, self.m_strVal):
+			Globs.saveSettings()
+			return True
+		self.m_oHtmlPage.createBox(self.m_strFxn,
+			"Die Einstellung \"%s\" konnte nicht auf den Wert \"%s\" geändert werden." % (
+			self.m_strFxn, self.m_strVal),
 			strType="warning")
 		return False
 
@@ -1148,7 +1241,21 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 	def serveGet(self, strPath, oHtmlPage = None, dictQuery = None):
 		try:
 			oFutureTask = None
-			if strPath == "/system/values.html":
+			if strPath == "/system/settings.html":
+				strFxn = ""
+				strVal = ""
+				strKey = ""
+				if dictQuery and "edit" in dictQuery and "key" in dictQuery:
+					strFxn = "edit"
+					strVal = dictQuery[strFxn]
+					strKey = dictQuery["key"]
+				oHtmlPage = HtmlPage(strPath,
+					strTitle = "Konfigurationseinstellungen")
+				oFutureTask = TaskDisplaySettings(g_oHttpdWorker, oHtmlPage,
+					strFxn=strFxn,
+					strVal=strVal,
+					strKey=strKey)
+			elif strPath == "/system/values.html":
 				nAutoRefresh = 10
 				strFxn = ""
 				strArg = ""
@@ -1217,6 +1324,21 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				strMode = oForm.getfirst("mode")
 				oFutureTask = TaskDisplayLogMem(g_oHttpdWorker,
 					oHtmlPage, strMode)
+				if oFutureTask.start():
+					oFutureTask.wait()
+				else:
+					oHtmlPage = None
+			elif (strPath == "/system/settings.html"
+				and "target" in oForm
+				and "key" in oForm):
+				oHtmlPage = HtmlPage(strPath, strTitle = "Konfigurationseinstellungen")
+				strFxn = oForm.getfirst("target")
+				strKey = oForm.getfirst("key")
+				strVal = ""
+				if strFxn in oForm:
+					strVal = oForm.getfirst(strFxn)
+				oFutureTask = TaskDisplaySettings(g_oHttpdWorker,
+					oHtmlPage, strFxn=strFxn, strVal=strVal, strKey=strKey)
 				if oFutureTask.start():
 					oFutureTask.wait()
 				else:

@@ -76,6 +76,7 @@ class TaskSystemWatchDog(FastTask):
 	s_fCpuUseAvg = 0.0
 	s_strIpAddr = ""
 	s_nCpuTooHot = 0
+	s_nIpFailCnt = 0
 	s_bCpuTempWrn = False
 	s_bHistory = False
 	
@@ -94,15 +95,21 @@ class TaskSystemWatchDog(FastTask):
 			fCpuUse = 0.0
 		# IP-Adresse ermitteln
 		if not TaskSystemWatchDog.s_strIpAddr:
-			TaskSystemWatchDog.s_strIpAddr = SDK.getNetworkInfo()
+			TaskSystemWatchDog.s_strIpAddr = SDK.getNetworkInfo(
+				Globs.getSetting("System", "strNetInfoName"))
 			if TaskSystemWatchDog.s_strIpAddr:
-				pass
 				TaskSpeak(self.m_oWorker,
 				"Die aktuelle Netzwerkadresse ist: %s" % (
 				TaskSystemWatchDog.s_strIpAddr.replace(".", " Punkt "))).start()
-			else:
+			elif TaskSystemWatchDog.s_nIpFailCnt < 4:
+				TaskSystemWatchDog.s_nIpFailCnt += 1
 				TaskSpeak(self.m_oWorker,
 				"Die aktuelle Netzwerkadresse konnte nicht ermittelt werden.").start()
+			else:
+				TaskSystemWatchDog.s_strIpAddr = "127.0.0.1"
+				TaskSpeak(self.m_oWorker,
+				"Die Netzwerkadresse kann nicht ermittelt werden, daher wird %s angenommen." % (
+				TaskSystemWatchDog.s_strIpAddr.replace(".", " Punkt "))).start()
 		# CPU-Statistik erstellen
 		if not TaskSystemWatchDog.s_bHistory:
 			# Statistik initialisieren
@@ -169,7 +176,7 @@ class TaskSystemWatchDog(FastTask):
 		# CPU-Temperatur auswerten
 		strCpuTemp = ("%0.1f Grad" % (TaskSystemWatchDog.s_fCpuTempAvg)
 			).replace(".", " Komma ")
-		if TaskSystemWatchDog.s_fCpuTempAvg > 60.0:
+		if TaskSystemWatchDog.s_fCpuTempAvg > Globs.getSetting("System", "fCpuTempA", "\\d{2,}\\.\\d+", 60.0):
 			TaskSystemWatchDog.s_bCpuTempWrn = True
 			TaskSystemWatchDog.s_nCpuTooHot += 1
 			TaskSpeak(self.m_oWorker, "Achtung!").start()
@@ -183,14 +190,14 @@ class TaskSystemWatchDog(FastTask):
 				TaskSpeak(self.m_oWorker,
 					"Notabschaltung zu %s Prozent wahrscheinlich!" % (
 					TaskSystemWatchDog.s_nCpuTooHot * 10)).start()
-		elif TaskSystemWatchDog.s_fCpuTempAvg > 56.0:
+		elif TaskSystemWatchDog.s_fCpuTempAvg > Globs.getSetting("System", "fCpuTempB", "\\d{2,}\\.\\d+", 56.0):
 			TaskSystemWatchDog.s_bCpuTempWrn = True
 			if TaskSystemWatchDog.s_nCpuTooHot > 0:
 				TaskSystemWatchDog.s_nCpuTooHot -= 1
 			TaskSpeak(self.m_oWorker,
 				"Die Temperatur ist mit %s zu hoch!" % (
 				strCpuTemp)).start()
-		elif TaskSystemWatchDog.s_fCpuTempAvg > 53.0:
+		elif TaskSystemWatchDog.s_fCpuTempAvg > Globs.getSetting("System", "fCpuTempC", "\\d{2,}\\.\\d+", 53.0):
 			TaskSystemWatchDog.s_bCpuTempWrn = True
 			TaskSystemWatchDog.s_nCpuTooHot = 0
 			TaskSpeak(self.m_oWorker,
@@ -260,8 +267,26 @@ class TaskModuleInit(FutureTask):
 				return
 			# Module instanziieren
 			oInstance = clsModule(self.m_oWorker)
-			if not oInstance.moduleInit():
-				strMsg = "Das Modul %s konnte nicht initialisiert werden." % (self.m_strComponent)
+			# >>> Critical Section
+			Globs.s_oSettingsLock.acquire()
+			if self.m_strComponent not in Globs.s_dictSettings:
+				Globs.s_dictSettings.update({self.m_strComponent : {}})
+			dictModCfg = Globs.s_dictSettings[self.m_strComponent]
+			Globs.s_oSettingsLock.release()
+			# <<< Critical Section
+			dictCfgUsr = {}
+			try:
+				if not oInstance.moduleInit(dictModCfg=dictModCfg, dictCfgUsr=dictCfgUsr):
+					strMsg = "Das Modul %s konnte nicht initialisiert werden." % (self.m_strComponent)
+					TaskSpeak(self.m_oWorker, strMsg).start()
+					print(strMsg)
+					if self.m_oHtmlPage:
+						self.m_oHtmlPage.createBox(self.m_strComponent, strMsg, strType="warning")
+					return
+			except:
+				Globs.exc("Verwalten des Moduls %s" % (self.m_strComponent))
+				strMsg = "Das Modul %s konnte nicht initialisiert werden. Wahrscheinlich ist es veraltet und nicht mehr kompatibel." % (
+					self.m_strComponent)
 				TaskSpeak(self.m_oWorker, strMsg).start()
 				print(strMsg)
 				if self.m_oHtmlPage:
@@ -269,6 +294,7 @@ class TaskModuleInit(FutureTask):
 				return
 			# Module registrieren
 			self.m_oWorker.m_dictModules.update({self.m_strComponent : oInstance})
+			Globs.s_dictUserSettings.update({self.m_strComponent : dictCfgUsr})
 			return
 		if (self.m_strComponent not in Globs.s_dictSettings["dictModules"]):
 			strMsg = "Das Modul %s wurde dauerhaft entfernt." % (self.m_strComponent)

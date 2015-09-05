@@ -80,11 +80,11 @@ def getCpuUse():
 	return strResult
 	
 # Liefert die aktuelle IP-Adresse zurück
-def getNetworkInfo():
+def getNetworkInfo(strComputerName="google.com"):
 	strIpAddr = ""
 	try:
 		oSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		oSocket.connect(("google.com", 0))
+		oSocket.connect((strComputerName, 0))
 		strIpAddr = oSocket.getsockname()[0]
 		oSocket.close()
 	except:
@@ -578,7 +578,11 @@ class ModuleBase:
 	def getWorker(self):
 		return self.m_oWorker
 		
-	def moduleInit(self):
+	## Modulinitialisierung
+	# @param self This-Pointer
+	# @param dictModCfg Modulkonfiguration {<"Param"> : <Value>}
+	# @param dictCfgUsr Konfigurationsbeschreibung {<"Param"> : {<"(title|description|default|choice)"> : <"Value"|{<"Choice"> : <"Value">}>}}
+	def moduleInit(self, dictModCfg={}, dictCfgUsr={}):
 		return True
 		
 	def moduleExit(self):

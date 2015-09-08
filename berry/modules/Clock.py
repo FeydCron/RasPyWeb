@@ -10,11 +10,12 @@ from SDK import TaskSpeak
 class Clock(ModuleBase):
 	
 	def moduleInit(self, dictModCfg={}, dictCfgUsr={}):
-		dictModCfg.update({
-			"nSilenceFrom" : 19,
-			"nSilenceTo" : 6,
-			"nTellTimeInt" : 30,
-		})
+		if not dictModCfg:
+			dictModCfg.update({
+				"nSilenceFrom" : 19,
+				"nSilenceTo" : 6,
+				"nTellTimeInt" : 30,
+			})
 		dictCfgUsr.update({
 			"nSilenceFrom" : {
 				"title"			: "Beginn der Ruhezeit",
@@ -102,10 +103,10 @@ class Clock(ModuleBase):
 		if (self.m_nMinutes % self.m_nTellTimeInt) == 0:
 			if self.m_nMinutes == 0:
 				nCount = self.m_nHour12h
-			elif self.m_nTellTimeInt == 30:
+			elif self.m_nTellTimeInt == 30 or self.m_nTellTimeInt == 5:
 				nCount = 1
 			else:
-				nCount = self.m_nMinutes / self.m_nTellTimeInt
+				nCount = int(self.m_nMinutes / 15)
 		# Testmodus berücksichtigen
 		if (nCount == 0 and Globs.getSetting("System", "bTestMode", "True|False", False)):
 			nCount = 1
@@ -120,7 +121,7 @@ class Clock(ModuleBase):
 			return
 		self.m_nTimeSpoken += 1
 		# Zeitansage in Bezug auf nächste volle Stunde zusammenbasteln
-		strPart = "genau"
+		strPart = ""
 		strNext = "viertel"
 		strHour = "Uhr"
 		nHour = self.m_nHour12h

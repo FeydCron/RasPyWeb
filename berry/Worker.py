@@ -232,12 +232,11 @@ class TaskLoadSettings(FastTask):
 			TaskModuleInit(self.m_oWorker, strComponent).start()
 		return
 		
-class TaskModuleInit(FutureTask):
+class TaskModuleInit(FastTask):
 	
-	def __init__(self, oWorker, strComponent, oHtmlPage = None):
+	def __init__(self, oWorker, strComponent):
 		super(TaskModuleInit, self).__init__(oWorker)
 		self.m_strComponent = strComponent
-		self.m_oHtmlPage = oHtmlPage
 		return
 		
 	def __str__(self):
@@ -260,10 +259,8 @@ class TaskModuleInit(FutureTask):
 			if not clsModule:
 				strMsg = "Das Modul %s kann nicht geladen werden. Wahrscheinlich sind die Einstellungen falsch." % (
 					self.m_strComponent)
+				Globs.wrn(strMsg)
 				TaskSpeak(self.m_oWorker, strMsg).start()
-				print(strMsg)
-				if self.m_oHtmlPage:
-					self.m_oHtmlPage.createBox(self.m_strComponent, strMsg, strType="error")
 				return
 			# Module instanziieren
 			oInstance = clsModule(self.m_oWorker)
@@ -278,19 +275,15 @@ class TaskModuleInit(FutureTask):
 			try:
 				if not oInstance.moduleInit(dictModCfg=dictModCfg, dictCfgUsr=dictCfgUsr):
 					strMsg = "Das Modul %s konnte nicht initialisiert werden." % (self.m_strComponent)
+					Globs.wrn(strMsg)
 					TaskSpeak(self.m_oWorker, strMsg).start()
-					print(strMsg)
-					if self.m_oHtmlPage:
-						self.m_oHtmlPage.createBox(self.m_strComponent, strMsg, strType="warning")
 					return
 			except:
 				Globs.exc("Verwalten des Moduls %s" % (self.m_strComponent))
 				strMsg = "Das Modul %s konnte nicht initialisiert werden. Wahrscheinlich ist es veraltet und nicht mehr kompatibel." % (
 					self.m_strComponent)
+				Globs.wrn(strMsg)
 				TaskSpeak(self.m_oWorker, strMsg).start()
-				print(strMsg)
-				if self.m_oHtmlPage:
-					self.m_oHtmlPage.createBox(self.m_strComponent, strMsg, strType="warning")
 				return
 			# Module registrieren
 			self.m_oWorker.m_dictModules.update({self.m_strComponent : oInstance})
@@ -298,16 +291,16 @@ class TaskModuleInit(FutureTask):
 			return
 		if (self.m_strComponent not in Globs.s_dictSettings["dictModules"]):
 			strMsg = "Das Modul %s wurde dauerhaft entfernt." % (self.m_strComponent)
+			Globs.log(strMsg)
 			TaskSpeak(self.m_oWorker, strMsg).start()
-			print(strMsg)
-			if self.m_oHtmlPage:					
-				self.m_oHtmlPage.createBox("Hinweis", strMsg)
 			return
 		strMsg = "Das Modul %s wurde ausgeschaltet" % (self.m_strComponent)
 		if (bUnloaded):
 			strMsg += " und entladen"
 		strMsg += "."
+		Globs.log(strMsg)
 		TaskSpeak(self.m_oWorker, strMsg).start()
+		Globs.log(strMsg)
 		return
 		
 class TaskQueueFastStop(FastTask):

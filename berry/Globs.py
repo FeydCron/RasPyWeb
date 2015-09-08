@@ -1,4 +1,5 @@
 import io
+import os
 import sys
 import json
 import re
@@ -76,17 +77,12 @@ class Globs:
 			"fCpuTempA" 		: 60.0,			# Abschalt-Temperaturgrenze
 			"fCpuTempB" 		: 56.0,			# Kritische Temperaturgrenze
 			"fCpuTempC" 		: 53.0,			# Warn-Temperaturgrenze
+			"strSoundLocation"	: "/usr/share/scratch/Media/Sounds",
 		},
 		# HTTP-Weiterleitungen
 		# {"<ID>" : "<URL>"}
 		"Redirects" : {
 			"startpage" : "/system/startpage.html"
-		},
-		# Modulspezifische Einstellungen
-		"Clock" : {
-			"nSilenceFrom" : 19,
-			"nSilenceTo" : 6,
-			"nTellTimeInt" : 30,
 		}
 	}
 	
@@ -158,6 +154,14 @@ class Globs:
 									"bei deren Überschreitung jeweils Meldung über die hohe "+
 									"Betriebstemperatur der CPU zu veranlassen ist."),
 				"default"		: "53.0"
+			},
+			"strSoundLocation" : {
+				"title"			: "Sound-Datei Ablageort",
+				"description"	: ("Legt den Ablageort der Sound-Dateien fest, die für das System, "+
+									"zur Verfügung stehen sollen. Beim Installieren neuer Sounds "+
+									"werden diese dort abgelegt, gegebenenfalls auch in neuen "+
+									"Unterordnern zur Kategorisierung."),
+				"default"		: "/usr/share/scratch/Media/Sounds"
 			}
 		},
 	})
@@ -227,7 +231,8 @@ class Globs:
 		return oComponent
 	
 	def loadSettings():
-		
+		# >>> Critical Section
+		Globs.s_oSettingsLock.acquire()
 		# Einstellungen lesen
 		try:
 			foFile = open(Globs.s_strConfigFile, "r")
@@ -242,6 +247,8 @@ class Globs:
 		except:
 			Globs.exc("Laden der Einstellungen von %s" % (
 				Globs.s_strConfigFile))
+		Globs.s_oSettingsLock.release()
+		# <<< Critical Section
 				
 		# Fehlerspeicher wiederherstellen
 		oLogMem = None
@@ -269,7 +276,7 @@ class Globs:
 			if ("strLogLvl" in Globs.s_dictSettings["System"]):
 				Globs.setLogLvl(Globs.s_dictSettings["System"]["strLogLvl"])
 				
-		#Startseite lesen
+		# Startseite lesen
 		try:
 			with open(Globs.s_strStartPageFile, "rb") as f:
 				Globs.s_oStartPage = pickle.load(f)
@@ -277,12 +284,18 @@ class Globs:
 			Globs.exc("Laden der Startseite von %s" % (
 				Globs.s_strStartPageFile))
 				
+		# Sounds einmalig scannen
+		Globs.scanSoundFiles(
+			Globs.getSetting("System", "strSoundLocation",
+				varDefault="/usr/share/scratch/Media/Sounds"))
+				
 		Globs.log("Konfiguration: %r" % (Globs.s_dictSettings))
 		Globs.log("Startseite: %r" % (Globs.s_oStartPage))
 		return
 		
 	def saveSettings():
-	
+		# >>> Critical Section
+		Globs.s_oSettingsLock.acquire()
 		# Einstellungen vorbereiten
 		if (not "System" in Globs.s_dictSettings):
 			Globs.s_dictSettings.update({"System" : {}})
@@ -290,7 +303,6 @@ class Globs:
 		Globs.s_dictSettings["System"].update({
 			"strLogLvl" : Globs.getLogLvl()
 		})
-		
 		# Einstellungen speichern
 		try:
 			foFile = open(Globs.s_strConfigFile, "w")
@@ -299,6 +311,8 @@ class Globs:
 		except:
 			Globs.exc("Speichern der Einstellungen in %s" % (
 				Globs.s_strConfigFile))
+		Globs.s_oSettingsLock.release()
+		# <<< Critical Section
 		
 		# Fehlerspeicher speichern
 		# >>> Critical Section
@@ -323,6 +337,58 @@ class Globs:
 				Globs.exc("Speichern der Startseite in %s" % (
 					Globs.s_strStartPageFile))
 			
+		return
+		
+	def scanSoundFiles(strDir=".", bRescan=False, bClear=False):
+		# >>> Critical Section
+		Globs.s_oSettingsLock.acquire()
+		try:
+			if "Sounds" not in Globs.s_dictSettings:
+				bRescan = True
+			elif bClear:
+				Globs.s_dictSettings["Sounds"].clear()
+				bRescan = True
+		except:
+			Globs.exc("Sound-Dateien in '%s' scannen" % (strDir))
+		Globs.s_oSettingsLock.release()
+		# <<< Critical Section
+		if not bRescan:
+			return
+		# Verzeichnisstruktur scannen (Kategorie, Datei)
+		for strCategory in os.listdir(strDir):
+			strFile = None
+			strPath = os.path.join(strDir, strCategory)
+			if os.path.isdir(strPath):
+				for strEntry in os.listdir(strPath):
+					strFile = os.path.join(strPath, strEntry)
+					if os.path.isfile(strFile):
+						Globs.registerSoundFile(strFile, strCategory)
+			elif os.path.isfile(strPath):
+				strFile = strPath
+				Globs.registerSoundFile(strFile)
+		return
+		
+	def registerSoundFile(strFile, strCategory="Default"):
+		strHead, strTail = os.path.split(strFile)
+		if not strTail:
+			return
+		strName, strExt = os.path.splitext(strTail)
+		if not strExt or not strName:
+			return
+		if not re.match("\\.([Ww][Aa][Vv]|[Mm][Pp]3)", strExt):
+			return
+		# >>> Critical Section
+		Globs.s_oSettingsLock.acquire()
+		try:
+			if "Sounds" not in Globs.s_dictSettings:
+				Globs.s_dictSettings.update({"Sounds" : {}})
+			if not strCategory in Globs.s_dictSettings["Sounds"]:
+				Globs.s_dictSettings["Sounds"].update({strCategory : {}})
+			Globs.s_dictSettings["Sounds"][strCategory].update({strName : strFile})
+		except:
+			Globs.exc("Sound-Datei '%s' registrieren" % (strFile))
+		Globs.s_oSettingsLock.release()
+		# <<< Critical Section
 		return
 		
 	def dbg(strText):

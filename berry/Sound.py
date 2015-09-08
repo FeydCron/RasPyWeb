@@ -1,5 +1,8 @@
 import os
 import os.path
+import re
+
+from Globs import Globs
 
 class Sound:
 	# Animal/           
@@ -74,33 +77,50 @@ class Sound:
 	
 	# Sound abspielen
 	def sound(self, strSound):
-		strFile = "/usr/share/scratch/Media/Sounds"
+		strFile = None
 		strPlay = "aplay"
 	    
-		for strDir, listSounds in self.s_sounds.items():
-			if strSound in listSounds:
-				strFile += "/" + strDir + "/" + strSound
-				break
-	
-		if os.path.isfile(strFile + ".wav"):
-			strFile += ".wav"
-			strPlay = "aplay"
-		elif os.path.isfile(strFile + ".mp3"):
-			strFile += ".mp3"
-			strPlay = "omxplayer"
-		else:
-			strFile = "/usr/share/scratch/Media/Sounds/Electronic/ComputerBeeps2.wav"
+		# >>> Critical Section
+		Globs.s_oSettingsLock.acquire()
+		try:
+			if "Sounds" in Globs.s_dictSettings:
+				# Direkte Übereinstimmung finden
+				for (strCategory, dictSounds) in Globs.s_dictSettings["Sounds"].items():
+					if strSound in dictSounds:
+						strFile = Globs.s_dictSettings["Sounds"][strCategory][strSound]
+						break
+				# Partiellen Treffer finden
+				for (strCategory, dictSounds) in Globs.s_dictSettings["Sounds"].items():
+					for (strName, strPath) in dictSounds.items():
+						if re.match(".*" + strSound + ".*", strName):
+							Globs.log("Sound '%s' für angeforderten Sound '%s' verwendet." % (
+								strName, strSound))
+							strFile = strPath
+							break
+		except:
+			Globs.exc("Sound '%s' finden" % (strSound))
+		Globs.s_oSettingsLock.release()
+		# <<< Critical Section
+		
+		if not strFile:
+			Globs.wrn("Der angeforderte Sound konnte nicht gefunden werden: '%s'" % (strSound))
+			print("\\a")
+			return
 	
 		if os.path.isfile(strFile):
-			print('Now playing: "%s" <%s>' %(strSound, strFile))
-			os.system('%s "%s"' %(strPlay, strFile))
+			if re.match(".*\\.[Ww][Aa][Vv]", strFile):
+				strPlay = "aplay"
+			elif re.match(".*\\.[Mm][Pp]3", strFile):
+				strPlay = "omxplayer"
+			else:
+				Globs.wrn("Das Format der Sound-Datei wird nicht unterstützt: '%s'" % (strFile))
+				print("\\a")
+				return
 		else:
-			print("*** Error: File <%s> not found!" %strFile);
-		return
-	
-	# Testroutine für Sound abspielen
-	def testSound(self):
-		for strKey, listSounds in self.s_sounds.items():
-			for strSound in listSounds:
-				sound(strSound)
+			Globs.wrn("Die Datei des angeforderten Sounds ist ungültig: '%s'" % (strFile))
+			print("\\a")
+			return
+			
+		print("Now playing: '%s' <%s>" %(strSound, strFile))
+		os.system('%s "%s"' %(strPlay, strFile))
 		return

@@ -14,9 +14,9 @@ VERBOSE = 0
 class AMatisGPIO(ModuleBase):
 	
 	def moduleInit(self, dictModCfg={}, dictCfgUsr={}):
-		global status
+		global STATUS
 		
-		status = 1
+		STATUS = 1
 		
 		print('init PI ' + str(IO.RPI_REVISION) + ' V'  + str(IO.VERSION))
 		IO.setmode(IO.BOARD)
@@ -38,12 +38,12 @@ class AMatisGPIO(ModuleBase):
 		return True
 		
 	def moduleExit(self):
-		global status
+		global STATUS
 		
-		IO.cleanup()		
-		status = 0
+		STATUS = 0
 		self.t1.join()
 		self.t2.join()
+		IO.cleanup()		
 		return True
 		
 	def moduleExec(self, strPath, strCmd, strArg):
@@ -97,7 +97,7 @@ class DuoLed:
       self.IO.output((self.r,self.g),1)
   #class DuoLed
   
-status=1
+STATUS=1
 I0 = 24
 I1 = 26
 QAR = 7
@@ -130,8 +130,9 @@ PORT = 80
 isAlive = 0
 
 def setLeds(leds):
+  global STATUS
   print('setLeds' + str(bin(leds)))
-  if(status > 0):
+  if(STATUS > 0):
     IO.output(Q0r,(leds>>1)&1)
     IO.output(QRel,(leds>>0)&1)
     IO.output(Q0g,(leds>>0)&1)
@@ -143,7 +144,8 @@ def setLeds(leds):
     IO.output(Q3g,(leds>>6)&1)
 
 def ampel(ryg):
-  if(status > 0):
+  global STATUS
+  if(STATUS > 0):
     if(ryg == 'r' or ryg == 'R'):
       IO.output([QAR],1)
     elif(ryg == 'y' or ryg == 'Y'):
@@ -155,7 +157,8 @@ def ampel(ryg):
 
 
 def alarm(al):
-  if(status > 0):
+  global STATUS
+  if(STATUS > 0):
     if(al == 'on' or al == '1'):
       IO.output(QRel,1)
     elif(al == 'o' or al == 'O' or al == '0'):
@@ -167,7 +170,8 @@ def setAlive():
     isAlive = isAlive+1
 
 def alive():
-  if(status > 0):
+  global STATUS
+  if(STATUS > 0):
     if(isAlive > 1):
       IO.output([QAG],1)
     else:
@@ -175,7 +179,8 @@ def alive():
       IO.output([QAR],1)
 
 def status(st):
-  if(status > 0):
+  global STATUS
+  if(STATUS > 0):
     ls = list(st)
     L0.set(ls[0])
     L1.set(ls[1])
@@ -199,7 +204,8 @@ def sysCall(cmd):
     print(e)
 	
 def heartBeat():
-  while(status != 0):
+  global STATUS
+  while(STATUS != 0):
     on=0.5
     #getCPUuse()
     #off=(((60.0/(getCpuTemp()-20)))*1.5)-on
@@ -211,9 +217,9 @@ def heartBeat():
     time.sleep(on)
 	
 def checkAlive():
-  global isAlive
+  global isAlive, STATUS
   i=0
-  while(status != 0):
+  while(STATUS != 0):
     time.sleep(1.0)
     if(i>7200):
       i=0

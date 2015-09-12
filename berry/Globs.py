@@ -1,4 +1,5 @@
 import io
+import os
 import sys
 import json
 import re
@@ -7,6 +8,7 @@ import pickle
 import threading
 
 from collections import deque
+from collections import OrderedDict
 from datetime import datetime
 
 class LogEntry:
@@ -39,30 +41,6 @@ class LogEntry:
 
 class Globs:
 	
-	# -------------------------------------
-	# Allgemeine Einstellungen der Ruhezeit
-	# -------------------------------------
-	#
-	# Anfang der Ruhezeit, Stunde 0...23
-	s_nSilenceFrom = 19
-	#
-	# Ende der Ruhezeit, Stunde 0...23
-	s_nSilenceTo   = 6
-	
-	# --------------------
-	# Uhrzeiteinstellungen
-	# --------------------
-	#
-	# Intervall der akustischen Zeitanzeige/-ansage in Minuten
-	s_nTellTimeInt = 30
-	
-	# -----------------------------
-	# Test- und Debug-Einstellungen
-	# -----------------------------
-	# True 	- Testmodus ein
-	# False	- Testmodus aus
-	s_bTestMode	 = True
-	
 	# ------------------------------------------------
 	# Signalisierung der Art der  Programmterminierung
 	# ------------------------------------------------
@@ -91,23 +69,102 @@ class Globs:
 		# Systemeinstellungen
 		# {"<Eigenschaft>" : "<Wert>"}
 		"System" : {
-			"strLogLvl" : "DBG",		# Aktuelles Log-Level
-			"bTestMode" : True,			# Aktivierung des Testmodus
-			"strHttpIp" : "0.0.0.0",	# IP-Adresse für den HTTP-Server
-			"nHttpPort" : 8081			# Portnummer für den HTTP-Server
+			"strLogLvl" 		: "DBG",		# Aktuelles Log-Level
+			"bTestMode" 		: False,		# Aktivierung des Testmodus
+			"strHttpIp" 		: "0.0.0.0",	# IP-Adresse für den HTTP-Server
+			"nHttpPort" 		: 8081,			# Portnummer für den HTTP-Server
+			"strNetInfoName"	: "google.com",	# Computername zum ermitteln der eigenen IP-Adresse
+			"fCpuTempA" 		: 60.0,			# Abschalt-Temperaturgrenze
+			"fCpuTempB" 		: 56.0,			# Kritische Temperaturgrenze
+			"fCpuTempC" 		: 53.0,			# Warn-Temperaturgrenze
+			"strSoundLocation"	: "/usr/share/scratch/Media/Sounds",
 		},
 		# HTTP-Weiterleitungen
 		# {"<ID>" : "<URL>"}
 		"Redirects" : {
 			"startpage" : "/system/startpage.html"
-		},
-		# Modulspezifische Einstellungen
-		"Clock" : {
-			"nSilenceFrom" : 19,
-			"nSilenceTo" : 6,
-			"nTellTimeInt" : 30,
 		}
 	}
+	
+	# Parameterdefinitionen
+	# {"<Schlüssel>" : {"<Name>" : {"" : ""}}}
+	# 
+	# Die Initialisierung über ein normales dict, mit chaotischer Sortierung
+	# macht an dieser Stelle nur deshalb Sinn, weil das Dictionary auf
+	# oberster Ebene nur einen Schlüssel enthält.
+	#
+	s_dictUserSettings = OrderedDict({
+		"System" : {
+			"bTestMode" : {
+				"title"			: "Testmodus",
+				"description"	: ("Der Testmodus ist eine Eigenschaft, die von anderen Modulen "+
+									"oder Programmteilen für Testzwecke verwendet werden kann, "+
+									"um zum Beispiel spezielle Testfunktionen ein- oder auszuschalten."),
+				"default"		: "Aus"
+			},
+			"strHttpIp" : {
+				"title"			: "Web-Server IP-Adresse",
+				"description"	: ("Wenn der Raspberry über mehrere Netzwerkschnittstellen "+
+									"verfügt, kann hier die IP-Adresse eingestellt werden, "+
+									"unter welcher das Web-Interface erreichbar sein soll. "+
+									"ACHTUNG: Eine falsche Einstellung kann das Web-Interface "+
+									"unerreichbar machen!"),
+				"default"		: "0.0.0.0"
+			},
+			"nHttpPort" : {
+				"title"			: "Web-Server TCP-Portnummer",
+				"description"	: ("Die TCP-Portnummer, unter welcher das Web-Interface "+
+									"erreichbar sein soll, kann geändert werden, wenn die "+
+									"Standardeinstellung in Konflikt mit einem anderen Programm "+
+									"steht, welches die TCP-Portnummer für sich  beansprucht. "+
+									"ACHTUNG: Eine falsche Einstellung kann das Web-Interface "+
+									"unerreichbar machen!"),
+				"default"		: "8081"
+			},
+			"strNetInfoName" : {
+				"title"			: "Referenz-Computername",
+				"description"	: ("Die Einstellung legt den Computernamen bzw. dessen "+
+									"IP-Adresse fest, um damit die eigene IP-Adresse "+
+									"ermitteln zu können. Bei vorhandener Internetverbindung "+
+									"kann der Standard beibehalten oder ein anderer "+
+									"namhafter Internet-Host verwendet werden. Steht kein "+
+									"Internet zur Verfügung, muss sich der betreffende "+
+									"Computer im gleichen Netzwerk befinden und erreichbar "+
+									"sein. Ist der Raspberry netzwerktechnisch eine einsame "+
+									"Insel, muss auf localhost bzw. 127.0.0.1 zurückgegriffen werden."),
+				"default"		: "google.com"
+			},
+			"fCpuTempA" : {
+				"title"			: "Temperaturgrenze Notabschaltung",
+				"description"	: ("Legt die Temperaturgrenze für die CPU in Grad Celsius fest, "+
+									"bei deren Überschreitung über einen längeren Zeitraum "+
+									"die Notabschaltung des Systems zu veranlassen ist."),
+				"default"		: "60.0"
+			},
+			"fCpuTempB" : {
+				"title"			: "Temperaturgrenze Kritisch",
+				"description"	: ("Legt die Temperaturgrenze für die CPU in Grad Celsius fest, "+
+									"bei deren Überschreitung jeweils Meldung über die kritische "+
+									"Betriebstemperatur der CPU zu veranlassen ist."),
+				"default"		: "56.0"
+			},
+			"fCpuTempC" : {
+				"title"			: "Temperaturgrenze Warnung",
+				"description"	: ("Legt die Temperaturgrenze für die CPU in Grad Celsius fest, "+
+									"bei deren Überschreitung jeweils Meldung über die hohe "+
+									"Betriebstemperatur der CPU zu veranlassen ist."),
+				"default"		: "53.0"
+			},
+			"strSoundLocation" : {
+				"title"			: "Sound-Datei Ablageort",
+				"description"	: ("Legt den Ablageort der Sound-Dateien fest, die für das System, "+
+									"zur Verfügung stehen sollen. Beim Installieren neuer Sounds "+
+									"werden diese dort abgelegt, gegebenenfalls auch in neuen "+
+									"Unterordnern zur Kategorisierung."),
+				"default"		: "/usr/share/scratch/Media/Sounds"
+			}
+		},
+	})
 	
 	s_dictSystemValues = {
 		"CPU" : {
@@ -174,7 +231,8 @@ class Globs:
 		return oComponent
 	
 	def loadSettings():
-		
+		# >>> Critical Section
+		Globs.s_oSettingsLock.acquire()
 		# Einstellungen lesen
 		try:
 			foFile = open(Globs.s_strConfigFile, "r")
@@ -189,6 +247,8 @@ class Globs:
 		except:
 			Globs.exc("Laden der Einstellungen von %s" % (
 				Globs.s_strConfigFile))
+		Globs.s_oSettingsLock.release()
+		# <<< Critical Section
 				
 		# Fehlerspeicher wiederherstellen
 		oLogMem = None
@@ -215,29 +275,34 @@ class Globs:
 		if ("System" in Globs.s_dictSettings):
 			if ("strLogLvl" in Globs.s_dictSettings["System"]):
 				Globs.setLogLvl(Globs.s_dictSettings["System"]["strLogLvl"])
-			if ("bTestMode" in Globs.s_dictSettings["System"]):
-				Globs.s_bTestMode = (Globs.s_dictSettings["System"]["bTestMode"] == True)
 				
-		#Startseite lesen
+		# Startseite lesen
 		try:
 			with open(Globs.s_strStartPageFile, "rb") as f:
 				Globs.s_oStartPage = pickle.load(f)
 		except:
 			Globs.exc("Laden der Startseite von %s" % (
 				Globs.s_strStartPageFile))
+				
+		# Sounds einmalig scannen
+		Globs.scanSoundFiles(
+			Globs.getSetting("System", "strSoundLocation",
+				varDefault="/usr/share/scratch/Media/Sounds"))
+				
+		Globs.log("Konfiguration: %r" % (Globs.s_dictSettings))
+		Globs.log("Startseite: %r" % (Globs.s_oStartPage))
 		return
 		
 	def saveSettings():
-	
+		# >>> Critical Section
+		Globs.s_oSettingsLock.acquire()
 		# Einstellungen vorbereiten
 		if (not "System" in Globs.s_dictSettings):
 			Globs.s_dictSettings.update({"System" : {}})
 		# Konfigurationsparameter synchronisieren
 		Globs.s_dictSettings["System"].update({
-			"strLogLvl" : Globs.getLogLvl(),
-			"bTestMode" : Globs.s_bTestMode
+			"strLogLvl" : Globs.getLogLvl()
 		})
-		
 		# Einstellungen speichern
 		try:
 			foFile = open(Globs.s_strConfigFile, "w")
@@ -246,6 +311,8 @@ class Globs:
 		except:
 			Globs.exc("Speichern der Einstellungen in %s" % (
 				Globs.s_strConfigFile))
+		Globs.s_oSettingsLock.release()
+		# <<< Critical Section
 		
 		# Fehlerspeicher speichern
 		# >>> Critical Section
@@ -270,6 +337,58 @@ class Globs:
 				Globs.exc("Speichern der Startseite in %s" % (
 					Globs.s_strStartPageFile))
 			
+		return
+		
+	def scanSoundFiles(strDir=".", bRescan=False, bClear=False):
+		# >>> Critical Section
+		Globs.s_oSettingsLock.acquire()
+		try:
+			if "Sounds" not in Globs.s_dictSettings:
+				bRescan = True
+			elif bClear:
+				Globs.s_dictSettings["Sounds"].clear()
+				bRescan = True
+		except:
+			Globs.exc("Sound-Dateien in '%s' scannen" % (strDir))
+		Globs.s_oSettingsLock.release()
+		# <<< Critical Section
+		if not bRescan:
+			return
+		# Verzeichnisstruktur scannen (Kategorie, Datei)
+		for strCategory in os.listdir(strDir):
+			strFile = None
+			strPath = os.path.join(strDir, strCategory)
+			if os.path.isdir(strPath):
+				for strEntry in os.listdir(strPath):
+					strFile = os.path.join(strPath, strEntry)
+					if os.path.isfile(strFile):
+						Globs.registerSoundFile(strFile, strCategory)
+			elif os.path.isfile(strPath):
+				strFile = strPath
+				Globs.registerSoundFile(strFile)
+		return
+		
+	def registerSoundFile(strFile, strCategory="Default"):
+		strHead, strTail = os.path.split(strFile)
+		if not strTail:
+			return
+		strName, strExt = os.path.splitext(strTail)
+		if not strExt or not strName:
+			return
+		if not re.match("\\.([Ww][Aa][Vv]|[Mm][Pp]3)", strExt):
+			return
+		# >>> Critical Section
+		Globs.s_oSettingsLock.acquire()
+		try:
+			if "Sounds" not in Globs.s_dictSettings:
+				Globs.s_dictSettings.update({"Sounds" : {}})
+			if not strCategory in Globs.s_dictSettings["Sounds"]:
+				Globs.s_dictSettings["Sounds"].update({strCategory : {}})
+			Globs.s_dictSettings["Sounds"][strCategory].update({strName : strFile})
+		except:
+			Globs.exc("Sound-Datei '%s' registrieren" % (strFile))
+		Globs.s_oSettingsLock.release()
+		# <<< Critical Section
 		return
 		
 	def dbg(strText):
@@ -438,20 +557,28 @@ class Globs:
 			primitives = (bool, int, float, str)
 			if strKeyName in Globs.s_dictSettings:
 				if strValName in Globs.s_dictSettings[strKeyName]:
-					if isinstance(varValue, type(Globs.s_dictSettings[strKeyName][strValName])):
-						Globs.s_dictSettings[strKeyName][strValName] = varValue
-						bResult = True
+					varOldVal = Globs.s_dictSettings[strKeyName][strValName]
+					oOldType = type(varOldVal)
+					oSetType = type(varValue)
+					varNewVal = None					
+					oNewType = oSetType
+					if isinstance(varValue, oOldType):
+						varNewVal = varValue
 					elif isinstance(varValue, primitives):
-						oType = type(Globs.s_dictSettings[strKeyName][strValName])
-						Globs.s_dictSettings[strKeyName][strValName] = oType("%s" % (varValue))
-						bResult = True
+						if isinstance(varOldVal, bool):
+							varNewVal = (("%s" % (varValue)) == "True")
+							oNewType = type(varNewVal)
+						else:
+							varNewVal = oOldType("%s" % (varValue))
+							oNewType = type(varNewVal)
+					if varNewVal == None:
+						Globs.err("Konfiguration \"%s\".\"%s\" von \"%s\" %r auf \"%s\" %r ändern: Unverträgliche Datentypen!" % (
+							strKeyName, strValName, varOldVal, oOldType, varValue, oSetType))
 					else:
-						Globs.err("Konfigurationseinstellung setzen: \"%s\".\"%s\"=\"%s\" -> \"%s\" - Erwartet wurde Typ \"%s\" jedoch liegt Typ \"%s\" vor" % (
-							strKeyName, strValName,
-							Globs.s_dictSettings[strKeyName][strValName],
-							varValue,
-							type(Globs.s_dictSettings[strKeyName][strValName]),
-							type(varDefault)))
+						Globs.s_dictSettings[strKeyName][strValName] = varNewVal
+						bResult = True
+						Globs.log("Konfiguration \"%s\".\"%s\" von \"%s\" %r auf \"%s\" %r geändert." % (
+							strKeyName, strValName, varOldVal, oOldType, varNewVal, oNewType))
 				else:
 					Globs.err("Konfigurationseinstellung setzen: \"%s\".\"%s\" -> \"%s\" - Adressierter Wert existiert nicht" % (
 						strKeyName, strValName, varValue))

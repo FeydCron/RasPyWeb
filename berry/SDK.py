@@ -3,6 +3,7 @@ import subprocess
 import re
 import threading
 import socket
+import html
 
 from datetime import datetime
 
@@ -79,11 +80,11 @@ def getCpuUse():
 	return strResult
 	
 # Liefert die aktuelle IP-Adresse zurück
-def getNetworkInfo():
+def getNetworkInfo(strComputerName="google.com"):
 	strIpAddr = ""
 	try:
 		oSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		oSocket.connect(("google.com", 0))
+		oSocket.connect((strComputerName, 0))
 		strIpAddr = oSocket.getsockname()[0]
 		oSocket.close()
 	except:
@@ -141,7 +142,7 @@ class HtmlPage(list):
 			"<html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\">",
 			"<head>",
 			"<meta charset=\"utf-8\"/>",
-			"<title>%s</title>" % (strTitle),
+			"<title>%s</title>" % (html.escape(strTitle)),
 			"%s" % (strAutoRefresh),
 			"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">",
 			"<link href=\"../css/flexible-columns.css\" rel=\"stylesheet\" type=\"text/css\"/>",
@@ -188,16 +189,16 @@ class HtmlPage(list):
 				"ym-form ym-full", "post", "multipart/form-data", self.m_strPath),
 			"<div class=\"ym-fbox\">",
 			"<table%s>" % (strClass),
-			"<caption>%s</caption>" % (strCaption),
+			"<caption>%s</caption>" % (html.escape(strCaption)),
 			"<thead>",
 			"<tr>",
 		])
 		if self.m_bChk:
-			self.append("<th>%s</th>" % (strChk))
+			self.append("<th>%s</th>" % (html.escape(strChk)))
 		for strHead in lstHeader:
-			self.append("<th>%s</th>" % (strHead))
+			self.append("<th>%s</th>" % (html.escape(strHead)))
 		if self.m_bAct:
-			self.append("<th>%s</th>" % (strAct))
+			self.append("<th>%s</th>" % (html.escape(strAct)))
 		self.extend([
 			"</tr>",
 			"</thead>",
@@ -213,7 +214,7 @@ class HtmlPage(list):
 	#		"type" : "primary|success|warning|danger",
 	#	},
 	# }
-	def appendTableForm(self, strRef, lstData, bChk = False, dictAct = {}):
+	def appendTableForm(self, strRef, lstData, bChk=False, dictAct={}, bEscape=True):
 		strChecked = ""
 		self.extend([
 			"<tr>",
@@ -227,6 +228,8 @@ class HtmlPage(list):
 				strRef, strChecked))
 			self.append("</td>")
 		for strData in lstData:
+			if bEscape:
+				strData = html.escape(strData)
 			self.append("<td>%s</td>" % (strData))
 		if self.m_bAct:
 			self.append("<td style=\"white-space:nowrap\">")
@@ -240,6 +243,8 @@ class HtmlPage(list):
 						strType = "ym-%s" % (strValue)
 					elif strParam == "content":
 						strContent = strValue
+						if bEscape:
+							strContent = html.escape(strContent)
 					elif strParam == "query":
 						strHRef += "?" + strValue
 					else:
@@ -247,9 +252,6 @@ class HtmlPage(list):
 				self.append(
 					"<a class=\"ym-button %s\" name=\"%s\" value=\"%s\" href=\"%s\" %s>%s</a>" % (
 					strType, strName, strRef, strHRef, strAttr, strContent))
-#				self.append(
-#					"<button class=\"%s\" name=\"%s\" value=\"%s\" type=\"submit\" %s>%s</button>"  % (
-#					strType, strName, strRef, strAttr, strContent))
 			self.append("</td>")
 		self.append("</tr>")
 		return
@@ -284,14 +286,14 @@ class HtmlPage(list):
 					else:
 						strAttr += " %s=\"%s\"" % (strParam, strValue)
 				self.append(
-					"<button class=\"%s\" name=\"submit\" value=\"%s\" type=\"submit\" %s>%s</button>"  % (
-					strType, strName, strAttr, strContent))
+					"<button class=\"%s\" name=\"submit\" value=\"%s\" type=\"submit\" style=\"margin-top:10px;\" %s>%s</button>"  % (
+					strType, strName, strAttr, html.escape(strContent)))
 			if bReset:
 				self.append(
-					"<button type=\"reset\" class=\"reset ym-delete ym-warning\">Zurücksetzen</button>")
+					"<button type=\"reset\" class=\"reset ym-delete ym-warning\" style=\"margin-top:10px;\">Zurücksetzen</button>")
 			if bSave:
 				self.append(
-					"<button name=\"submit\" value=\"save\" type=\"submit\" class=\"save ym-save ym-success\">Speichern</button>")
+					"<button name=\"submit\" value=\"save\" type=\"submit\" class=\"save ym-save ym-success\" style=\"margin-top:10px;\">Speichern</button>")
 			self.append("</div>")
 		self.append("</form>")
 		return
@@ -311,12 +313,12 @@ class HtmlPage(list):
 			strClass = ""
 		self.extend([
 			"<table%s>" % (strClass),
-			"<caption>%s</caption>" % (strCaption),
+			"<caption>%s</caption>" % (html.escape(strCaption)),
 			"<thead>",
 			"<tr>",
 		])
 		for strHead in lstHeader:
-			self.append("<th>%s</th>" % (strHead))
+			self.append("<th>%s</th>" % (html.escape(strHead)))
 		self.extend([
 			"</tr>",
 			"</thead>",
@@ -324,11 +326,13 @@ class HtmlPage(list):
 		])
 		return
 		
-	def appendTable(self, lstData, bFirstIsHead = False):
+	def appendTable(self, lstData, bFirstIsHead=False, bEscape=True):
 		self.extend([
 			"<tr>",
 		])
 		for strData in lstData:
+			if bEscape:
+				strData = html.escape(strData)
 			if bFirstIsHead:
 				bFirstIsHead = False
 				self.append("<th>%s</th>" % (strData))
@@ -337,13 +341,15 @@ class HtmlPage(list):
 		self.append("</tr>")
 		return
 		
-	def appendHeader(self, lstData):
+	def appendHeader(self, lstData, bEscape=True):
 		self.extend([
 			"</tbody>",
 			"<thead><tr>",
 		])
 		for strData in lstData:
-			self.append("<th>%s</th>" % (strData))	
+			if bEscape:
+				strData = html.escape(strData)
+			self.append("<th>%s</th>" % (strData))
 		self.extend([
 			"</tr></thead>",
 			"<tbody>"
@@ -393,14 +399,19 @@ class HtmlPage(list):
 			for (strName, lstProps) in dictButtons.items():
 				self.append(
 					"<button name=\"%s\" value=\"%s\" type=\"submit\" class=\"%s\">%s</button>" % (
-						strName, lstProps[0], lstProps[2], lstProps[1]))
+						strName, lstProps[0], lstProps[2], html.escape(lstProps[1])))
 			self.append("</div>")
 		return
 		
 	def appendForm(self, strName, strInput="", strTitle="", bSelected=False,
 		dictChoice=None, nLines=None, bCheck=False, bRadio=False, bButton=False,
-		strTip="", strClass=""):
+		strTip="", strClass="", strTextType="text", strTypePattern="", bEscape=True):
 		strSelected = ""
+		if bEscape:
+			if strTitle:
+				strTitle = html.escape(strTitle)
+			if strTip:
+				strTip = html.escape(strTip)
 		if dictChoice:
 			if bCheck or bRadio:
 				strType = "checkbox"
@@ -415,6 +426,8 @@ class HtmlPage(list):
 					])
 				self.append("<div class=\"ym-fbox-wrap\">")
 				for (oName, oValue) in sorted(dictChoice.items()):
+					if bEscape:
+						oName = html.escape("%s" % (oName))
 					if (type(oValue) is list or type(oValue) is tuple):
 						self.append("<p>%s</p>" % (oName))
 						for oItem in sorted(oValue):
@@ -423,13 +436,12 @@ class HtmlPage(list):
 								strSelected = "checked"
 							else:
 								strSelected = ""
-							#self.append("<div class=\"ym-fbox\">")
 							self.extend([
 								"<div class=\"ym-fbox-check\">",
 								"<input type=\"%s\" name=\"%s\" value=\"%s\" id=\"%s\" %s/>" % (
 									strType, strName, oItem, self.m_nId, strSelected),
 								"<label for=\"%s\">%s</label>" % (
-									self.m_nId, oItem),
+									self.m_nId, html.escape(oItem)),
 								"</div>"
 							])
 					else:
@@ -464,18 +476,21 @@ class HtmlPage(list):
 					"<select name=\"%s\" size=\"%s\" id=\"%s\">" % (
 						strName, nSize, self.m_nId))
 				for (oName, oValue) in sorted(dictChoice.items()):
+					if bEscape:
+						oName = html.escape(oName)
 					self.m_nId += 1
-					if (type(oValue) is list or type(oValue) is tuple):
-						self.append("<optgroup label=\"%s\">" % (
-							oName))
-						for oItem in sorted(oValue):
+					if (isinstance(oValue, dict)):
+						self.append("<optgroup label=\"%s\">" % (oName))
+						for (oName, oItem) in sorted(oValue.items()):
+							if bEscape:
+								oName = html.escape(oName)
 							if strInput == oItem:
 								strSelected = "selected=\"selected\""
 							else:
 								strSelected = ""
 							self.append(
 								"<option value=\"%s\" %s>%s</option>" % (
-									oItem, strSelected, oItem))
+									oItem, strSelected, oName))
 						self.append("</optgroup>")
 					else:
 						if strInput == oValue:
@@ -496,7 +511,7 @@ class HtmlPage(list):
 					self.m_nId, strTitle))
 			self.append(
 				"<textarea id=\"%s\" rows=\"%s\" name=\"%s\">%s</textarea>" % (
-				self.m_nId, nLines, strName, strInput))
+				self.m_nId, nLines, strName, html.escape(strInput)))
 			self.append("</div>")
 		elif bCheck:
 			# Einzelne Check-Box
@@ -507,6 +522,8 @@ class HtmlPage(list):
 				strSelected = ""
 			if not strTitle:
 				strTitle = strInput
+				if strTitle and bEscape:
+					strTitle = html.escape(strTitle)
 			self.m_nId += 1
 			self.extend([
 				"<input type=\"checkbox\" name=\"%s\" value=\"%s\" id=\"%s\" %s/>" % (
@@ -529,16 +546,15 @@ class HtmlPage(list):
 			self.extend([
 				"<label for=\"%s\">%s</label>" % (
 					self.m_nId, strTitle),
-				"<input type=\"text\" name=\"%s\" value=\"%s\" id=\"%s\" placeholder=\"%s\"/>" % (
-					strName, strInput, self.m_nId, strInput),
+				"<input type=\"%s\" name=\"%s\" value=\"%s\" id=\"%s\" placeholder=\"%s\"/>" % (
+					strTextType, strName, strInput, self.m_nId, html.escape(strInput)),
 				"</div>"
 			])
 		return
 		
 	def createText(self, strText):
 		self.extend([
-			"<p>%s</p>" % (
-				strText)
+			"<p>%s</p>" % (html.escape(strText))
 		])
 		return
 	
@@ -550,8 +566,8 @@ class HtmlPage(list):
 		
 		self.extend([
 			"<div class=\"box %s\">" % (strType),
-			"<h3>%s</h3>" % (strTitle),
-			"<p>%s</p>" % (strMsg),
+			"<h3>%s</h3>" % (html.escape(strTitle)),
+			"<p>%s</p>" % (html.escape(strMsg)),
 		])
 		if bClose:
 			self.append(
@@ -564,7 +580,7 @@ class HtmlPage(list):
 		if not strHRef:
 			strHRef = self.m_strPath
 		self.append("<a class=\"ym-button %s\" style=\"margin-top:10px;\" href=\"%s\">%s</a>" % (
-			strClass, strHRef, strTitle))
+			strClass, strHRef, html.escape(strTitle)))
 		return
 		
 	def closeBox(self):
@@ -581,7 +597,11 @@ class ModuleBase:
 	def getWorker(self):
 		return self.m_oWorker
 		
-	def moduleInit(self):
+	## Modulinitialisierung
+	# @param self This-Pointer
+	# @param dictModCfg Modulkonfiguration {<"Param"> : <Value>}
+	# @param dictCfgUsr Konfigurationsbeschreibung {<"Param"> : {<"(title|description|default|choice)"> : <"Value"|{<"Choice"> : <"Value">}>}}
+	def moduleInit(self, dictModCfg={}, dictCfgUsr={}):
 		return True
 		
 	def moduleExit(self):

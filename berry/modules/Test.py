@@ -5,7 +5,7 @@ import SDK
 from SDK import ModuleBase
 
 class Test(ModuleBase):
-	def moduleInit(self):
+	def moduleInit(self, dictModCfg={}, dictCfgUsr={}):
 		print("%r::moduleInit(%s)" % (self, SDK.getCpuTemp()))
 		return True
 		

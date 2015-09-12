@@ -13,7 +13,7 @@ VERBOSE = 0
 
 class AMatisGPIO(ModuleBase):
 	
-	def moduleInit(self):
+	def moduleInit(self, dictModCfg={}, dictCfgUsr={}):
 		global STATUS
 		
 		STATUS = 1

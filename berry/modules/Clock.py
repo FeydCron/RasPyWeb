@@ -10,12 +10,19 @@ from SDK import TaskSpeak
 class Clock(ModuleBase):
 	
 	def moduleInit(self, dictModCfg={}, dictCfgUsr={}):
-		if not dictModCfg:
-			dictModCfg.update({
-				"nSilenceFrom" : 19,
-				"nSilenceTo" : 6,
-				"nTellTimeInt" : 30,
-			})
+		dictSettings = {
+			"nSilenceFrom" : 19,
+			"nSilenceTo" : 6,
+			"nTellTimeInt" : 30,
+			"strSoundHour" : "BellToll",
+		}
+		if (not dictModCfg):
+			dictModCfg.update(dictSettings)
+		else:
+			for (strName, strValue) in dictSettings.items():
+				if strName not in dictModCfg:
+					dictModCfg.update({strName : strValue})
+		
 		dictCfgUsr.update({
 			"nSilenceFrom" : {
 				"title"			: "Beginn der Ruhezeit",
@@ -37,7 +44,7 @@ class Clock(ModuleBase):
 			"nTellTimeInt" : {
 				"title"			: "Uhrzeitansage",
 				"description"	: ("Die Uhrzeit kann in einem festen Raster von stündlich bis "+
-									"alle 5 Minuten angesagt werden. "),
+									"alle 5 Minuten angesagt werden."),
 				"default"		: "30",
 				"choices"		: {
 					"Jede volle Stunde"		: "60",
@@ -45,7 +52,15 @@ class Clock(ModuleBase):
 					"Jede viertel Stunde"	: "15",
 					"Alle 5 Minuten"		: "5"
 				}
-			}})
+			},
+			"strSoundHour" : {
+				"title"			: "Klang Stundenschlag",
+				"description"	: ("Die akustische Anzeige der Uhrzeit erfolgt durch den "+
+									"angegebenen Klang."),
+				"default"		: "BellToll",
+				"choices"		: Globs.s_dictSettings["Sounds"]
+			},
+			})
 		self.m_nSilenceFrom = Globs.getSetting("Clock", "nSilenceFrom", "\\d{1,2}", 19)
 		self.m_nSilenceTo = Globs.getSetting("Clock", "nSilenceTo", "\\d{1,2}", 6)
 		self.m_nTellTimeInt = Globs.getSetting("Clock", "nTellTimeInt", "\\d{1,2}", 30)

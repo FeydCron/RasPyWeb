@@ -6,6 +6,7 @@ import re
 import traceback
 import pickle
 import threading
+import socket
 
 from collections import deque
 from collections import OrderedDict
@@ -212,6 +213,12 @@ class Globs:
 	def stop():
 		if Globs.s_oHttpd:
 			Globs.s_oHttpd.shutdown()
+			Globs.s_oHttpd.server_close()
+			try:
+				Globs.s_oHttpd.socket.shutdown(socket.SHUT_RDWR)
+				Globs.s_oHttpd.socket.close()
+			except Exception as ex:
+				print("Schließen des Sockets sicherstellen: %r" % (ex))
 		return
 	
 	def importComponent(strModuleName, strComponentName):

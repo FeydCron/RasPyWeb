@@ -916,6 +916,67 @@ class TaskDisplayLogMem(FutureTask):
 		self.m_oHtmlPage.closeTable()
 		return
 		
+class TaskDisplaySounds(FutureTask):
+	
+	def __init__(self,
+		oWorker,
+		oHtmlPage,
+		dictForm=None,
+		dictQuery=None
+		):
+		super(TaskDisplaySounds, self).__init__(oWorker)
+		self.m_oHtmlPage = oHtmlPage
+		self.m_dictForm = dictForm
+		self.m_dictQuery = dictQuery
+		return
+		
+	def __str__(self):
+		strDesc = "Darstellen der installierten Klänge"
+		return  strDesc
+		
+	def do(self):
+		self.displaySounds()
+		return
+		
+	def displaySounds(self):
+		self.m_oHtmlPage.extend([
+			"<div class=\"nav-wrapper\">",
+			"<nav class=\"ym-vlist\">",
+			"<h6 class=\"ym-vtitle\">Installierte Klänge</h6>"
+		])
+		
+		strSound = ""
+		if self.m_dictQuery and "sound" in self.m_dictQuery:
+			strSound = self.m_dictQuery["sound"]
+		
+		self.m_oHtmlPage.append("<ul>")
+		for (strCategory, dictSounds) in sorted(Globs.s_dictSettings["Sounds"].items()):
+			strAnchor = uuid.uuid1().hex
+			self.m_oHtmlPage.append("<li id=\"%s\"><span>%s</span>" % (strCategory, strCategory))
+			self.m_oHtmlPage.append("<ul>")
+			for (strName, strFile) in sorted(dictSounds.items()):
+				if strName == strSound:
+					strActive = "&#x1F50A;"
+				else:
+					strActive = "&#x1F508;"
+				self.m_oHtmlPage.append(
+					"<li><a href=\"%s?sound=%s&token=%s#%s\">%s \"%s\"</a></li>" % (
+						"/sound/values.html", strName, strAnchor, strCategory, strActive, strName))
+			self.m_oHtmlPage.append(
+				"<li><a href=\"#\">%s Neuen Klang hinzufügen</a></li>" % (
+					"&#x0271A;"))
+			self.m_oHtmlPage.append("</ul>")
+			self.m_oHtmlPage.append("</li>")
+		self.m_oHtmlPage.append(
+			"<li><a href=\"#\">%s Neue Kategorie anlegen</a></li>" % (
+				"&#x0271A;"))
+		self.m_oHtmlPage.extend([
+			"</ul>",
+			"</nav>",
+			"</div>"
+		])
+		return
+		
 class TaskStartPage(FutureTask):
 	
 	def __init__(self,
@@ -1159,10 +1220,8 @@ class Httpd:
 		print("Running HTTP Server on %s at %s ..." % (
 			Globs.s_oHttpd.server_name, Globs.s_oHttpd.server_address))
 		Globs.s_oHttpd.serve_forever()
-		Globs.s_oHttpd.socket.close()
-		
-#		TaskSpeak(g_oHttpdWorker,
-#			"Die Hah-Teh-Teh-Peh Schnittstelle wurde geschlossen").start()
+		#Globs.s_oHttpd.socket.close()
+		Globs.s_oHttpd.server_close()
 		return
 	
 class BerryHttpHandler(SimpleHTTPRequestHandler):
@@ -1327,9 +1386,12 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				oFutureTask = TaskDisplayLogMem(g_oHttpdWorker,
 					oHtmlPage, strMode)
 			elif strPath == "/system/startpage.html":
-				print("GET: startpage")
 				oHtmlPage = HtmlPage(strPath, strTitle = "Startseite")
 				oFutureTask = TaskStartPage(g_oHttpdWorker,
+					oHtmlPage, dictQuery=dictQuery)
+			elif strPath == "/sound/values.html":
+				oHtmlPage = HtmlPage(strPath, strTitle = "Klänge")
+				oFutureTask = TaskDisplaySounds(g_oHttpdWorker,
 					oHtmlPage, dictQuery=dictQuery)
 			if oFutureTask:
 				if oFutureTask.start():

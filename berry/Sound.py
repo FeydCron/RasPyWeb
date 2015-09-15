@@ -89,14 +89,15 @@ class Sound:
 					if strSound in dictSounds:
 						strFile = Globs.s_dictSettings["Sounds"][strCategory][strSound]
 						break
-				# Partiellen Treffer finden
-				for (strCategory, dictSounds) in Globs.s_dictSettings["Sounds"].items():
-					for (strName, strPath) in dictSounds.items():
-						if re.match(".*" + strSound + ".*", strName):
-							Globs.log("Sound '%s' für angeforderten Sound '%s' verwendet." % (
-								strName, strSound))
-							strFile = strPath
-							break
+				if not strFile:
+					# Partiellen Treffer finden
+					for (strCategory, dictSounds) in sorted(Globs.s_dictSettings["Sounds"].items()):
+						for (strName, strPath) in dictSounds.items():
+							if re.match(".*" + strSound + ".*", strName):
+								Globs.log("Sound '%s' für angeforderten Sound '%s' verwendet." % (
+									strName, strSound))
+								strFile = strPath
+								break
 		except:
 			Globs.exc("Sound '%s' finden" % (strSound))
 		Globs.s_oSettingsLock.release()

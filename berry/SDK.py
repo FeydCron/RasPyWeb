@@ -482,15 +482,15 @@ class HtmlPage(list):
 					if (isinstance(oValue, dict)):
 						self.append("<optgroup label=\"%s\">" % (oName))
 						for (oName, oItem) in sorted(oValue.items()):
-							if bEscape:
-								oName = html.escape(oName)
-							if strInput == oItem:
+							if strInput == oName:
 								strSelected = "selected=\"selected\""
 							else:
 								strSelected = ""
+							if bEscape:
+								oName = html.escape(oName)
 							self.append(
 								"<option value=\"%s\" %s>%s</option>" % (
-									oItem, strSelected, oName))
+									oName, strSelected, oName))
 						self.append("</optgroup>")
 					else:
 						if strInput == oValue:

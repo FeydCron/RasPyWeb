@@ -6,6 +6,7 @@ import re
 import traceback
 import pickle
 import threading
+import socket
 
 from collections import deque
 from collections import OrderedDict
@@ -212,6 +213,12 @@ class Globs:
 	def stop():
 		if Globs.s_oHttpd:
 			Globs.s_oHttpd.shutdown()
+			Globs.s_oHttpd.server_close()
+			try:
+				Globs.s_oHttpd.socket.shutdown(socket.SHUT_RDWR)
+				Globs.s_oHttpd.socket.close()
+			except Exception as ex:
+				print("Schließen des Sockets sicherstellen: %r" % (ex))
 		return
 	
 	def importComponent(strModuleName, strComponentName):
@@ -285,9 +292,7 @@ class Globs:
 				Globs.s_strStartPageFile))
 				
 		# Sounds einmalig scannen
-		Globs.scanSoundFiles(
-			Globs.getSetting("System", "strSoundLocation",
-				varDefault="/usr/share/scratch/Media/Sounds"))
+		Globs.scanSoundFiles()
 				
 		Globs.log("Konfiguration: %r" % (Globs.s_dictSettings))
 		Globs.log("Startseite: %r" % (Globs.s_oStartPage))
@@ -339,7 +344,10 @@ class Globs:
 			
 		return
 		
-	def scanSoundFiles(strDir=".", bRescan=False, bClear=False):
+	def scanSoundFiles(strDir=None, bRescan=False, bClear=False):
+		if not strDir:
+			strDir = Globs.getSetting("System", "strSoundLocation",
+				varDefault="/usr/share/scratch/Media/Sounds")
 		# >>> Critical Section
 		Globs.s_oSettingsLock.acquire()
 		try:

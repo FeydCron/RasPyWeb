@@ -916,6 +916,87 @@ class TaskDisplayLogMem(FutureTask):
 		self.m_oHtmlPage.closeTable()
 		return
 		
+class TaskDisplaySounds(FutureTask):
+	
+	def __init__(self,
+		oWorker,
+		oHtmlPage,
+		dictForm=None,
+		dictQuery=None
+		):
+		super(TaskDisplaySounds, self).__init__(oWorker)
+		self.m_oHtmlPage = oHtmlPage
+		self.m_dictForm = dictForm
+		self.m_dictQuery = dictQuery
+		return
+		
+	def __str__(self):
+		strDesc = "Darstellen der installierten Klänge"
+		return  strDesc
+		
+	def do(self):
+		self.displaySounds()
+		return
+		
+	def displaySounds(self):
+		self.m_oHtmlPage.extend([
+			"<div class=\"nav-wrapper\">",
+			"<nav class=\"ym-vlist\">",
+			"<h6 class=\"ym-vtitle\">Installierte Klänge</h6>"
+		])
+		
+		strSound = ""
+		
+		if self.m_dictQuery and "cache" in self.m_dictQuery:
+			if self.m_dictQuery["cache"] == "clear":
+				Globs.scanSoundFiles(bClear=True)
+			if self.m_dictQuery["cache"] == "rescan":
+				Globs.scanSoundFiles(bRescan=True)
+		if self.m_dictQuery and "sound" in self.m_dictQuery:
+			strSound = self.m_dictQuery["sound"]
+		
+		self.m_oHtmlPage.append("<ul>")
+		if "Sounds" in Globs.s_dictSettings:
+			dictSounds = Globs.s_dictSettings["Sounds"]
+			# Eigene Klänge darstellen
+			if "Default" in dictSounds:
+				strAnchor = uuid.uuid1().hex
+				self.m_oHtmlPage.append("<li id=\"Default\"><span>Eigene Klänge</span>")
+				self.m_oHtmlPage.append("<ul>")
+				for (strName, strFile) in sorted(dictSounds["Default"].items()):
+					if strName == strSound:
+						strActive = "&#x0266B;"
+					else:
+						strActive = "&#x025B6;"
+					self.m_oHtmlPage.append(
+						"<li><a href=\"%s?sound=%s&token=%s#%s\">%s %s</a></li>" % (
+							"/sound/values.html", strName, strAnchor, "Default", strActive, strName))
+				self.m_oHtmlPage.append("</ul>")
+				self.m_oHtmlPage.append("</li>")
+			# Alle übrigen Klänge darstellen
+			for (strCategory, dictSounds) in sorted(Globs.s_dictSettings["Sounds"].items()):
+				if strCategory == "Default":
+					continue
+				strAnchor = uuid.uuid1().hex
+				self.m_oHtmlPage.append("<li id=\"%s\"><span>%s</span>" % (strCategory, strCategory))
+				self.m_oHtmlPage.append("<ul>")
+				for (strName, strFile) in sorted(dictSounds.items()):
+					if strName == strSound:
+						strActive = "&#x0266B;"
+					else:
+						strActive = "&#x025B6;"
+					self.m_oHtmlPage.append(
+						"<li><a href=\"%s?sound=%s&token=%s#%s\">%s %s</a></li>" % (
+							"/sound/values.html", strName, strAnchor, strCategory, strActive, strName))
+				self.m_oHtmlPage.append("</ul>")
+				self.m_oHtmlPage.append("</li>")
+		self.m_oHtmlPage.extend([
+			"</ul>",
+			"</nav>",
+			"</div>"
+		])
+		return
+		
 class TaskStartPage(FutureTask):
 	
 	def __init__(self,
@@ -1159,10 +1240,8 @@ class Httpd:
 		print("Running HTTP Server on %s at %s ..." % (
 			Globs.s_oHttpd.server_name, Globs.s_oHttpd.server_address))
 		Globs.s_oHttpd.serve_forever()
-		Globs.s_oHttpd.socket.close()
-		
-#		TaskSpeak(g_oHttpdWorker,
-#			"Die Hah-Teh-Teh-Peh Schnittstelle wurde geschlossen").start()
+		#Globs.s_oHttpd.socket.close()
+		Globs.s_oHttpd.server_close()
 		return
 	
 class BerryHttpHandler(SimpleHTTPRequestHandler):
@@ -1200,7 +1279,16 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		oHtmlPage = HtmlPage("/system/modules.html", strTitle = "Modulkonfiguration")
 		oModuleFile = oForm["ModuleFile"]
 		strFilename = oModuleFile.filename
-		strComponent = strFilename.split(".")[0]
+		strFilename = strFilename.replace("\\", "/")
+		strHead, strFilename = os.path.split(strFilename)
+		strComponent, strExt = os.path.splitext(strFilename)
+		if not re.match("\\.[Pp][Yy]", strExt):
+			oHtmlPage = HtmlPage(strPath, strTitle = "Modulinstallation")
+			oHtmlPage.createBox(
+				"Die hochgeladene Datei ist unzulässig",
+				"Bitte geben Sie eine Moduldatei an",
+				strType="warning")
+			return oHtmlPage
 		if ("ModuleClass" in oForm):
 			strName = "%s" % (oForm.getfirst("ModuleClass"))
 		if not strName:
@@ -1224,6 +1312,52 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		TaskInstallModule(g_oHttpdWorker, strComponent, strName).start()
 		TaskModuleInit(g_oHttpdWorker, strComponent).start()
 		oTask = TaskDisplayModules(g_oHttpdWorker, oHtmlPage)
+		if oTask.start():
+			oTask.wait()
+		return oHtmlPage
+		
+	def installSound(self, strPath, oForm):
+		if ("SoundFile" not in oForm or
+			not oForm["SoundFile"].filename or
+			not oForm["SoundFile"].file):
+			oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
+			oHtmlPage.createBox(
+				"Die Formulardaten sind unvollständig",
+				"Bitte geben Sie eine Klangdatei an",
+				strType="warning")
+			return oHtmlPage
+		oHtmlPage = HtmlPage("/sound/values.html", strTitle = "Installierte Klänge")
+		oSoundFile = oForm["SoundFile"]
+		strFilename = oSoundFile.filename
+		strFilename = strFilename.replace("\\", "/")
+		strHead, strFilename = os.path.split(strFilename)
+		strComponent, strExt = os.path.splitext(strFilename)
+		if not re.match("\\.[Ww][Aa][Vv]|\\.[Mm][Pp]3", strExt):
+			oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
+			oHtmlPage.createBox(
+				"Die hochgeladene Datei ist unzulässig",
+				"Bitte geben Sie eine zulässige Klangdatei an",
+				strType="warning")
+			return oHtmlPage
+		strSoundPath = Globs.getSetting("System", "strSoundLocation",
+			varDefault="/usr/share/scratch/Media/Sounds")
+		try:
+			foFile = open("%s/%s" % (strSoundPath, strFilename), "w+b")
+			oData = oSoundFile.file.read()
+			foFile.write(oData)
+			foFile.close()
+			del oData
+		except:
+			Globs.exc("Schreiben der Klangdatei %s/%s" % (
+				strSoundPath, strFilename))
+			oHtmlPage.createBox(
+				"Fehler",
+				"Die hochgeladene Datei konnte nicht gespeichert werden.",
+				strType="error")
+			return oHtmlPage
+		# Tasks ausführen
+		Globs.scanSoundFiles(bRescan=True)
+		oTask = TaskDisplaySounds(g_oHttpdWorker, oHtmlPage)
 		if oTask.start():
 			oTask.wait()
 		return oHtmlPage
@@ -1327,9 +1461,12 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				oFutureTask = TaskDisplayLogMem(g_oHttpdWorker,
 					oHtmlPage, strMode)
 			elif strPath == "/system/startpage.html":
-				print("GET: startpage")
 				oHtmlPage = HtmlPage(strPath, strTitle = "Startseite")
 				oFutureTask = TaskStartPage(g_oHttpdWorker,
+					oHtmlPage, dictQuery=dictQuery)
+			elif strPath == "/sound/values.html":
+				oHtmlPage = HtmlPage(strPath, strTitle = "Klänge")
+				oFutureTask = TaskDisplaySounds(g_oHttpdWorker,
 					oHtmlPage, dictQuery=dictQuery)
 			if oFutureTask:
 				if oFutureTask.start():
@@ -1359,6 +1496,8 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		try:
 			if strPath == "/system/install.html":
 				oHtmlPage = self.installModule(strPath, oForm)
+			elif strPath == "/sound/install.html":
+				oHtmlPage = self.installSound(strPath, oForm)
 			elif strPath == "/system/modules.html":
 				oHtmlPage = self.changeModules(strPath, oForm)
 			elif strPath == "/system/logging.html" and "mode" in oForm:

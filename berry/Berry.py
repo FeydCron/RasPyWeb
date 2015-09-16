@@ -34,7 +34,11 @@ class Berry:
 		TaskSpeak(self.m_oWorker, "Servus!").start()
 		
 		print("Attempt to start HTTP Server ...")
-		self.m_oHttpd.run()
+		try:
+			self.m_oHttpd.run()
+		except:
+			Globs.exc("HTTP Server starten und laufen lassen")
+			TaskSpeak(self.m_oWorker, "Hoppla! Scheinbar gibt es ein Problem mit der Webb Sörver Schnittstelle.").start()
 		print("HTTP Server STOPPED")
 		
 		if Globs.s_strExitMode == "halt":

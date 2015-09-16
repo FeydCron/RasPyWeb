@@ -946,30 +946,50 @@ class TaskDisplaySounds(FutureTask):
 		])
 		
 		strSound = ""
+		
+		if self.m_dictQuery and "cache" in self.m_dictQuery:
+			if self.m_dictQuery["cache"] == "clear":
+				Globs.scanSoundFiles(bClear=True)
+			if self.m_dictQuery["cache"] == "rescan":
+				Globs.scanSoundFiles(bRescan=True)
 		if self.m_dictQuery and "sound" in self.m_dictQuery:
 			strSound = self.m_dictQuery["sound"]
 		
 		self.m_oHtmlPage.append("<ul>")
-		for (strCategory, dictSounds) in sorted(Globs.s_dictSettings["Sounds"].items()):
-			strAnchor = uuid.uuid1().hex
-			self.m_oHtmlPage.append("<li id=\"%s\"><span>%s</span>" % (strCategory, strCategory))
-			self.m_oHtmlPage.append("<ul>")
-			for (strName, strFile) in sorted(dictSounds.items()):
-				if strName == strSound:
-					strActive = "&#x1F50A;"
-				else:
-					strActive = "&#x1F508;"
-				self.m_oHtmlPage.append(
-					"<li><a href=\"%s?sound=%s&token=%s#%s\">%s \"%s\"</a></li>" % (
-						"/sound/values.html", strName, strAnchor, strCategory, strActive, strName))
-			self.m_oHtmlPage.append(
-				"<li><a href=\"#\">%s Neuen Klang hinzufügen</a></li>" % (
-					"&#x0271A;"))
-			self.m_oHtmlPage.append("</ul>")
-			self.m_oHtmlPage.append("</li>")
-		self.m_oHtmlPage.append(
-			"<li><a href=\"#\">%s Neue Kategorie anlegen</a></li>" % (
-				"&#x0271A;"))
+		if "Sounds" in Globs.s_dictSettings:
+			dictSounds = Globs.s_dictSettings["Sounds"]
+			# Eigene Klänge darstellen
+			if "Default" in dictSounds:
+				strAnchor = uuid.uuid1().hex
+				self.m_oHtmlPage.append("<li id=\"Default\"><span>Eigene Klänge</span>")
+				self.m_oHtmlPage.append("<ul>")
+				for (strName, strFile) in sorted(dictSounds["Default"].items()):
+					if strName == strSound:
+						strActive = "&#x0266B;"
+					else:
+						strActive = "&#x025B6;"
+					self.m_oHtmlPage.append(
+						"<li><a href=\"%s?sound=%s&token=%s#%s\">%s %s</a></li>" % (
+							"/sound/values.html", strName, strAnchor, "Default", strActive, strName))
+				self.m_oHtmlPage.append("</ul>")
+				self.m_oHtmlPage.append("</li>")
+			# Alle übrigen Klänge darstellen
+			for (strCategory, dictSounds) in sorted(Globs.s_dictSettings["Sounds"].items()):
+				if strCategory == "Default":
+					continue
+				strAnchor = uuid.uuid1().hex
+				self.m_oHtmlPage.append("<li id=\"%s\"><span>%s</span>" % (strCategory, strCategory))
+				self.m_oHtmlPage.append("<ul>")
+				for (strName, strFile) in sorted(dictSounds.items()):
+					if strName == strSound:
+						strActive = "&#x0266B;"
+					else:
+						strActive = "&#x025B6;"
+					self.m_oHtmlPage.append(
+						"<li><a href=\"%s?sound=%s&token=%s#%s\">%s %s</a></li>" % (
+							"/sound/values.html", strName, strAnchor, strCategory, strActive, strName))
+				self.m_oHtmlPage.append("</ul>")
+				self.m_oHtmlPage.append("</li>")
 		self.m_oHtmlPage.extend([
 			"</ul>",
 			"</nav>",
@@ -1259,7 +1279,16 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		oHtmlPage = HtmlPage("/system/modules.html", strTitle = "Modulkonfiguration")
 		oModuleFile = oForm["ModuleFile"]
 		strFilename = oModuleFile.filename
-		strComponent = strFilename.split(".")[0]
+		strFilename = strFilename.replace("\\", "/")
+		strHead, strFilename = os.path.split(strFilename)
+		strComponent, strExt = os.path.splitext(strFilename)
+		if not re.match("\\.[Pp][Yy]", strExt):
+			oHtmlPage = HtmlPage(strPath, strTitle = "Modulinstallation")
+			oHtmlPage.createBox(
+				"Die hochgeladene Datei ist unzulässig",
+				"Bitte geben Sie eine Moduldatei an",
+				strType="warning")
+			return oHtmlPage
 		if ("ModuleClass" in oForm):
 			strName = "%s" % (oForm.getfirst("ModuleClass"))
 		if not strName:
@@ -1283,6 +1312,52 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		TaskInstallModule(g_oHttpdWorker, strComponent, strName).start()
 		TaskModuleInit(g_oHttpdWorker, strComponent).start()
 		oTask = TaskDisplayModules(g_oHttpdWorker, oHtmlPage)
+		if oTask.start():
+			oTask.wait()
+		return oHtmlPage
+		
+	def installSound(self, strPath, oForm):
+		if ("SoundFile" not in oForm or
+			not oForm["SoundFile"].filename or
+			not oForm["SoundFile"].file):
+			oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
+			oHtmlPage.createBox(
+				"Die Formulardaten sind unvollständig",
+				"Bitte geben Sie eine Klangdatei an",
+				strType="warning")
+			return oHtmlPage
+		oHtmlPage = HtmlPage("/sound/values.html", strTitle = "Installierte Klänge")
+		oSoundFile = oForm["SoundFile"]
+		strFilename = oSoundFile.filename
+		strFilename = strFilename.replace("\\", "/")
+		strHead, strFilename = os.path.split(strFilename)
+		strComponent, strExt = os.path.splitext(strFilename)
+		if not re.match("\\.[Ww][Aa][Vv]|\\.[Mm][Pp]3", strExt):
+			oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
+			oHtmlPage.createBox(
+				"Die hochgeladene Datei ist unzulässig",
+				"Bitte geben Sie eine zulässige Klangdatei an",
+				strType="warning")
+			return oHtmlPage
+		strSoundPath = Globs.getSetting("System", "strSoundLocation",
+			varDefault="/usr/share/scratch/Media/Sounds")
+		try:
+			foFile = open("%s/%s" % (strSoundPath, strFilename), "w+b")
+			oData = oSoundFile.file.read()
+			foFile.write(oData)
+			foFile.close()
+			del oData
+		except:
+			Globs.exc("Schreiben der Klangdatei %s/%s" % (
+				strSoundPath, strFilename))
+			oHtmlPage.createBox(
+				"Fehler",
+				"Die hochgeladene Datei konnte nicht gespeichert werden.",
+				strType="error")
+			return oHtmlPage
+		# Tasks ausführen
+		Globs.scanSoundFiles(bRescan=True)
+		oTask = TaskDisplaySounds(g_oHttpdWorker, oHtmlPage)
 		if oTask.start():
 			oTask.wait()
 		return oHtmlPage
@@ -1421,6 +1496,8 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		try:
 			if strPath == "/system/install.html":
 				oHtmlPage = self.installModule(strPath, oForm)
+			elif strPath == "/sound/install.html":
+				oHtmlPage = self.installSound(strPath, oForm)
 			elif strPath == "/system/modules.html":
 				oHtmlPage = self.changeModules(strPath, oForm)
 			elif strPath == "/system/logging.html" and "mode" in oForm:

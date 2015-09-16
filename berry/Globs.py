@@ -292,9 +292,7 @@ class Globs:
 				Globs.s_strStartPageFile))
 				
 		# Sounds einmalig scannen
-		Globs.scanSoundFiles(
-			Globs.getSetting("System", "strSoundLocation",
-				varDefault="/usr/share/scratch/Media/Sounds"))
+		Globs.scanSoundFiles()
 				
 		Globs.log("Konfiguration: %r" % (Globs.s_dictSettings))
 		Globs.log("Startseite: %r" % (Globs.s_oStartPage))
@@ -346,7 +344,10 @@ class Globs:
 			
 		return
 		
-	def scanSoundFiles(strDir=".", bRescan=False, bClear=False):
+	def scanSoundFiles(strDir=None, bRescan=False, bClear=False):
+		if not strDir:
+			strDir = Globs.getSetting("System", "strSoundLocation",
+				varDefault="/usr/share/scratch/Media/Sounds")
 		# >>> Critical Section
 		Globs.s_oSettingsLock.acquire()
 		try:

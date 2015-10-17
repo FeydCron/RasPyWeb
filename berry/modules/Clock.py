@@ -58,7 +58,8 @@ class Clock(ModuleBase):
 				"description"	: ("Die akustische Anzeige der Uhrzeit erfolgt durch den "+
 									"angegebenen Klang."),
 				"default"		: "BellToll",
-				"choices"		: Globs.s_dictSettings["Sounds"]
+				"choices"		: Globs.s_dictSettings["Sounds"],
+				"keyIsValue" 	: True
 			},
 			})
 		self.m_nSilenceFrom = Globs.getSetting("Clock", "nSilenceFrom", "\\d{1,2}", 19)
@@ -66,33 +67,47 @@ class Clock(ModuleBase):
 		self.m_nTellTimeInt = Globs.getSetting("Clock", "nTellTimeInt", "\\d{1,2}", 30)
 		return True
 		
-	def moduleExec(self, strPath, strCmd, strArg):
-		print("%r::moduleExec(strPath=%s, strCmd=%s, strArg=%s) [%s]" % (
-			self, strPath, strCmd, strArg, datetime.today().strftime("%X")))
+	def moduleExec(self,
+		strPath,
+		oHtmlPage,
+		dictQuery,
+		dictForm
+		):
+		print("%r::moduleExec(strPath=%s, dictQuery=%s, dictForm=%s) [%s]" % (
+			self, strPath, dictQuery, dictForm, datetime.today().strftime("%X")))
+		
+		if not dictQuery:
+			return False
+			
 		# Akustische Uhrzeitanzeige
-		if (strCmd == "clock"):
-			self.updateTime()
-			# Nur Glockenschlag ausführen
-			if (strArg == "gong"):
-				self.gong()
-				return True
-			# Nur Zeitansage ausführen
-			if (strArg == "speak"):
-				self.speakTime()
-				return True
-			# Default: Aktustische Zeitanzeige
-			if Globs.getSetting("System", "bTestMode", "True|False", False):
-				TaskSpeak(self.getWorker(), "Entschuldigung. Test.").start()
-				self.gong()
-				self.speakTime()
-			elif (self.m_nHour24h < self.m_nSilenceFrom
-				and self.m_nHour24h > self.m_nSilenceTo):
-				if (self.m_nMinutes % self.m_nTellTimeInt) == 0:
-					self.gong()
-					self.speakTime()
-			return True
+		bResult = False
+		for (strCmd, lstArg) in dictQuery.items():
+			if (strCmd == "clock"):
+				for strArg in lstArg:
+					self.updateTime()
+					# Nur Glockenschlag ausführen
+					if (strArg == "gong"):
+						self.gong()
+						bResult = True
+						continue
+					# Nur Zeitansage ausführen
+					if (strArg == "speak"):
+						self.speakTime()
+						bResult = True
+						continue
+					# Default: Aktustische Zeitanzeige
+					if Globs.getSetting("System", "bTestMode", "True|False", False):
+						TaskSpeak(self.getWorker(), "Entschuldigung. Test.").start()
+						self.gong()
+						self.speakTime()
+					elif (self.m_nHour24h < self.m_nSilenceFrom
+						and self.m_nHour24h > self.m_nSilenceTo):
+						if (self.m_nMinutes % self.m_nTellTimeInt) == 0:
+							self.gong()
+							self.speakTime()
+					bResult = True
 		# Unbekanntes Kommando
-		return False
+		return bResult
 	
 	# Aktuelle Zeit holen und in globalen Variablen speichern
 	def updateTime(self):
@@ -135,37 +150,41 @@ class Clock(ModuleBase):
 		if self.m_nTimeSpoken > 0:
 			return
 		self.m_nTimeSpoken += 1
+		
 		# Zeitansage in Bezug auf nächste volle Stunde zusammenbasteln
 		strPart = ""
 		strNext = "viertel"
-		strHour = "Uhr"
+		strHour = ""
 		nHour = self.m_nHour12h
 		if self.m_nMinutes >= 45:
 			strPart = "drei-viertel"
 			strNext = ""
-			strHour = ""
 			nHour += 1
 		elif self.m_nMinutes >= 30:
 			strPart = "halb"
 			strNext = "drei-viertel"
-			strHour = ""
 			nHour += 1
 		elif self.m_nMinutes >= 15:
 			strPart = "viertel"
 			strNext = "halb"
-			strHour = ""
 			nHour += 1
+		
+		# Ansage "Uhr" nur um die volle Stunde herum
+		if (self.m_nMinutes > 55
+			or (self.m_nMinutes >= 0 and self.m_nMinutes <= 10)):
+			strHour = "Uhr"
+			
 		# Nächste volle Stunde innerhalb des 12h-Intervalls beachten
 		if nHour == 13:
 			nHour = 1
-		# Angabe der Minuten etwas natürlicher formulieren
+			
+		# Angabe der Minuten in Bezug auf die Viertelstunde natürlicher formulieren
 		nMinutesPast = self.m_nMinutes % 15
-		if nMinutesPast > 1 and nMinutesPast <= 5:
-			strPart = "kurz nach " + strPart
-		elif nMinutesPast > 5 and nMinutesPast <= 10:
+		if nMinutesPast < 8:
 			strPart = "nach " + strPart
-		elif nMinutesPast > 10:
-			strPart = "kurz vor " + strNext
+		else:
+			strPart = "vor " + strNext
+			
 		# Komplette Zeitansage zusammensetzen und aussprechen
 		strSpeech = "Es ist jetzt " + strPart + " " + str(nHour) + " " + strHour
 		TaskSpeak(self.getWorker(), strSpeech).start()

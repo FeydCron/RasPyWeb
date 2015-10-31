@@ -9,12 +9,12 @@
         <File name="Sound.py" />
         <File name="Voice.py" />
         <File name="Worker.py" />
-        <File name="AMatisGPIO.py" />
         <Folder name="www" />
         <Folder name="modules">
             <File name="modules\__init__.py" />
             <File name="modules\Test.py" />
             <File name="modules\Clock.py" />
+            <File name="modules\AMatisGPIO.py" />
         </Folder>
     </Project>
 </NotepadPlus>

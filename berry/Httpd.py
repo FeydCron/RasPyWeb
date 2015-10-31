@@ -293,18 +293,14 @@ class Button:
 		strHRef="",
 		strIcon="",
 		strColor="",
-		strRedirect=""
+		strRedirect="startpage"
 		):
 		self.m_strName = strName
 		self.m_strTitle = strTitle
 		self.m_strHRef = strHRef
 		self.m_strIcon = strIcon
 		self.m_strColor = strColor
-		if strRedirect:
-			self.m_strRedirect = strRedirect
-		else:
-			self.m_strRedirect = "redirect2=%s" % (
-				"startpage")
+		self.m_strRedirect = strRedirect
 		return
 		
 	def writeToPage(self,
@@ -316,8 +312,16 @@ class Button:
 				strInput=self.m_strTitle, strTitle="Titel der Schaltfläche")
 			oHtmlPage.appendForm("btnHRef",
 				strInput=self.m_strHRef, strTitle="URL mit Abfrage")
+			oHtmlPage.appendForm("btnRedirect",
+				strInput=self.m_strRedirect,
+				strTitle="Zu dieser Seite navigieren",
+				bUseKeyAsValue=True,
+				bEscape=True,
+				dictChoice = Globs.s_dictSettings["Redirects"])
 			oHtmlPage.appendForm("btnIcon",
-				strInput=self.m_strIcon, strTitle="Icon", bEscape=False,
+				strInput=self.m_strIcon,
+				strTitle="Icon",
+				bEscape=False,
 				dictChoice = {
 					"" : "",
 					"&#x1F6AB; Verboten" 				: "ym-forbid",
@@ -381,9 +385,9 @@ class Button:
 		else:
 			strRedirect = ""
 			if "?" in self.m_strHRef:
-				strRedirect = "&"
+				strRedirect = "&redirect2="
 			else:
-				strRedirect = "?"
+				strRedirect = "?redirect2="
 			strRedirect += self.m_strRedirect
 			oHtmlPage.createButton(
 				self.m_strTitle,
@@ -391,23 +395,31 @@ class Button:
 				"%s %s" % (self.m_strIcon, self.m_strColor))
 		return
 		
-class TaskModuleCmd(FastTask):
+class TaskModuleCmd(FutureTask):
 	
-	def __init__(self, oWorker, strPath, strCmd, strArg):
+	def __init__(self,
+		oWorker,
+		strPath,
+		oHtmlPage,
+		dictForm=None,
+		dictQuery=None
+		):
 		super(TaskModuleCmd, self).__init__(oWorker)
 		self.m_strPath = strPath
-		self.m_strCmd = strCmd
-		self.m_strArg = strArg
+		self.m_dictForm = dictForm
+		self.m_dictQuery = dictQuery
+		self.m_oHtmlPage = oHtmlPage
 		return
 		
 	def __str__(self):
-		strDesc = "Ausführen eines Modulkommandos"
+		strDesc = "Ausführen von Modulkommandos"
 		return  strDesc
 	
 	def do(self):
 		for (strName, oInstance) in self.m_oWorker.m_dictModules.items():
 			if (re.match("/modules/%s\\..+" % (strName), self.m_strPath)):
-				oInstance.moduleExec(self.m_strPath, self.m_strCmd, self.m_strArg)
+				self.m_oResult = oInstance.moduleExec(self.m_strPath,
+					self.m_oHtmlPage, self.m_dictQuery, self.m_dictForm)
 				return
 		return
 		
@@ -481,10 +493,11 @@ class TaskEnableModule(FastTask):
 		
 class TaskDisplayModules(FutureTask):
 	
-	def __init__(self, oWorker, oHtmlPage, oTargetEdit = None):
+	def __init__(self, oWorker, oHtmlPage, dictQuery=None):
 		super(TaskDisplayModules, self).__init__(oWorker)
 		self.m_oHtmlPage = oHtmlPage
-		self.m_oTargetEdit = oTargetEdit
+		self.m_dictQuery = dictQuery
+		self.m_oTargetEdit = None
 		return
 		
 	def __str__(self):
@@ -497,6 +510,11 @@ class TaskDisplayModules(FutureTask):
 		return  strDesc
 		
 	def do(self):
+		self.m_oTargetEdit = None
+		
+		if self.m_dictQuery and "edit" in self.m_dictQuery:
+			self.m_oTargetEdit = self.m_dictQuery["edit"][0]
+		
 		if self.m_oTargetEdit and self.m_oTargetEdit in Globs.s_dictSettings["dictModules"]:
 			self.createForm()
 		else:
@@ -567,11 +585,13 @@ class TaskDisplayModules(FutureTask):
 		
 class TaskDisplaySystem(FutureTask):
 	
-	def __init__(self, oWorker, oHtmlPage, strFxn = "", strArg = ""):
+	def __init__(self, oWorker, oHtmlPage, dictForm=None, dictQuery=None):
 		super(TaskDisplaySystem, self).__init__(oWorker)
 		self.m_oHtmlPage = oHtmlPage
-		self.m_strFxn = strFxn
-		self.m_strArg = strArg
+		self.m_dictForm = dictForm
+		self.m_dictQuery = dictQuery
+		self.m_strFxn = ""
+		self.m_strArg = ""
 		return
 		
 	def __str__(self):
@@ -579,12 +599,33 @@ class TaskDisplaySystem(FutureTask):
 		return  strDesc
 		
 	def do(self):
-		if (self.m_strFxn and self.m_strFxn == "edit" and self.m_strArg):
-			if self.createForm():
-				return
-		elif (self.m_strFxn and self.m_strArg):
+		self.m_strFxn = ""
+		self.m_strArg = ""
+		
+		self.m_oHtmlPage.setTitle("Systemwerte")
+		
+		if self.m_dictQuery:
+			for strVal in ("edit", "date", "time"):
+				if strVal in self.m_dictQuery:
+					self.m_strFxn = "%s" % (strVal)
+					self.m_strArg = self.m_dictQuery[self.m_strFxn][0]
+					break;		
+			if (self.m_strFxn
+				and self.m_strFxn == "edit"
+				and self.m_strArg):
+				if self.createForm():
+					return
+					
+		if self.m_dictForm:
+			if "target" in self.m_dictForm:
+				self.m_strFxn = self.m_dictForm["target"][0]
+			if self.m_strFxn and self.m_strFxn in self.m_dictForm:
+				self.m_strArg = self.m_dictForm[self.m_strFxn][0]
+				
+		if (self.m_strFxn and self.m_strArg):
 			if not self.updateValue():
 				return
+				
 		self.displayValues()
 		return
 		
@@ -615,6 +656,7 @@ class TaskDisplaySystem(FutureTask):
 					bFirstIsHead=True)
 		# Tabelle schließen
 		self.m_oHtmlPage.closeTable()
+		self.m_oHtmlPage.setAutoRefresh(10)
 		return
 		
 	def createForm(self):
@@ -687,12 +729,14 @@ class TaskDisplaySystem(FutureTask):
 		
 class TaskDisplaySettings(FutureTask):
 	
-	def __init__(self, oWorker, oHtmlPage, strFxn = "", strVal = "", strKey = ""):
+	def __init__(self, oWorker, oHtmlPage, dictForm=None, dictQuery=None):
 		super(TaskDisplaySettings, self).__init__(oWorker)
 		self.m_oHtmlPage = oHtmlPage
-		self.m_strFxn = strFxn
-		self.m_strVal = strVal
-		self.m_strKey = strKey
+		self.m_dictForm = dictForm
+		self.m_dictQuery = dictQuery
+		self.m_strFxn = ""
+		self.m_strVal = ""
+		self.m_strKey = ""
 		return
 		
 	def __str__(self):
@@ -700,12 +744,32 @@ class TaskDisplaySettings(FutureTask):
 		return  strDesc
 		
 	def do(self):
-		if (self.m_strFxn and self.m_strFxn == "edit" and self.m_strVal and self.m_strKey):
+		self.m_strFxn = ""
+		self.m_strVal = ""
+		self.m_strKey = ""
+		
+		self.m_oHtmlPage.setTitle("Konfigurationseinstellungen")
+		
+		if (self.m_dictQuery
+			and "edit" in self.m_dictQuery
+			and "key" in self.m_dictQuery):
+			self.m_strFxn = "edit"
+			self.m_strVal = self.m_dictQuery[self.m_strFxn][0]
+			self.m_strKey = self.m_dictQuery["key"][0]
 			if self.createForm():
 				return
-		elif (self.m_strFxn and self.m_strVal and self.m_strKey):
-			if not self.updateValue():
-				return
+				
+		if (self.m_dictForm
+			and "target" in self.m_dictForm
+			and "key" in self.m_dictForm):
+			self.m_strFxn = self.m_dictForm["target"][0]
+			self.m_strKey = self.m_dictForm["key"][0]
+			self.m_strVal = ""
+			if self.m_strFxn in self.m_dictForm:
+				self.m_strVal = self.m_dictForm[self.m_strFxn][0]
+				if not self.updateValue():
+					return
+			
 		self.displayValues()
 		return
 		
@@ -748,6 +812,7 @@ class TaskDisplaySettings(FutureTask):
 		strDesc = ""
 		strDefault = ""
 		varVal = None
+		bUseKeyAsValue = False
 		# >>> Critical Section
 		Globs.s_oSettingsLock.acquire()
 		try:
@@ -770,6 +835,8 @@ class TaskDisplaySettings(FutureTask):
 					strDefault = dictProperties["default"]
 				if "choices" in dictProperties:
 					dictChoices = dictProperties["choices"]
+				if "keyIsValue" in dictProperties:
+					bUseKeyAsValue = dictProperties["keyIsValue"]
 		except:
 			Globs.exc("Ändern der Konfiguration")
 			varVal = None
@@ -798,7 +865,8 @@ class TaskDisplaySettings(FutureTask):
 			self.m_oHtmlPage.appendForm(self.m_strVal,
 				strInput="%s" % (varVal),
 				strTitle=strTitle,
-				dictChoice = dictChoices)	
+				dictChoice=dictChoices,
+				bUseKeyAsValue=bUseKeyAsValue)	
 		self.m_oHtmlPage.closeForm()
 		self.m_oHtmlPage.closeBox()
 		return True
@@ -816,10 +884,12 @@ class TaskDisplaySettings(FutureTask):
 
 class TaskDisplayLogMem(FutureTask):
 	
-	def __init__(self, oWorker, oHtmlPage, strMode = ""):
+	def __init__(self, oWorker, oHtmlPage, dictQuery=None, dictForm=None):
 		super(TaskDisplayLogMem, self).__init__(oWorker)
 		self.m_oHtmlPage = oHtmlPage
-		self.m_strMode = strMode
+		self.m_dictQuery = dictQuery
+		self.m_dictForm = dictForm
+		self.m_strMode = ""
 		return
 		
 	def __str__(self):
@@ -827,6 +897,15 @@ class TaskDisplayLogMem(FutureTask):
 		return  strDesc
 		
 	def do(self):
+		self.m_strMode = ""
+		
+		self.m_oHtmlPage.setTitle("Protokollierung")
+		
+		if self.m_dictQuery and "mode" in self.m_dictQuery:
+			self.m_strMode = self.m_dictQuery["mode"][0]
+		elif self.m_dictForm and "mode" in self.m_dictForm:
+			self.m_strMode = self.m_dictForm["mode"][0]
+		
 		bUpdate = (self.m_strMode and (self.m_strMode == "update"))
 		lstLogMem = Globs.getLogMem(bUpdate)
 		if self.m_strMode and self.m_strMode == "edit":
@@ -939,6 +1018,7 @@ class TaskDisplaySounds(FutureTask):
 		return
 		
 	def displaySounds(self):
+		self.m_oHtmlPage.setTitle("Klänge")
 		self.m_oHtmlPage.extend([
 			"<div class=\"nav-wrapper\">",
 			"<nav class=\"ym-vlist\">",
@@ -948,12 +1028,12 @@ class TaskDisplaySounds(FutureTask):
 		strSound = ""
 		
 		if self.m_dictQuery and "cache" in self.m_dictQuery:
-			if self.m_dictQuery["cache"] == "clear":
+			if self.m_dictQuery["cache"][0] == "clear":
 				Globs.scanSoundFiles(bClear=True)
-			if self.m_dictQuery["cache"] == "rescan":
+			if self.m_dictQuery["cache"][0] == "rescan":
 				Globs.scanSoundFiles(bRescan=True)
 		if self.m_dictQuery and "sound" in self.m_dictQuery:
-			strSound = self.m_dictQuery["sound"]
+			strSound = self.m_dictQuery["sound"][0]
 		
 		self.m_oHtmlPage.append("<ul>")
 		if "Sounds" in Globs.s_dictSettings:
@@ -1002,8 +1082,8 @@ class TaskStartPage(FutureTask):
 	def __init__(self,
 		oWorker,
 		oHtmlPage,
-		dictForm=None,	# {<name> : [<value>, ...]}
-		dictQuery=None	# {<name> : <value>}
+		dictForm=None,
+		dictQuery=None
 		):
 		super(TaskStartPage, self).__init__(oWorker)
 		self.m_oHtmlPage = oHtmlPage
@@ -1020,10 +1100,11 @@ class TaskStartPage(FutureTask):
 		artEdt = ""
 		btnEdt = ""
 		
+		self.m_oHtmlPage.setTitle("Startseite")
 		if (not Globs.s_oStartPage):
 			Globs.s_oStartPage = StartPage()
 			
-		bEdit = ("edit" in self.m_dictQuery and self.m_dictQuery["edit"] == "startpage")
+		bEdit = ("edit" in self.m_dictQuery and self.m_dictQuery["edit"][0] == "startpage")
 		
 		if self.m_dictForm:
 			if "del" in self.m_dictForm:
@@ -1049,18 +1130,18 @@ class TaskStartPage(FutureTask):
 				bEdit = False
 		if self.m_dictQuery:
 			if "secEdt" in self.m_dictQuery:
-				secEdt = self.m_dictQuery["secEdt"]
+				secEdt = self.m_dictQuery["secEdt"][0]
 			if ("artEdt" in self.m_dictQuery
 				and "sec" in self.m_dictQuery):
-				secEdt = self.m_dictQuery["sec"]
-				artEdt = self.m_dictQuery["artEdt"]
+				secEdt = self.m_dictQuery["sec"][0]
+				artEdt = self.m_dictQuery["artEdt"][0]
 			if "secAdd" in self.m_dictQuery:
-				secEdt = self.m_dictQuery["secAdd"]
+				secEdt = self.m_dictQuery["secAdd"][0]
 				self.doAdd(addSec=secEdt)
 			if ("artAdd" in self.m_dictQuery
 				and "sec" in self.m_dictQuery):
-				secEdt = self.m_dictQuery["sec"]
-				artEdt = self.m_dictQuery["artAdd"]
+				secEdt = self.m_dictQuery["sec"][0]
+				artEdt = self.m_dictQuery["artAdd"][0]
 				self.doAdd(addArt=artEdt)
 			
 		Globs.s_oStartPage.writeToPage(self.m_oHtmlPage, bEdit, secEdt, artEdt, btnEdt)
@@ -1088,7 +1169,7 @@ class TaskStartPage(FutureTask):
 			return
 		elif (addArt and self.m_dictQuery
 			and "sec" in self.m_dictQuery):
-			strSec = self.m_dictQuery["sec"]
+			strSec = self.m_dictQuery["sec"][0]
 		else:
 			return
 		
@@ -1213,6 +1294,8 @@ class TaskStartPage(FutureTask):
 			oButton.m_strIcon = self.m_dictForm["btnIcon"][0]
 		if "btnColor" in self.m_dictForm:
 			oButton.m_strColor = self.m_dictForm["btnColor"][0]
+		if "btnRedirect" in self.m_dictForm:
+			oButton.m_strRedirect = self.m_dictForm["btnRedirect"][0]
 		return
 
 class Httpd:
@@ -1246,38 +1329,18 @@ class Httpd:
 	
 class BerryHttpHandler(SimpleHTTPRequestHandler):
 	
-	def serveSoundHtml(self, strPath):
-		
-		page = [
-			"<html><title>Sounds</title>",
-			"<body><table border=1>",
-			"<tr><th colspan=2>Sounds</th></tr>",
-		]
-		
-		for strKey, listSounds in Sound.s_sounds.items():
-			page.append("<tr><th>%s</th><td><nl>" % (strKey))
-			for strSound in listSounds:
-				page.append(
-					"<li><a href=\"http://%s%s?sound=%s\">%s</a></li>" % (
-					self.headers["Host"], strPath, strSound, strSound))
-			page.append("</nl></td></tr>")
-			
-		page.append("</table></body></html>")
-		
-		return page
-	
-	def installModule(self, strPath, oForm):
-		if ("ModuleFile" not in oForm or
-			not oForm["ModuleFile"].filename or
-			not oForm["ModuleFile"].file):
+	def installModule(self, strPath, dictForm):
+		if ("ModuleFile" not in dictForm or
+			not dictForm["ModuleFile"][0].filename or
+			not dictForm["ModuleFile"][0].file):
 			oHtmlPage = HtmlPage(strPath, strTitle = "Modulinstallation")
 			oHtmlPage.createBox(
-				"Die Formulardaten sind unvollständig",
-				"Bitte geben Sie eine Moduldatei an",
+				"Unvollständige Eingabe",
+				"Bitte geben Sie die zu installierende Python3 Moduldatei an.",
 				strType="warning")
 			return oHtmlPage
 		oHtmlPage = HtmlPage("/system/modules.html", strTitle = "Modulkonfiguration")
-		oModuleFile = oForm["ModuleFile"]
+		oModuleFile = dictForm["ModuleFile"][0]
 		strFilename = oModuleFile.filename
 		strFilename = strFilename.replace("\\", "/")
 		strHead, strFilename = os.path.split(strFilename)
@@ -1285,12 +1348,13 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		if not re.match("\\.[Pp][Yy]", strExt):
 			oHtmlPage = HtmlPage(strPath, strTitle = "Modulinstallation")
 			oHtmlPage.createBox(
-				"Die hochgeladene Datei ist unzulässig",
-				"Bitte geben Sie eine Moduldatei an",
+				"Unzulässige Eingabe",
+				"Die Datei '%s' ist keine unterstützte Python3 Datei." % (strFilename) +
+				"Bitte geben Sie eine Python3 Moduldatei (*.py) an.",
 				strType="warning")
 			return oHtmlPage
-		if ("ModuleClass" in oForm):
-			strName = "%s" % (oForm.getfirst("ModuleClass"))
+		if ("ModuleClass" in dictForm):
+			strName = "%s" % (dictForm["ModuleClass"][0])
 		if not strName:
 			strName = strComponent
 		try:
@@ -1305,7 +1369,8 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				Globs.s_strModulePath, strFilename))
 			oHtmlPage.createBox(
 				"Fehler",
-				"Die hochgeladene Datei konnte nicht gespeichert werden.",
+				"Die hochgeladene Moduldatei '%s'" % (strFilename) +
+				"konnte nicht in '%s' gespeichert werden." % (Globs.s_strModulePath),
 				strType="error")
 			return oHtmlPage
 		# Tasks ausführen
@@ -1316,45 +1381,53 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			oTask.wait()
 		return oHtmlPage
 		
-	def installSound(self, strPath, oForm):
-		if ("SoundFile" not in oForm or
-			not oForm["SoundFile"].filename or
-			not oForm["SoundFile"].file):
+	def installSound(self, strPath, dictForm):
+		if ("SoundFile" not in dictForm):
 			oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
 			oHtmlPage.createBox(
-				"Die Formulardaten sind unvollständig",
-				"Bitte geben Sie eine Klangdatei an",
+				"Unvollständige Eingabe",
+				"Bitte geben Sie wenigstens eine Klangdatei an.",
 				strType="warning")
 			return oHtmlPage
 		oHtmlPage = HtmlPage("/sound/values.html", strTitle = "Installierte Klänge")
-		oSoundFile = oForm["SoundFile"]
-		strFilename = oSoundFile.filename
-		strFilename = strFilename.replace("\\", "/")
-		strHead, strFilename = os.path.split(strFilename)
-		strComponent, strExt = os.path.splitext(strFilename)
-		if not re.match("\\.[Ww][Aa][Vv]|\\.[Mm][Pp]3", strExt):
-			oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
-			oHtmlPage.createBox(
-				"Die hochgeladene Datei ist unzulässig",
-				"Bitte geben Sie eine zulässige Klangdatei an",
-				strType="warning")
-			return oHtmlPage
-		strSoundPath = Globs.getSetting("System", "strSoundLocation",
-			varDefault="/usr/share/scratch/Media/Sounds")
-		try:
-			foFile = open("%s/%s" % (strSoundPath, strFilename), "w+b")
-			oData = oSoundFile.file.read()
-			foFile.write(oData)
-			foFile.close()
-			del oData
-		except:
-			Globs.exc("Schreiben der Klangdatei %s/%s" % (
-				strSoundPath, strFilename))
-			oHtmlPage.createBox(
-				"Fehler",
-				"Die hochgeladene Datei konnte nicht gespeichert werden.",
-				strType="error")
-			return oHtmlPage
+		for oSoundFile in dictForm["SoundFile"]:
+			if (not oSoundFile.filename or
+				not oSoundFile.file):
+				oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
+				oHtmlPage.createBox(
+					"Unvollständige Eingabe",
+					"Bitte geben Sie wenigstens eine Klangdatei an",
+					strType="warning")
+				return oHtmlPage
+			strFilename = oSoundFile.filename
+			strFilename = strFilename.replace("\\", "/")
+			strHead, strFilename = os.path.split(strFilename)
+			strComponent, strExt = os.path.splitext(strFilename)
+			if not re.match("\\.[Ww][Aa][Vv]|\\.[Mm][Pp]3", strExt):
+				oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
+				oHtmlPage.createBox(
+					"Unzulässige Eingabe",
+					"Die Datei '%s' ist keine unterstützte Klangdatei." % (strFilename) +
+					"Bitte geben Sie nur zulässige Klangdateien (*.wav, *.mp3) an.",
+					strType="warning")
+				return oHtmlPage
+			strSoundPath = Globs.getSetting("System", "strSoundLocation",
+				varDefault="/usr/share/scratch/Media/Sounds")
+			try:
+				foFile = open("%s/%s" % (strSoundPath, strFilename), "w+b")
+				oData = oSoundFile.file.read()
+				foFile.write(oData)
+				foFile.close()
+				del oData
+			except:
+				Globs.exc("Schreiben der Klangdatei %s/%s" % (
+					strSoundPath, strFilename))
+				oHtmlPage.createBox(
+					"Fehler",
+					"Die hochgeladene Klangdatei '%s'" % (strFilename) +
+					"konnte nicht in '%s' gespeichert werden." % (strSoundPath),
+					strType="error")
+				return oHtmlPage
 		# Tasks ausführen
 		Globs.scanSoundFiles(bRescan=True)
 		oTask = TaskDisplaySounds(g_oHttpdWorker, oHtmlPage)
@@ -1362,35 +1435,35 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			oTask.wait()
 		return oHtmlPage
 		
-	def changeModules(self, strPath, oForm):
+	def changeModules(self, strPath, dictForm):
 		oHtmlPage = HtmlPage(strPath, strTitle = "Modulkonfiguration")
-		if ("submit" not in oForm):
+		if ("submit" not in dictForm):
 			oHtmlPage.createBox(
 				"Fehler",
 				"Im Formular fehlt die Angabe der auszuführenden Aktion (Parameter \"submit\").",
 				strType="error")
 			return oHtmlPage
-		if ("target" not in oForm):
+		if ("target" not in dictForm):
 			oHtmlPage.createBox(
 				"Achtung",
 				"Für den auszuführenden Vorgang müssen zunächst Objekte ausgewählt werden.",
 				strType="warning")
 			return oHtmlPage
-		strAction = oForm.getfirst("submit")
+		strAction = dictForm["submit"][0]
 		if strAction == "save":
-			if ("ModuleClass" not in oForm):
+			if ("ModuleClass" not in dictForm):
 				oHtmlPage.createBox(
 					"Achtung",
 					"Es muss ein gültiger Bezeichner für die Hauptklasse des Moduls angegeben werden.",
 					strType="error")
 				return oHtmlPage
-			strTarget = oForm.getfirst("target")
-			strName = oForm.getfirst("ModuleClass")
+			strTarget = dictForm["target"][0]
+			strName = dictForm["ModuleClass"][0]
 			# Modul installieren
 			TaskInstallModule(g_oHttpdWorker, strTarget, strName).start()
 			TaskModuleInit(g_oHttpdWorker, strTarget).start()
 		elif strAction == "enable" or strAction == "disable":
-			lstTarget = oForm.getlist("target")
+			lstTarget = dictForm["target"]
 			bEnable = True
 			if strAction == "disable":
 				bEnable = False
@@ -1399,7 +1472,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				TaskEnableModule(g_oHttpdWorker, strTarget, bEnable).start()
 				TaskModuleInit(g_oHttpdWorker, strTarget).start()
 		elif strAction == "delete":
-			lstTarget = oForm.getlist("target")
+			lstTarget = dictForm["target"]
 			for strTarget in lstTarget:
 				TaskRemoveModule(g_oHttpdWorker, strTarget).start()
 				TaskModuleInit(g_oHttpdWorker, strTarget).start()
@@ -1414,65 +1487,67 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			oTask.wait()
 		return oHtmlPage
 	
-	def serveGet(self, strPath, oHtmlPage = None, dictQuery = None):
+	def serveGet(self,
+		strPath,
+		strRedirect=None,
+		dictForm=None,
+		dictQuery=None
+		):
 		try:
 			oFutureTask = None
-			if strPath == "/system/settings.html":
-				strFxn = ""
-				strVal = ""
-				strKey = ""
-				if dictQuery and "edit" in dictQuery and "key" in dictQuery:
-					strFxn = "edit"
-					strVal = dictQuery[strFxn]
-					strKey = dictQuery["key"]
-				oHtmlPage = HtmlPage(strPath,
-					strTitle = "Konfigurationseinstellungen")
-				oFutureTask = TaskDisplaySettings(g_oHttpdWorker, oHtmlPage,
-					strFxn=strFxn,
-					strVal=strVal,
-					strKey=strKey)
-			elif strPath == "/system/values.html":
-				nAutoRefresh = 10
-				strFxn = ""
-				strArg = ""
-				if dictQuery:
-					for strVal in ("edit", "date", "time"):
-						if strVal in dictQuery:
-							strFxn = "%s" % (strVal)
-							strArg = dictQuery[strFxn]
-							nAutoRefresh = 0
-							break
-				oHtmlPage = HtmlPage(strPath,
-					strTitle = "Systemwerte",
-					nAutoRefresh = nAutoRefresh)
-				oFutureTask = TaskDisplaySystem(g_oHttpdWorker, oHtmlPage, strFxn=strFxn, strArg=strArg)
-			elif strPath == "/system/modules.html":
-				oHtmlPage = HtmlPage(strPath, strTitle = "Installierte Module")
-				oTargetEdit = None
-				if dictQuery and "edit" in dictQuery:
-					oTargetEdit = dictQuery["edit"]
-				oFutureTask = TaskDisplayModules(g_oHttpdWorker,
-					oHtmlPage, oTargetEdit)
-			elif strPath == "/system/logging.html":
-				oHtmlPage = HtmlPage(strPath, strTitle = "Logging")
-				strMode = None
-				if dictQuery and "mode" in dictQuery:
-					strMode = dictQuery["mode"]
-				oFutureTask = TaskDisplayLogMem(g_oHttpdWorker,
-					oHtmlPage, strMode)
-			elif strPath == "/system/startpage.html":
-				oHtmlPage = HtmlPage(strPath, strTitle = "Startseite")
-				oFutureTask = TaskStartPage(g_oHttpdWorker,
-					oHtmlPage, dictQuery=dictQuery)
-			elif strPath == "/sound/values.html":
-				oHtmlPage = HtmlPage(strPath, strTitle = "Klänge")
-				oFutureTask = TaskDisplaySounds(g_oHttpdWorker,
-					oHtmlPage, dictQuery=dictQuery)
+			oHtmlPage = None
+			
+			if dictQuery or dictForm:
+				oHtmlPage = self.doCommand(strPath,
+					dictForm=dictForm,
+					dictQuery=dictQuery)
+				if strRedirect:
+					strPath = strRedirect
+					oHtmlPage = None
+			
+			if (not oHtmlPage):
+				if strPath == "/system/settings.html":
+					oHtmlPage = HtmlPage(strPath)
+					oFutureTask = TaskDisplaySettings(g_oHttpdWorker,
+						oHtmlPage,
+						dictQuery=dictQuery,
+						dictForm=dictForm)
+				elif strPath == "/system/values.html":
+					oHtmlPage = HtmlPage(strPath)
+					oFutureTask = TaskDisplaySystem(g_oHttpdWorker,
+						oHtmlPage,
+						dictQuery=dictQuery,
+						dictForm=dictForm)
+				elif strPath == "/system/modules.html":
+					oHtmlPage = HtmlPage(strPath)
+					oFutureTask = TaskDisplayModules(g_oHttpdWorker,
+						oHtmlPage,
+						dictQuery=dictQuery)
+				elif strPath == "/system/logging.html":
+					oHtmlPage = HtmlPage(strPath)
+					oFutureTask = TaskDisplayLogMem(g_oHttpdWorker,
+						oHtmlPage,
+						dictQuery=dictQuery,
+						dictForm=dictForm)
+				elif strPath == "/system/startpage.html":
+					oHtmlPage = HtmlPage(strPath)
+					oFutureTask = TaskStartPage(g_oHttpdWorker,
+						oHtmlPage,
+						dictQuery=dictQuery,
+						dictForm=dictForm)
+				elif strPath == "/sound/values.html":
+					oHtmlPage = HtmlPage(strPath)
+					oFutureTask = TaskDisplaySounds(g_oHttpdWorker,
+						oHtmlPage,
+						dictQuery=dictQuery,
+						dictForm=dictForm)
+						
 			if oFutureTask:
 				if oFutureTask.start():
 					oFutureTask.wait()
 				else:
 					oHtmlPage = None
+					
 			if not oHtmlPage:
 				SimpleHTTPRequestHandler.do_GET(self)
 				return
@@ -1494,84 +1569,41 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 	def servePost(self, strPath, oForm, dictQuery = None):
 		oHtmlPage = None
 		try:
-			if strPath == "/system/install.html":
-				oHtmlPage = self.installModule(strPath, oForm)
-			elif strPath == "/sound/install.html":
-				oHtmlPage = self.installSound(strPath, oForm)
-			elif strPath == "/system/modules.html":
-				oHtmlPage = self.changeModules(strPath, oForm)
-			elif strPath == "/system/logging.html" and "mode" in oForm:
-				oHtmlPage = HtmlPage(strPath, strTitle = "Logging")
-				strMode = oForm.getfirst("mode")
-				oFutureTask = TaskDisplayLogMem(g_oHttpdWorker,
-					oHtmlPage, strMode)
-				if oFutureTask.start():
-					oFutureTask.wait()
-				else:
-					oHtmlPage = None
-			elif (strPath == "/system/settings.html"
-				and "target" in oForm
-				and "key" in oForm):
-				oHtmlPage = HtmlPage(strPath, strTitle = "Konfigurationseinstellungen")
-				strFxn = oForm.getfirst("target")
-				strKey = oForm.getfirst("key")
-				strVal = ""
-				if strFxn in oForm:
-					strVal = oForm.getfirst(strFxn)
-				oFutureTask = TaskDisplaySettings(g_oHttpdWorker,
-					oHtmlPage, strFxn=strFxn, strVal=strVal, strKey=strKey)
-				if oFutureTask.start():
-					oFutureTask.wait()
-				else:
-					oHtmlPage = None
-			elif strPath == "/system/values.html" and "target" in oForm:
-				oHtmlPage = HtmlPage(strPath, strTitle = "Systemwerte")
-				strFxn = oForm.getfirst("target")
-				strArg = ""
-				if strFxn in oForm:
-					strArg = oForm.getfirst(strFxn)
-				oFutureTask = TaskDisplaySystem(g_oHttpdWorker,
-					oHtmlPage, strFxn=strFxn, strArg=strArg)
-				if oFutureTask.start():
-					oFutureTask.wait()
-				else:
-					oHtmlPage = None
-			elif strPath == "/system/startpage.html":
-				dictForm = {}
-				for strKey in oForm.keys():
-					dictForm.update({strKey : oForm.getlist(strKey)})
-				oHtmlPage = HtmlPage(strPath, strTitle = "Startseite")
-				oFutureTask = TaskStartPage(g_oHttpdWorker,
-					oHtmlPage, dictForm=dictForm, dictQuery=dictQuery)
-				if oFutureTask.start():
-					oFutureTask.wait()
-				else:
-					oHtmlPage = None
-			if not oHtmlPage:
-				for oKey in oForm.keys():
-					print("oKey=%s" % (oKey))
-					oField = oForm[oKey]
-					print("  oField=%r" % (oField))
-					if (type(oField) is list or type(oField) is tuple):
-						# handle list of FieldStorage or MiniFieldStorage instances
-						for oItem in oField:
-							print("    oItem=%r, %s" % (oItem, oItem.type))
-							if (oItem.filename):
-								# File Upload
-								print("File Upload - Field: %s, Filename: %s, File: %s" % (
-									oItem.name, oItem.filename, oItem.file))
+			# Formulardaten aufbereiten
+			dictForm = {}
+			for oKey in oForm.keys():
+				strInfo = ""
+				bSkip = False
+				oField = oForm[oKey]
+				if (type(oField) is list or type(oField) is tuple):
+					for oItem in oField:
+						if (oItem.filename):
+							if strInfo:
+								strInfo += ", '%s'" % (oItem.filename)
 							else:
-								# Regular form value
-								self.doCommand(strPath, "%s" % (oKey), "%s" % (oItem.value))
-					else:
-						if (oField.filename):
-							# File Upload
-							print("File Upload - Field: %s, Filename: %s, File: %s" % (
-								oField.name, oField.filename, oField.file))
-						else:
-							# Regular form value
-							self.doCommand(strPath, "%s" % (oKey), "%s" % (oField.value))
-				self.serveGet(strPath)
+								strInfo = "mehrerer Dateien: %s='%s'" % (oKey, oItem.filename)
+							if (oKey not in dictForm):
+								dictForm.update({oKey : []})
+							dictForm[oKey].append(oItem)
+							bSkip = True
+				elif (oField.filename):
+					strInfo = "einer Datei: %s=%s" % (oKey, oField.filename)
+					dictForm.update({oKey : [oField]})
+					bSkip = True
+				if strInfo:
+					Globs.log("Hochladen %s" % (strInfo))
+				if (not bSkip):
+					dictForm.update({oKey : oForm.getlist(oKey)})
+				
+			if strPath == "/system/install.html":
+				oHtmlPage = self.installModule(strPath, dictForm)
+			elif strPath == "/sound/install.html":
+				oHtmlPage = self.installSound(strPath, dictForm)
+			elif strPath == "/system/modules.html":
+				oHtmlPage = self.changeModules(strPath, dictForm)
+			
+			if not oHtmlPage:
+				self.serveGet(strPath, dictForm=dictForm, dictQuery=dictQuery)
 				return
 		except:
 			Globs.exc("HTTP POST Version %s: Client '%s' (%s), Path '%s', Form '%r'" % (
@@ -1588,31 +1620,47 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		self.wfile.write(oHtmlPage.getContent())
 		return
 	
-	def doCommand(self, strPath, strCmd, strArg):
-		Globs.dbg("doCommand(strPath=%s, strCmd=%s, strArg=%s)" % (
-			strPath, strCmd, strArg))
-		# System or program termination		
-		if (re.match("/exit/(exit|halt|boot)\\.html", strPath)):
-			if strCmd == "exit":
-				TaskExit(g_oHttpdWorker, strArg).start()
-				delayShutdown()
-				return
-			Globs.wrn(
-				"Unbekanntes Kommando \"%s\"=\"%s\" an Adresse \"%s\" (%s)." % (
-				strCmd, strArg, strPath, "Programm/System beenden"))
-			return
-		# Built-in commands
-		if strCmd == "sound":
-			TaskSound(g_oHttpdWorker, strArg).start()
-			return
-		if strCmd == "speak":
-			TaskSpeak(g_oHttpdWorker, strArg).start()
-			return
+	def doCommand(self,
+		strPath,
+		dictForm=None,
+		dictQuery=None
+		):
+		Globs.dbg("doCommand(strPath=%s, dictForm=%r, dictQuery=%r)" % (
+			strPath, dictForm, dictQuery))
+		# Built-in sound and speak command processing for GET and POST
+		if (dictQuery and "sound" in dictQuery):
+			for strArg in dictQuery["sound"]:
+				TaskSound(g_oHttpdWorker, strArg).start()
+		if (dictForm and "sound" in dictForm):
+			for strArg in dictForm["sound"]:
+				TaskSound(g_oHttpdWorker, strArg).start()
+		if (dictQuery and "speak" in dictQuery):
+			for strArg in dictQuery["speak"]:
+				TaskSpeak(g_oHttpdWorker, strArg).start()
+		if (dictForm and "speak" in dictForm):
+			for strArg in dictForm["speak"]:
+				TaskSpeak(g_oHttpdWorker, strArg).start()
+		# System or program termination
+		if (re.match("/exit/(exit|halt|boot)\\.html", strPath)
+			and dictQuery
+			and "exit" in dictQuery):
+			TaskExit(g_oHttpdWorker, dictQuery["exit"][0]).start()
+			delayShutdown()
+			return None
 		# Commands being passed to installed modules
 		if (re.match("/modules/.+\\..+", strPath)):
-			TaskModuleCmd(g_oHttpdWorker, strPath, strCmd, strArg).start()
-			return
-		return
+			oHtmlPage = HtmlPage(strPath)
+			oFutureTask = TaskModuleCmd(g_oHttpdWorker,
+				strPath,
+				oHtmlPage,
+				dictForm=dictForm,
+				dictQuery=dictQuery)
+			if oFutureTask.start():
+				oFutureTask.wait()
+			else:
+				oHtmlPage = None
+			return oHtmlPage
+		return None
 	
 	def do_GET(self):
 		# Webserver-Aktivität signalisieren
@@ -1620,24 +1668,22 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		# Die angeforderten Informationen auswerten
 		oParsedPath = urlparse(self.path)
 		strPath = oParsedPath.path
-		lstQueryItems = parse_qsl(oParsedPath.query)
-		dictQuery = dict((p.strip(), v.strip()) for p, v in lstQueryItems)
+		dictQuery = {}
+		for (p, v) in parse_qsl(oParsedPath.query):
+			p = p.strip()
+			if p not in dictQuery:
+				dictQuery.update({p : []})
+			dictQuery[p].append(v.strip())
 		bRedirect = False
 		strRedirect = strPath
-		for strCmd, strArg in dictQuery.items():
-			# HTTP-Server redirect commands
-			if strCmd == "redirect2":
-				bRedirect = True
-				strRedirect = Globs.getRedirect(strArg, strPath)
-			self.doCommand(strPath, strCmd, strArg)
+		# HTTP-Server redirect commands
+		if ("redirect2" in dictQuery):
+			bRedirect = True
+			strRedirect = Globs.getRedirect(dictQuery["redirect2"][0], strPath)
 		oHtmlPage = None
-		if ((not bRedirect)
-			and re.match("/modules/.+\\..+", strPath)):
-			oHtmlPage = HtmlPage(strPath, strTitle = "Modulkommando")
-			oHtmlPage.createText("OK")
 		# Angeforderten Inhalt liefern
-		self.serveGet(strRedirect,
-			oHtmlPage = oHtmlPage,
+		self.serveGet(strPath,
+			strRedirect=strRedirect,
 			dictQuery = dictQuery)
 		return
 	
@@ -1648,11 +1694,12 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		oParsedPath = urlparse(self.path)
 		strPath = oParsedPath.path
 		# Die angeforderten Informationen (Query) auswerten		
-		lstQueryItems = parse_qsl(oParsedPath.query)
-		dictQuery = dict((p.strip(), v.strip()) for p, v in lstQueryItems)
-		bResult = True
-		for strCmd, strArg in dictQuery.items():
-			self.doCommand(strPath, strCmd, strArg)
+		dictQuery = {}
+		for (p, v) in parse_qsl(oParsedPath.query):
+			p = p.strip()
+			if p not in dictQuery:
+				dictQuery.update({p : []})
+			dictQuery[p].append(v.strip())
 		# Die angeforderten Informationen (Formular) auswerten
 		oForm = cgi.FieldStorage(
 			fp=self.rfile, 
@@ -1660,7 +1707,6 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			environ={'REQUEST_METHOD':'POST',
 				'CONTENT_TYPE':self.headers['Content-Type'],
 				})
-		print("do_POST: %r" % (oForm))
 		# Das abgesendete Formular verarbeiten
 		self.servePost(strPath, oForm, dictQuery=dictQuery)
 		return

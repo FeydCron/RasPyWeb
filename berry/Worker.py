@@ -264,6 +264,7 @@ class TaskModuleInit(FastTask):
 				return
 			# Module instanziieren
 			oInstance = clsModule(self.m_oWorker)
+			del clsModule
 			# >>> Critical Section
 			Globs.s_oSettingsLock.acquire()
 			if self.m_strComponent not in Globs.s_dictSettings:

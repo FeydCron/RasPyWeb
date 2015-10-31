@@ -7,6 +7,7 @@ import traceback
 import pickle
 import threading
 import socket
+import imp
 
 from collections import deque
 from collections import OrderedDict
@@ -83,7 +84,8 @@ class Globs:
 		# HTTP-Weiterleitungen
 		# {"<ID>" : "<URL>"}
 		"Redirects" : {
-			"startpage" : "/system/startpage.html"
+			"Zielseite" : "",
+			"Startseite" : "/system/startpage.html"
 		}
 	}
 	
@@ -222,6 +224,7 @@ class Globs:
 		return
 	
 	def importComponent(strModuleName, strComponentName):
+		oComponent = None
 		try:
 			Globs.log("Importieren des Moduls '%s'" % (strModuleName))
 			oComponent = __import__(strModuleName)
@@ -246,7 +249,7 @@ class Globs:
 			oObj = json.load(foFile)
 			foFile.close()
 			for (strKey, varVal) in oObj.items():
-				if (strKey == "System"
+				if (strKey in ["System", "Redirects"]
 					and strKey in Globs.s_dictSettings):
 					Globs.s_dictSettings[strKey].update(oObj[strKey])
 				else:

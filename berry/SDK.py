@@ -126,35 +126,27 @@ class HtmlPage(list):
 	def __init__(self, strPath, strTitle = "", nAutoRefresh=0):
 		list.__init__([])
 		self.m_strPath = strPath
+		self.m_strTitle = strTitle
 		self.m_bPageEnded = False
 		self.m_bChk = False
 		self.m_bAct = False
 		self.m_strQueries = ""
+		self.m_strAutoRefresh = ""
 		self.m_nId = 0
 		
-		strAutoRefresh = ""
+		self.setAutoRefresh(nAutoRefresh)
+		return
+	
+	def setTitle(self, strTitle):
+		self.m_strTitle = strTitle
+		return
+		
+	def setAutoRefresh(self, nAutoRefresh=0):
 		if nAutoRefresh >= 5:
-			strAutoRefresh = "<meta http-equiv=\"refresh\" content=\"%s\">" % (
+			self.m_strAutoRefresh = "<meta http-equiv=\"refresh\" content=\"%s\">" % (
 				nAutoRefresh)
-			
-		self.extend([
-			"<!DOCTYPE html>",
-			"<html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\">",
-			"<head>",
-			"<meta charset=\"utf-8\"/>",
-			"<title>%s</title>" % (html.escape(strTitle)),
-			"%s" % (strAutoRefresh),
-			"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">",
-			"<link href=\"../css/flexible-columns.css\" rel=\"stylesheet\" type=\"text/css\"/>",
-			"<!--[if lte IE 7]>",
-			"<link href=\"../../yaml/core/iehacks.css\" rel=\"stylesheet\" type=\"text/css\" />",
-			"<![endif]-->",
-			"<!--[if lt IE 9]>",
-			"<script src=\"../../lib/html5shiv/html5shiv.js\"></script>",
-			"<![endif]-->",
-			"</head>",
-			"<body>",
-		])
+		else:
+			self.m_strAutoRefresh = ""
 		return
 	
 	def getContent(self):
@@ -164,7 +156,24 @@ class HtmlPage(list):
 				"</html>",
 			])
 		self.m_bPageEnded = True
-		return "\n".join(self).encode()
+		
+		return (("<!DOCTYPE html>" +
+			"<html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\">" +
+			"<head>" +
+			"<meta charset=\"utf-8\"/>" +
+			"<title>%s</title>" % (html.escape(self.m_strTitle)) +
+			"%s" % (self.m_strAutoRefresh) +
+			"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">" +
+			"<link href=\"../css/flexible-columns.css\" rel=\"stylesheet\" type=\"text/css\"/>" +
+			"<!--[if lte IE 7]>" +
+			"<link href=\"../../yaml/core/iehacks.css\" rel=\"stylesheet\" type=\"text/css\" />" +
+			"<![endif]-->" +
+			"<!--[if lt IE 9]>" +
+			"<script src=\"../../lib/html5shiv/html5shiv.js\"></script>" +
+			"<![endif]-->" +
+			"</head>" +
+			"<body>" +
+			("\n".join(self))).encode())
 	
 	def openTableForm(self, strCaption, lstHeader, strChk = None, strAct = None, bBorder = False):
 		self.m_bChk = False
@@ -405,7 +414,8 @@ class HtmlPage(list):
 		
 	def appendForm(self, strName, strInput="", strTitle="", bSelected=False,
 		dictChoice=None, nLines=None, bCheck=False, bRadio=False, bButton=False,
-		strTip="", strClass="", strTextType="text", strTypePattern="", bEscape=True):
+		strTip="", strClass="", strTextType="text", strTypePattern="",
+		bEscape=True, bUseKeyAsValue=False):
 		strSelected = ""
 		if bEscape:
 			if strTitle:
@@ -482,21 +492,29 @@ class HtmlPage(list):
 					if (isinstance(oValue, dict)):
 						self.append("<optgroup label=\"%s\">" % (oName))
 						for (oName, oItem) in sorted(oValue.items()):
-							if strInput == oName:
+							if ((bUseKeyAsValue and strInput == oName) or
+								(not bUseKeyAsValue and strInput == oItem)):
 								strSelected = "selected=\"selected\""
 							else:
 								strSelected = ""
+							if bUseKeyAsValue:
+								oItem = oName
 							if bEscape:
-								oName = html.escape(oName)
+								oItem = html.escape(oItem)
 							self.append(
 								"<option value=\"%s\" %s>%s</option>" % (
-									oName, strSelected, oName))
+									oItem, strSelected, oName))
 						self.append("</optgroup>")
 					else:
-						if strInput == oValue:
+						if ((bUseKeyAsValue and strInput == oName) or
+							(not bUseKeyAsValue and strInput == oValue)):
 							strSelected = "selected=\"selected\""
 						else:
 							strSelected = ""
+						if bUseKeyAsValue:
+							oValue = oName
+						if bEscape:
+							oValue = html.escape(oValue)
 						self.append(
 							"<option value=\"%s\" %s>%s</option>" % (
 								oValue, strSelected, oName))

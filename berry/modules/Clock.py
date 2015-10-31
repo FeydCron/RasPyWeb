@@ -180,10 +180,11 @@ class Clock(ModuleBase):
 			
 		# Angabe der Minuten in Bezug auf die Viertelstunde natürlicher formulieren
 		nMinutesPast = self.m_nMinutes % 15
-		if nMinutesPast < 8:
-			strPart = "nach " + strPart
-		else:
-			strPart = "vor " + strNext
+		if not nMinutesPast == 0:
+			if nMinutesPast < 8:
+				strPart = "nach " + strPart
+			else:
+				strPart = "vor " + strNext
 			
 		# Komplette Zeitansage zusammensetzen und aussprechen
 		strSpeech = "Es ist jetzt " + strPart + " " + str(nHour) + " " + strHour

@@ -6,6 +6,7 @@ import threading
 import traceback
 import uuid
 import html
+import zipfile
 
 from http.server import BaseHTTPRequestHandler
 from http.server import SimpleHTTPRequestHandler
@@ -15,6 +16,7 @@ from urllib.parse import urlparse
 from urllib.parse import parse_qsl
 from datetime import datetime
 from collections import OrderedDict
+from zipfile import ZipFile
 
 from Sound import Sound
 from Globs import Globs
@@ -1386,7 +1388,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
 			oHtmlPage.createBox(
 				"Unvollständige Eingabe",
-				"Bitte geben Sie wenigstens eine Klangdatei an.",
+				"Es muss mindestens eine Klang- oder Zip-Datei angegeben werden.",
 				strType="warning")
 			return oHtmlPage
 		oHtmlPage = HtmlPage("/sound/values.html", strTitle = "Installierte Klänge")
@@ -1396,36 +1398,24 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
 				oHtmlPage.createBox(
 					"Unvollständige Eingabe",
-					"Bitte geben Sie wenigstens eine Klangdatei an",
+					"Es konnte keine gültige Klang- oder Zip-Datei empfangen werden.",
 					strType="warning")
 				return oHtmlPage
-			strFilename = oSoundFile.filename
-			strFilename = strFilename.replace("\\", "/")
-			strHead, strFilename = os.path.split(strFilename)
-			strComponent, strExt = os.path.splitext(strFilename)
-			if not re.match("\\.[Ww][Aa][Vv]|\\.[Mm][Pp]3", strExt):
-				oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
-				oHtmlPage.createBox(
-					"Unzulässige Eingabe",
-					"Die Datei '%s' ist keine unterstützte Klangdatei." % (strFilename) +
-					"Bitte geben Sie nur zulässige Klangdateien (*.wav, *.mp3) an.",
-					strType="warning")
-				return oHtmlPage
-			strSoundPath = Globs.getSetting("System", "strSoundLocation",
-				varDefault="/usr/share/scratch/Media/Sounds")
 			try:
-				foFile = open("%s/%s" % (strSoundPath, strFilename), "w+b")
-				oData = oSoundFile.file.read()
-				foFile.write(oData)
-				foFile.close()
-				del oData
-			except:
-				Globs.exc("Schreiben der Klangdatei %s/%s" % (
-					strSoundPath, strFilename))
+				if not self.processSoundFile(oSoundFile):
+					oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
+					oHtmlPage.createBox(
+						"Unzulässige Eingabe",
+						"Bitte verwenden Sie nur zulässige Klangdateien (*.wav, *.mp3).",
+						strType="warning")
+					return oHtmlPage
+			except Exception as ex:
+				Globs.exc("Verarbeiten der Klangdatei %s" % (
+					oSoundFile.filename))
 				oHtmlPage.createBox(
 					"Fehler",
-					"Die hochgeladene Klangdatei '%s'" % (strFilename) +
-					"konnte nicht in '%s' gespeichert werden." % (strSoundPath),
+					"Die empfangene Datei '%s' " % (oSoundFile.filename) +
+					"konnte nicht verarbeitet werden (%s)." % (ex),
 					strType="error")
 				return oHtmlPage
 		# Tasks ausführen
@@ -1434,6 +1424,41 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		if oTask.start():
 			oTask.wait()
 		return oHtmlPage
+		
+	def processSoundFile(self, oSoundFile):
+		strSoundPath = Globs.getSetting("System", "strSoundLocation",
+			varDefault="/usr/share/scratch/Media/Sounds")
+		strFilename = oSoundFile.filename
+		strFilename = strFilename.replace("\\", "/")
+		strHead, strFilename = os.path.split(strFilename)
+		strComponent, strExt = os.path.splitext(strFilename)
+		bResult = False
+		if (zipfile.is_zipfile(oSoundFile.file)):
+			strDirname = os.path.join(strSoundPath, strComponent)
+			if not (os.path.isdir(strDirname) or os.path.islink(strDirname)):
+				os.mkdir(strDirname)
+			with ZipFile(oSoundFile.file, "r") as oZipFile:
+				for oZipInfo in (oZipFile.infolist()):
+					foFile = oZipFile.open(oZipInfo)
+					strHead, strFilename = os.path.split(oZipInfo.filename)
+					if re.match("\\.[Ww][Aa][Vv]|\\.[Mm][Pp]3", strFilename):
+						continue
+					self.installSoundFile(foFile, os.path.join(strDirname, strFilename))
+					bResult = True
+		elif not re.match("\\.[Ww][Aa][Vv]|\\.[Mm][Pp]3", strExt):
+			return False
+		else:
+			this.installSoundFile(oSoundFile.file, os.path.join(strSoundPath, strFilename))
+			bResult = True
+		return bResult
+		
+	def installSoundFile(self, foSource, strFilename):
+		foFile = open(strFilename, "w+b")
+		oData = foSource.read()
+		foFile.write(oData)
+		foFile.close()
+		del oData
+		return
 		
 	def changeModules(self, strPath, dictForm):
 		oHtmlPage = HtmlPage(strPath, strTitle = "Modulkonfiguration")
@@ -1552,9 +1577,9 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				SimpleHTTPRequestHandler.do_GET(self)
 				return
 		except:
-			Globs.exc("HTTP GET Version %s: Client '%s' (%s), Path '%s', Query '%r'" % (
+			Globs.exc("HTTP GET Version %s: Client '%s' (%s), Path '%s'" % (
 				self.request_version, self.client_address, self.address_string(),
-				strPath, dictQuery))
+				strPath))
 			oHtmlPage = HtmlPage(strPath, strTitle = "Fehler")
 			oHtmlPage.createBox(
 				"Fehler",
@@ -1606,9 +1631,9 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				self.serveGet(strPath, dictForm=dictForm, dictQuery=dictQuery)
 				return
 		except:
-			Globs.exc("HTTP POST Version %s: Client '%s' (%s), Path '%s', Form '%r'" % (
+			Globs.exc("HTTP POST Version %s: Client '%s' (%s), Path '%s'" % (
 				self.request_version, self.client_address, self.address_string(),
-				strPath, oForm))
+				strPath))
 			oHtmlPage = HtmlPage(strPath, strTitle = "Fehler")
 			oHtmlPage.createBox(
 				"Fehler",
@@ -1661,6 +1686,19 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				oHtmlPage = None
 			return oHtmlPage
 		return None
+		
+	def do_HEAD(self):
+		self.send_response(200)
+		self.send_header('Content-type', 'text/html')
+		self.end_headers()
+		return
+
+	def do_AUTHHEAD(self):
+		self.send_response(401)
+		self.send_header('WWW-Authenticate', 'Basic realm=\"RasPyWeb\"')
+		self.send_header('Content-type', 'text/html')
+		self.end_headers()
+		return
 	
 	def do_GET(self):
 		# Webserver-Aktivität signalisieren

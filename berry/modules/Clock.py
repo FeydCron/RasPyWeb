@@ -144,7 +144,9 @@ class Clock(ModuleBase):
 			nCount = 1
 		# Ggf. Sound abspielen
 		if (nCount >= 1):
-			TaskSound(self.getWorker(), "BellToll", nLoops = nCount).start()
+			TaskSound(self.getWorker(),
+				Globs.getSetting("Clock", "strSoundHour", ".+", "BellToll"),
+				nLoops = nCount).start()
 		return
 	
 	# Akustische Zeitansage

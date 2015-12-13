@@ -8,6 +8,7 @@ import pickle
 import threading
 import socket
 import imp
+import getopt
 
 from collections import deque
 from collections import OrderedDict
@@ -80,6 +81,7 @@ class Globs:
 			"fCpuTempB" 		: 56.0,			# Kritische Temperaturgrenze
 			"fCpuTempC" 		: 53.0,			# Warn-Temperaturgrenze
 			"strSoundLocation"	: "/usr/share/scratch/Media/Sounds",
+			"fVersion"			: 0.1,
 		},
 		# HTTP-Weiterleitungen
 		# {"<ID>" : "<URL>"}
@@ -194,6 +196,7 @@ class Globs:
 	s_oLogMemLock = threading.RLock()
 	s_oSettingsLock = threading.RLock()
 	
+	s_strBasePath = "/home/pi/berry"
 	s_strModulePath = "/home/pi/berry/modules"
 	s_strConfigFile = "/home/pi/berry/config.json"
 	s_strLogMemFile = "/home/pi/berry/logmem.pickle"
@@ -204,15 +207,29 @@ class Globs:
 	s_lstSnapshot = None
 	s_oStartPage = None
 	
-	def getRedirect(strID, strDefault):
-		if ("Redirects" in Globs.s_dictSettings
-			and strID in Globs.s_dictSettings["Redirects"]):
-			return Globs.s_dictSettings["Redirects"][strID]
-		Globs.wrn("Keine Weiterleitung auf \"%s\" bekannt. Default: \"%s\"" % (
-			strID, strDefault))
-		return strDefault
+	s_evtShutdown = threading.Event()
+	
+	def onDelayedShutdown():
+		if (Globs.s_evtShutdown.isSet()):
+			print("No critical activity since last shutdown indication. Shutdown now.")
+			Globs.stop()
+			return
+		print("Recognized critical activity since last shutdown indication.")
+		Globs.shutdown()
+		return
+		
+	def signalCriticalActivity():
+		Globs.s_evtShutdown.clear()
+		
+	def shutdown():
+		Globs.log("Globs.shutdown('%s')" % (Globs.s_strExitMode))
+		print("Delaying shutdown ...")
+		Globs.s_evtShutdown.set()
+		threading.Timer(5.0, Globs.onDelayedShutdown).start()
+		return
 	
 	def stop():
+		Globs.log("Globs.stop('%s')" % (Globs.s_strExitMode))
 		if Globs.s_oHttpd:
 			Globs.s_oHttpd.shutdown()
 			Globs.s_oHttpd.server_close()
@@ -222,6 +239,17 @@ class Globs:
 			except Exception as ex:
 				print("Schließen des Sockets sicherstellen: %r" % (ex))
 		return
+	
+	def getVersion():
+		return float(0.1)
+	
+	def getRedirect(strID, strDefault):
+		if ("Redirects" in Globs.s_dictSettings
+			and strID in Globs.s_dictSettings["Redirects"]):
+			return Globs.s_dictSettings["Redirects"][strID]
+		Globs.wrn("Keine Weiterleitung auf \"%s\" bekannt. Default: \"%s\"" % (
+			strID, strDefault))
+		return strDefault
 	
 	def importComponent(strModuleName, strComponentName):
 		oComponent = None
@@ -244,6 +272,19 @@ class Globs:
 		# >>> Critical Section
 		Globs.s_oSettingsLock.acquire()
 		# Einstellungen lesen
+		
+		Globs.s_strBasePath = ("%s" % os.path.dirname(__file__))		
+		#print("BasePath=%s" % Globs.s_strBasePath)
+		
+		s_strModulePath = os.path.join(Globs.s_strBasePath, "modules")
+		#print("ModulePath=%s" % s_strModulePath)
+		s_strConfigFile = os.path.join(Globs.s_strBasePath, "config.json")
+		#print("ConfigFile=%s" % s_strConfigFile)
+		s_strLogMemFile = os.path.join(Globs.s_strBasePath, "logmem.pickle")
+		#print("LogMemFile=%s" % s_strLogMemFile)
+		s_strStartPageFile = os.path.join(Globs.s_strBasePath, "startpage.pickle")
+		#print("StartPageFile=%s" % s_strStartPageFile)
+		
 		try:
 			foFile = open(Globs.s_strConfigFile, "r")
 			oObj = json.load(foFile)
@@ -588,7 +629,7 @@ class Globs:
 					else:
 						Globs.s_dictSettings[strKeyName][strValName] = varNewVal
 						bResult = True
-						Globs.log("Konfiguration \"%s\".\"%s\" von \"%s\" %r auf \"%s\" %r geändert." % (
+						Globs.dbg("Konfiguration \"%s\".\"%s\" von \"%s\" %r auf \"%s\" %r geändert." % (
 							strKeyName, strValName, varOldVal, oOldType, varNewVal, oNewType))
 				else:
 					Globs.err("Konfigurationseinstellung setzen: \"%s\".\"%s\" -> \"%s\" - Adressierter Wert existiert nicht" % (

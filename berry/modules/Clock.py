@@ -82,7 +82,20 @@ class Clock(ModuleBase):
 		# Akustische Uhrzeitanzeige
 		bResult = False
 		for (strCmd, lstArg) in dictQuery.items():
-			if (strCmd == "clock"):
+			if (strCmd == "timer" and lstArg and lstArg[0] == "cron"):
+				self.updateTime()
+				# Default: Aktustische Zeitanzeige
+				if Globs.getSetting("System", "bTestMode", "True|False", False):
+					TaskSpeak(self.getWorker(), "Entschuldigung. Test.").start()
+					self.gong()
+					self.speakTime()
+				elif (self.m_nHour24h < self.m_nSilenceFrom
+					and self.m_nHour24h > self.m_nSilenceTo):
+					if (self.m_nMinutes % self.m_nTellTimeInt) == 0:
+						self.gong()
+						self.speakTime()
+				bResult = True
+			elif (strCmd == "clock"):
 				for strArg in lstArg:
 					self.updateTime()
 					# Nur Glockenschlag ausführen
@@ -95,17 +108,6 @@ class Clock(ModuleBase):
 						self.speakTime()
 						bResult = True
 						continue
-					# Default: Aktustische Zeitanzeige
-					if Globs.getSetting("System", "bTestMode", "True|False", False):
-						TaskSpeak(self.getWorker(), "Entschuldigung. Test.").start()
-						self.gong()
-						self.speakTime()
-					elif (self.m_nHour24h < self.m_nSilenceFrom
-						and self.m_nHour24h > self.m_nSilenceTo):
-						if (self.m_nMinutes % self.m_nTellTimeInt) == 0:
-							self.gong()
-							self.speakTime()
-					bResult = True
 		# Unbekanntes Kommando
 		return bResult
 	

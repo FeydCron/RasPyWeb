@@ -28,27 +28,12 @@ from SDK import TaskSound
 from SDK import FastTask
 from SDK import LongTask
 from SDK import HtmlPage
+from SDK import TaskModuleEvt
 
 from Worker import FutureTask
 from Worker import TaskExit
 
 g_oHttpdWorker = None
-g_evtShutdown = threading.Event()
-
-def onDelayedShutdown():
-	if (g_evtShutdown.isSet()):
-		print("No activity of Httpd since last shutdown indication. Shutdown Httpd now.")
-		Globs.stop()
-		return
-	print("Recognized activity of Httpd since last shutdown indication.")
-	delayShutdown()
-	return
-	
-def delayShutdown():
-	print("Delaying shutdown of Httpd ...")
-	g_evtShutdown.set()
-	threading.Timer(5.0, onDelayedShutdown).start()
-	return
 	
 # {<name> : <Section>}
 class StartPage(OrderedDict):
@@ -793,11 +778,27 @@ class TaskDisplaySettings(FutureTask):
 							strTitle = strValueName
 							if ("title" in dictProperties):
 								strTitle = dictProperties["title"]
-							self.m_oHtmlPage.appendTable([
-								strTitle,
-								"<a href=\"%s?edit=%s&key=%s\">&#x0270E; %s</a>" % (
-									"/system/settings.html", strValueName, strKey, Globs.s_dictSettings[strKey][strValueName])
-								], bFirstIsHead=True, bEscape=False)
+							if ("readonly" in dictProperties and dictProperties["readonly"]):
+								self.m_oHtmlPage.appendTable([
+									strTitle,
+									"%s" % (Globs.s_dictSettings[strKey][strValueName])
+									], bFirstIsHead=True, bEscape=False)
+							elif ("showlink" in dictProperties and dictProperties["showlink"]
+								and "description" in dictProperties
+								and dictProperties["description"]):
+								self.m_oHtmlPage.appendTable([
+									strTitle,
+									"<a href=\"%s\">&#x027A5; %s</a>" % (
+										Globs.s_dictSettings[strKey][strValueName],
+										dictProperties["description"])
+									], bFirstIsHead=True, bEscape=False)
+							else:
+								self.m_oHtmlPage.appendTable([
+									strTitle,
+									"<a href=\"%s?edit=%s&key=%s\">&#x0270E; %s</a>" % (
+										"/system/settings.html", strValueName, strKey,
+										Globs.s_dictSettings[strKey][strValueName])
+									], bFirstIsHead=True, bEscape=False)
 			if bOpened:
 				self.m_oHtmlPage.closeTable()
 		except:
@@ -1305,27 +1306,42 @@ class Httpd:
 	def __init__(self, oWorker):
 		global g_oHttpdWorker
 		
-		g_evtShutdown.clear()
+		Globs.signalCriticalActivity()
 		g_oHttpdWorker = oWorker
 		return
 	
+	## 
+	#  @brief
+	#  Startet den Web-Server und kehrt erst nach dessen Terminierung zurück.
+	#  
+	#  @param [in] self
+	#  				die Httpd-Instanz
+	#  
+	#  @details
+	#  Bevor der Web-Server gestartet wird, wechselt die Routine das Arbeitsverzeichnis in das
+	#  Wurzelverzeichnis des Web-Servers. Das Wurzelverzeichnis des Web-Servers setzt sich
+	#  zusammen aus `[@ref installdir]/www`.	
+	#  
+	#  
 	def run(self):
-			
-		os.chdir("/home/pi/berry/www")
-		
-		Globs.s_oHttpd = BerryHttpServer((
-			Globs.getSetting("System", "strHttpIp",
-				"\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}",
-				"0.0.0.0"),
-			Globs.getSetting("System", "nHttpPort",
-				"\\d{1,5}",
-				8081)),
-			BerryHttpHandler)
-		
-		print("Running HTTP Server on %s at %s ..." % (
-			Globs.s_oHttpd.server_name, Globs.s_oHttpd.server_address))
-		Globs.s_oHttpd.serve_forever()
-		#Globs.s_oHttpd.socket.close()
+		strHttpDir = os.path.join(Globs.s_strBasePath, "www")
+		if (os.path.isdir(strHttpDir)):
+			# Das Arbeitsverzeichnis muss das "www"-Verzeichnis sein
+			os.chdir(strHttpDir)
+			# Web-Server instanziieren
+			Globs.s_oHttpd = BerryHttpServer((
+				Globs.getSetting("System", "strHttpIp",
+					"\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}",
+					"0.0.0.0"),
+				Globs.getSetting("System", "nHttpPort",
+					"\\d{1,5}",
+					8081)),
+				BerryHttpHandler)
+			# Web-Server starten
+			print("Running HTTP Server on %s at %s ..." % (
+				Globs.s_oHttpd.server_name, Globs.s_oHttpd.server_address))
+			Globs.s_oHttpd.serve_forever()
+		# Ressourcen des Web-Servers freigeben
 		Globs.s_oHttpd.server_close()
 		return
 	
@@ -1522,13 +1538,14 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			oFutureTask = None
 			oHtmlPage = None
 			
-			if dictQuery or dictForm:
-				oHtmlPage = self.doCommand(strPath,
-					dictForm=dictForm,
-					dictQuery=dictQuery)
-				if strRedirect:
-					strPath = strRedirect
-					oHtmlPage = None
+			oHtmlPage = self.doCommand(strPath,
+				dictForm=dictForm,
+				dictQuery=dictQuery)
+			if strRedirect:
+				strPath = strRedirect
+				oHtmlPage = None
+				
+			Globs.log("serveGet: '%s', redirect='%s' -> %s" % (strPath, strRedirect, oHtmlPage))
 			
 			if (not oHtmlPage):
 				if strPath == "/system/settings.html":
@@ -1665,15 +1682,25 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		if (dictForm and "speak" in dictForm):
 			for strArg in dictForm["speak"]:
 				TaskSpeak(g_oHttpdWorker, strArg).start()
+		# External timer event from cron-job
+		if (re.match("/ext/evt\\.src", strPath)
+			and dictQuery
+			and "timer" in dictQuery
+			and dictQuery["timer"]
+			and dictQuery["timer"][0] == "cron"):
+			TaskModuleEvt(g_oHttpdWorker, strPath, dictQuery=dictQuery).start()
+			return HtmlPage(strPath)
 		# System or program termination
 		if (re.match("/exit/(exit|halt|boot)\\.html", strPath)
 			and dictQuery
-			and "exit" in dictQuery):
+			and "exit" in dictQuery
+			and dictQuery["exit"]):
 			TaskExit(g_oHttpdWorker, dictQuery["exit"][0]).start()
-			delayShutdown()
 			return None
+		Globs.log("doCommand: '%s'" % strPath)
 		# Commands being passed to installed modules
-		if (re.match("/modules/.+\\..+", strPath)):
+		if (re.match("/modules/.+\\.(cmd|htm|html)", strPath)):
+			Globs.log("Modulkommando: '%s'" % strPath)
 			oHtmlPage = HtmlPage(strPath)
 			oFutureTask = TaskModuleCmd(g_oHttpdWorker,
 				strPath,
@@ -1702,7 +1729,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 	
 	def do_GET(self):
 		# Webserver-Aktivität signalisieren
-		g_evtShutdown.clear()
+		Globs.signalCriticalActivity()
 		# Die angeforderten Informationen auswerten
 		oParsedPath = urlparse(self.path)
 		strPath = oParsedPath.path
@@ -1713,7 +1740,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				dictQuery.update({p : []})
 			dictQuery[p].append(v.strip())
 		bRedirect = False
-		strRedirect = strPath
+		strRedirect = None
 		# HTTP-Server redirect commands
 		if ("redirect2" in dictQuery):
 			bRedirect = True
@@ -1727,7 +1754,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 	
 	def do_POST(self):
 		# Webserver-Aktivität signalisieren
-		g_evtShutdown.clear()
+		Globs.signalCriticalActivity()
 		# URL analysieren
 		oParsedPath = urlparse(self.path)
 		strPath = oParsedPath.path

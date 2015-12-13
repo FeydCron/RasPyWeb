@@ -6,6 +6,7 @@ import threading
 import traceback
 import uuid
 import html
+import zipfile
 
 from http.server import BaseHTTPRequestHandler
 from http.server import SimpleHTTPRequestHandler
@@ -15,6 +16,7 @@ from urllib.parse import urlparse
 from urllib.parse import parse_qsl
 from datetime import datetime
 from collections import OrderedDict
+from zipfile import ZipFile
 
 from Sound import Sound
 from Globs import Globs
@@ -26,27 +28,12 @@ from SDK import TaskSound
 from SDK import FastTask
 from SDK import LongTask
 from SDK import HtmlPage
+from SDK import TaskModuleEvt
 
 from Worker import FutureTask
 from Worker import TaskExit
 
 g_oHttpdWorker = None
-g_evtShutdown = threading.Event()
-
-def onDelayedShutdown():
-	if (g_evtShutdown.isSet()):
-		print("No activity of Httpd since last shutdown indication. Shutdown Httpd now.")
-		Globs.stop()
-		return
-	print("Recognized activity of Httpd since last shutdown indication.")
-	delayShutdown()
-	return
-	
-def delayShutdown():
-	print("Delaying shutdown of Httpd ...")
-	g_evtShutdown.set()
-	threading.Timer(5.0, onDelayedShutdown).start()
-	return
 	
 # {<name> : <Section>}
 class StartPage(OrderedDict):
@@ -791,11 +778,27 @@ class TaskDisplaySettings(FutureTask):
 							strTitle = strValueName
 							if ("title" in dictProperties):
 								strTitle = dictProperties["title"]
-							self.m_oHtmlPage.appendTable([
-								strTitle,
-								"<a href=\"%s?edit=%s&key=%s\">&#x0270E; %s</a>" % (
-									"/system/settings.html", strValueName, strKey, Globs.s_dictSettings[strKey][strValueName])
-								], bFirstIsHead=True, bEscape=False)
+							if ("readonly" in dictProperties and dictProperties["readonly"]):
+								self.m_oHtmlPage.appendTable([
+									strTitle,
+									"%s" % (Globs.s_dictSettings[strKey][strValueName])
+									], bFirstIsHead=True, bEscape=False)
+							elif ("showlink" in dictProperties and dictProperties["showlink"]
+								and "description" in dictProperties
+								and dictProperties["description"]):
+								self.m_oHtmlPage.appendTable([
+									strTitle,
+									"<a href=\"%s\">&#x027A5; %s</a>" % (
+										Globs.s_dictSettings[strKey][strValueName],
+										dictProperties["description"])
+									], bFirstIsHead=True, bEscape=False)
+							else:
+								self.m_oHtmlPage.appendTable([
+									strTitle,
+									"<a href=\"%s?edit=%s&key=%s\">&#x0270E; %s</a>" % (
+										"/system/settings.html", strValueName, strKey,
+										Globs.s_dictSettings[strKey][strValueName])
+									], bFirstIsHead=True, bEscape=False)
 			if bOpened:
 				self.m_oHtmlPage.closeTable()
 		except:
@@ -1303,27 +1306,42 @@ class Httpd:
 	def __init__(self, oWorker):
 		global g_oHttpdWorker
 		
-		g_evtShutdown.clear()
+		Globs.signalCriticalActivity()
 		g_oHttpdWorker = oWorker
 		return
 	
+	## 
+	#  @brief
+	#  Startet den Web-Server und kehrt erst nach dessen Terminierung zurück.
+	#  
+	#  @param [in] self
+	#  				die Httpd-Instanz
+	#  
+	#  @details
+	#  Bevor der Web-Server gestartet wird, wechselt die Routine das Arbeitsverzeichnis in das
+	#  Wurzelverzeichnis des Web-Servers. Das Wurzelverzeichnis des Web-Servers setzt sich
+	#  zusammen aus `[@ref installdir]/www`.	
+	#  
+	#  
 	def run(self):
-			
-		os.chdir("/home/pi/berry/www")
-		
-		Globs.s_oHttpd = BerryHttpServer((
-			Globs.getSetting("System", "strHttpIp",
-				"\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}",
-				"0.0.0.0"),
-			Globs.getSetting("System", "nHttpPort",
-				"\\d{1,5}",
-				8081)),
-			BerryHttpHandler)
-		
-		print("Running HTTP Server on %s at %s ..." % (
-			Globs.s_oHttpd.server_name, Globs.s_oHttpd.server_address))
-		Globs.s_oHttpd.serve_forever()
-		#Globs.s_oHttpd.socket.close()
+		strHttpDir = os.path.join(Globs.s_strBasePath, "www")
+		if (os.path.isdir(strHttpDir)):
+			# Das Arbeitsverzeichnis muss das "www"-Verzeichnis sein
+			os.chdir(strHttpDir)
+			# Web-Server instanziieren
+			Globs.s_oHttpd = BerryHttpServer((
+				Globs.getSetting("System", "strHttpIp",
+					"\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}",
+					"0.0.0.0"),
+				Globs.getSetting("System", "nHttpPort",
+					"\\d{1,5}",
+					8081)),
+				BerryHttpHandler)
+			# Web-Server starten
+			print("Running HTTP Server on %s at %s ..." % (
+				Globs.s_oHttpd.server_name, Globs.s_oHttpd.server_address))
+			Globs.s_oHttpd.serve_forever()
+		# Ressourcen des Web-Servers freigeben
 		Globs.s_oHttpd.server_close()
 		return
 	
@@ -1386,7 +1404,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
 			oHtmlPage.createBox(
 				"Unvollständige Eingabe",
-				"Bitte geben Sie wenigstens eine Klangdatei an.",
+				"Es muss mindestens eine Klang- oder Zip-Datei angegeben werden.",
 				strType="warning")
 			return oHtmlPage
 		oHtmlPage = HtmlPage("/sound/values.html", strTitle = "Installierte Klänge")
@@ -1396,36 +1414,24 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
 				oHtmlPage.createBox(
 					"Unvollständige Eingabe",
-					"Bitte geben Sie wenigstens eine Klangdatei an",
+					"Es konnte keine gültige Klang- oder Zip-Datei empfangen werden.",
 					strType="warning")
 				return oHtmlPage
-			strFilename = oSoundFile.filename
-			strFilename = strFilename.replace("\\", "/")
-			strHead, strFilename = os.path.split(strFilename)
-			strComponent, strExt = os.path.splitext(strFilename)
-			if not re.match("\\.[Ww][Aa][Vv]|\\.[Mm][Pp]3", strExt):
-				oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
-				oHtmlPage.createBox(
-					"Unzulässige Eingabe",
-					"Die Datei '%s' ist keine unterstützte Klangdatei." % (strFilename) +
-					"Bitte geben Sie nur zulässige Klangdateien (*.wav, *.mp3) an.",
-					strType="warning")
-				return oHtmlPage
-			strSoundPath = Globs.getSetting("System", "strSoundLocation",
-				varDefault="/usr/share/scratch/Media/Sounds")
 			try:
-				foFile = open("%s/%s" % (strSoundPath, strFilename), "w+b")
-				oData = oSoundFile.file.read()
-				foFile.write(oData)
-				foFile.close()
-				del oData
-			except:
-				Globs.exc("Schreiben der Klangdatei %s/%s" % (
-					strSoundPath, strFilename))
+				if not self.processSoundFile(oSoundFile):
+					oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
+					oHtmlPage.createBox(
+						"Unzulässige Eingabe",
+						"Bitte verwenden Sie nur zulässige Klangdateien (*.wav, *.mp3).",
+						strType="warning")
+					return oHtmlPage
+			except Exception as ex:
+				Globs.exc("Verarbeiten der Klangdatei %s" % (
+					oSoundFile.filename))
 				oHtmlPage.createBox(
 					"Fehler",
-					"Die hochgeladene Klangdatei '%s'" % (strFilename) +
-					"konnte nicht in '%s' gespeichert werden." % (strSoundPath),
+					"Die empfangene Datei '%s' " % (oSoundFile.filename) +
+					"konnte nicht verarbeitet werden (%s)." % (ex),
 					strType="error")
 				return oHtmlPage
 		# Tasks ausführen
@@ -1434,6 +1440,41 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		if oTask.start():
 			oTask.wait()
 		return oHtmlPage
+		
+	def processSoundFile(self, oSoundFile):
+		strSoundPath = Globs.getSetting("System", "strSoundLocation",
+			varDefault="/usr/share/scratch/Media/Sounds")
+		strFilename = oSoundFile.filename
+		strFilename = strFilename.replace("\\", "/")
+		strHead, strFilename = os.path.split(strFilename)
+		strComponent, strExt = os.path.splitext(strFilename)
+		bResult = False
+		if (zipfile.is_zipfile(oSoundFile.file)):
+			strDirname = os.path.join(strSoundPath, strComponent)
+			if not (os.path.isdir(strDirname) or os.path.islink(strDirname)):
+				os.mkdir(strDirname)
+			with ZipFile(oSoundFile.file, "r") as oZipFile:
+				for oZipInfo in (oZipFile.infolist()):
+					foFile = oZipFile.open(oZipInfo)
+					strHead, strFilename = os.path.split(oZipInfo.filename)
+					if re.match("\\.[Ww][Aa][Vv]|\\.[Mm][Pp]3", strFilename):
+						continue
+					self.installSoundFile(foFile, os.path.join(strDirname, strFilename))
+					bResult = True
+		elif not re.match("\\.[Ww][Aa][Vv]|\\.[Mm][Pp]3", strExt):
+			return False
+		else:
+			this.installSoundFile(oSoundFile.file, os.path.join(strSoundPath, strFilename))
+			bResult = True
+		return bResult
+		
+	def installSoundFile(self, foSource, strFilename):
+		foFile = open(strFilename, "w+b")
+		oData = foSource.read()
+		foFile.write(oData)
+		foFile.close()
+		del oData
+		return
 		
 	def changeModules(self, strPath, dictForm):
 		oHtmlPage = HtmlPage(strPath, strTitle = "Modulkonfiguration")
@@ -1497,13 +1538,14 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			oFutureTask = None
 			oHtmlPage = None
 			
-			if dictQuery or dictForm:
-				oHtmlPage = self.doCommand(strPath,
-					dictForm=dictForm,
-					dictQuery=dictQuery)
-				if strRedirect:
-					strPath = strRedirect
-					oHtmlPage = None
+			oHtmlPage = self.doCommand(strPath,
+				dictForm=dictForm,
+				dictQuery=dictQuery)
+			if strRedirect:
+				strPath = strRedirect
+				oHtmlPage = None
+				
+			Globs.log("serveGet: '%s', redirect='%s' -> %s" % (strPath, strRedirect, oHtmlPage))
 			
 			if (not oHtmlPage):
 				if strPath == "/system/settings.html":
@@ -1552,9 +1594,9 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				SimpleHTTPRequestHandler.do_GET(self)
 				return
 		except:
-			Globs.exc("HTTP GET Version %s: Client '%s' (%s), Path '%s', Query '%r'" % (
+			Globs.exc("HTTP GET Version %s: Client '%s' (%s), Path '%s'" % (
 				self.request_version, self.client_address, self.address_string(),
-				strPath, dictQuery))
+				strPath))
 			oHtmlPage = HtmlPage(strPath, strTitle = "Fehler")
 			oHtmlPage.createBox(
 				"Fehler",
@@ -1606,9 +1648,9 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				self.serveGet(strPath, dictForm=dictForm, dictQuery=dictQuery)
 				return
 		except:
-			Globs.exc("HTTP POST Version %s: Client '%s' (%s), Path '%s', Form '%r'" % (
+			Globs.exc("HTTP POST Version %s: Client '%s' (%s), Path '%s'" % (
 				self.request_version, self.client_address, self.address_string(),
-				strPath, oForm))
+				strPath))
 			oHtmlPage = HtmlPage(strPath, strTitle = "Fehler")
 			oHtmlPage.createBox(
 				"Fehler",
@@ -1640,15 +1682,25 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		if (dictForm and "speak" in dictForm):
 			for strArg in dictForm["speak"]:
 				TaskSpeak(g_oHttpdWorker, strArg).start()
+		# External timer event from cron-job
+		if (re.match("/ext/evt\\.src", strPath)
+			and dictQuery
+			and "timer" in dictQuery
+			and dictQuery["timer"]
+			and dictQuery["timer"][0] == "cron"):
+			TaskModuleEvt(g_oHttpdWorker, strPath, dictQuery=dictQuery).start()
+			return HtmlPage(strPath)
 		# System or program termination
 		if (re.match("/exit/(exit|halt|boot)\\.html", strPath)
 			and dictQuery
-			and "exit" in dictQuery):
+			and "exit" in dictQuery
+			and dictQuery["exit"]):
 			TaskExit(g_oHttpdWorker, dictQuery["exit"][0]).start()
-			delayShutdown()
 			return None
+		Globs.log("doCommand: '%s'" % strPath)
 		# Commands being passed to installed modules
-		if (re.match("/modules/.+\\..+", strPath)):
+		if (re.match("/modules/.+\\.(cmd|htm|html)", strPath)):
+			Globs.log("Modulkommando: '%s'" % strPath)
 			oHtmlPage = HtmlPage(strPath)
 			oFutureTask = TaskModuleCmd(g_oHttpdWorker,
 				strPath,
@@ -1661,10 +1713,23 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				oHtmlPage = None
 			return oHtmlPage
 		return None
+		
+	def do_HEAD(self):
+		self.send_response(200)
+		self.send_header('Content-type', 'text/html')
+		self.end_headers()
+		return
+
+	def do_AUTHHEAD(self):
+		self.send_response(401)
+		self.send_header('WWW-Authenticate', 'Basic realm=\"RasPyWeb\"')
+		self.send_header('Content-type', 'text/html')
+		self.end_headers()
+		return
 	
 	def do_GET(self):
 		# Webserver-Aktivität signalisieren
-		g_evtShutdown.clear()
+		Globs.signalCriticalActivity()
 		# Die angeforderten Informationen auswerten
 		oParsedPath = urlparse(self.path)
 		strPath = oParsedPath.path
@@ -1675,7 +1740,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				dictQuery.update({p : []})
 			dictQuery[p].append(v.strip())
 		bRedirect = False
-		strRedirect = strPath
+		strRedirect = None
 		# HTTP-Server redirect commands
 		if ("redirect2" in dictQuery):
 			bRedirect = True
@@ -1689,7 +1754,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 	
 	def do_POST(self):
 		# Webserver-Aktivität signalisieren
-		g_evtShutdown.clear()
+		Globs.signalCriticalActivity()
 		# URL analysieren
 		oParsedPath = urlparse(self.path)
 		strPath = oParsedPath.path

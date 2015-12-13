@@ -1,5 +1,6 @@
 ﻿import sys
 import os
+import re
 import traceback
 import time
 import subprocess
@@ -10,6 +11,8 @@ from Voice import Voice
 from Globs import Globs
 from Worker import Worker
 from Httpd import Httpd
+
+import SDK
 from SDK import TaskSpeak
 
 class Berry:
@@ -24,6 +27,8 @@ class Berry:
 	
 	def run(self):
 		
+		strProgram = None
+		strPID = None
 		oSysCallCmd = False
 		strGoodBye = "Tschüssikovski!"
 		
@@ -33,12 +38,44 @@ class Berry:
 		
 		TaskSpeak(self.m_oWorker, "Servus!").start()
 		
-		print("Attempt to start HTTP Server ...")
-		try:
-			self.m_oHttpd.run()
-		except:
-			Globs.exc("HTTP Server starten und laufen lassen")
-			TaskSpeak(self.m_oWorker, "Hoppla! Scheinbar gibt es ein Problem mit dem Webb-Sörver.").start()
+		while True:
+			
+			print("Attempt to start HTTP Server ...")
+			try:
+				self.m_oHttpd.run()
+				break
+			except:
+				Globs.exc("HTTP Server starten und laufen lassen")
+				
+				if not (strProgram and strPID):
+					# Einmalig versuchen, den belegten Port freizugeben
+					oLines = SDK.getShellCmdOutput("netstat -pant")
+					for strLine in oLines:
+						if re.match("tcp\\s+.*\\s+%s\\:%s\\s+%s\\s+LISTEN\\s+\\d+/dbus-daemon" % (
+							re.escape(Globs.s_oHttpd.server_address[0]),
+							Globs.s_oHttpd.server_address[1],
+							re.escape("0.0.0.0:*"), strLine)):
+							for strToken in re.split("\\s+", strLine):
+								if (re.match("\\d+/dbus-daemon", strToken)):
+									strPID, strProgram = re.split("/", strToken)
+									break
+							if (strProgram and strPID):
+								break;
+					if (strProgram and strPID):
+						TaskSpeak(self.m_oWorker,
+							"Das Program %s mit der Prozesskennung %s belegt den Port %s" % (
+							strProgram, strPID, Globs.s_oHttpd.server_address[1])).start()
+						TaskSpeak(self.m_oWorker,
+							"Ich versuche, das Program %s mit der Prozesskennung %s zu beenden" % (
+							strProgram, strPID)).start()
+							
+						SDK.getShellCmdOutput("sudo kill %s" % strPID)
+						continue
+						
+				TaskSpeak(self.m_oWorker,
+					"Hoppla! Es gibt wohl Probleme mit dem Webb-Sörver.").start()
+				break
+
 		print("HTTP Server STOPPED")
 		
 		if Globs.s_strExitMode == "halt":

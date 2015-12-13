@@ -64,6 +64,7 @@ class TaskExit(FastTask):
 			oInstance.moduleExit()
 		self.m_oWorker.m_dictModules.clear()
 		Globs.saveSettings()
+		Globs.shutdown()
 		return
 		
 class TaskSystemWatchDog(FastTask):

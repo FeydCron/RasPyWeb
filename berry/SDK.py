@@ -1,9 +1,200 @@
+﻿## 
+#  @mainpage
+#  
+#  RasPyWeb ist ein auf Python3 basierendes Basissystem für den Raspberry und stellt in erster Linie
+#  ein Web-Frontend zur Verfügung. Das Basissystem kann durch die Installation Modulen beliebig
+#  erweitert werden.
+#  
+#  @see
+#  - @ref setup
+#  - @ref commands
+#  
+
+## 
+#  @page setup Installation
+#  
+#  @section installdir Installationsverzeichnis
+#  
+#  RasPyWeb kann in einem beliebigen Verzeichnis installiert werden, z.B. `/home/pi/raspyweb`.
+#  
+#  Darüber hinaus müssen noch einige administrative Einstellungen vorgenommen werden, damit
+#  RasPyWeb seinen vollen Funktionsumfang entfalten kann.
+#  
+#  
+#  @section crontab Cron-Job einrichten
+#  
+#  Für einige Konfigurationsschritte müssen sogenannte Cron-Jobs eingerichtet werden. Führen Sie
+#  das folgende Kommando aus, um einen Texteditor für die Einrichtung eines Cron-Jobs zu öffnen:
+#  
+#  @verbatim
+#  crontab -e
+#  @endverbatim
+#  
+#  Möglicherweise befinden sich bereits Einträge in der Konfigurationsdatei. Fügen Sie dann die
+#  neuen Zeilen am Ende der Datei ein, sofern die betreffenden Einträge noch nicht existieren.
+#  
+#  Die neue Version der Konfigurationsdatei wird nach dem Beenden des Texteditors installiert.
+#  
+#  
+#  @section cronstart Automatischen Start einrichten
+#  
+#  RasPyWeb kann beim Hochlauf des Raspberry automatisch gestartet werden, indem ein entsprechender
+#  Cron-Job eingerichtet wird.
+#  
+#  @ref crontab
+#  
+#  Fügen Sie die folgende Zeile hinzu, sofern diese noch nicht existiert:
+#  
+#  @verbatim
+#  @reboot     python3 <directory>/Berry.py
+#  @endverbatim
+#  
+#  @e @<directory@> entspricht dem @ref installdir von RasPyWeb.
+#  
+#  Beim nächsten Neustart des Raspberry sollte RasPyWeb automatisch gestartet werden. Falls dies
+#  nicht der Fall ist, überprüfen Sie bitte die folgenden Einrichtungsschritte:
+#  
+#  - @ref installdir
+#  - @ref cronstart
+#  
+#  
+#  @section crontimer Externen Zeitgeber einrichten
+#  
+#  Viele Module benötigen für die korrekte Funktion einen Zeitgeber. Es ist wichtig, dass das
+#  Zeitgeberereignis synchron zur aktuellen Systemzeit eintritt. Zu diesem Zweck wird ein
+#  Cron-Job eingerichtet, welcher ein solches Ereignis in einem Raster von 5 Minuten auslöst.
+#  
+#  @ref crontab
+#  
+#  Fügen Sie die folgende Zeile hinzu, sofern diese noch nicht existiert:
+#  
+#  @verbatim
+#  */5 * * * * wget --tries=1 -O - http://127.0.0.1:8081/ext/evt.src?timer=cron
+#  @endverbatim
+#  
+#  Von nun an sollten im 5-Minuten-Takt entsprechende Zeitgebereignisse generiert werden.
+#  Sollten Module, die auf Zeitgeberereignisse angewiesen sind, nicht funktionieren, überprüfen
+#  Sie bitte die folgenden Einstellungen:
+#  
+#  - Portnummer der Web-Server Schnittstelle von RasPyWeb
+#  - @ref crontimer
+#  
+#  @see
+#  - @ref event_crontimer
+#  
+
+## 
+#  @page commands Modulkommandos
+#  
+#  Das Konzept der Modulkommandos stellt eine standardisierte Form für den Austausch von Daten
+#  bzw. Informationen zwischen dem Web-Frontend und einem konkret angesprochenen installierten
+#  Modul dar. Modulkommandos sind zwangsläufig modulspezifisch und werden durch das jeweilige
+#  Modul festgelegt. Eine Beschreibung der verfügbaren Kommandos ist daher der Dokumentation des
+#  jeweiligen Moduls zu entnehmen.
+#  
+#  Jedes Modul kann aufgrund eines Kommandos, eine eigene HTML-Seite für die Anzeige im Web-Frontend
+#  generieren. Falls das Modul keine HTML-Seiten generiert, muss für die Kommandobearbeitung die
+#  Weiterleitung auf eine existierende HTML-Seite des Web-Frontends berücksichtigt werden.
+#  
+#  @see
+#  - @ref command_redirect2
+#  
+#  
+#  @section special_commands Spezialkommandos
+#  
+#  Es gibt spezielle Kommandos, die durch die Infrastruktur des Basissystems (RasPyWeb) direkt
+#  verarbeitet werden, ohne dass dafür ein spezielles Modul notwendig wäre. Es handelt sich dabei
+#  jedoch nicht um reservierte Kommandos. Wenn ein konkretes Modul für die Verarbeitung von diesen
+#  Spezialkommandos adressiert wird (oder beispielsweise eine Namensüberlappung vorliegt), werden
+#  diese Kommandos unabhängig von der Verarbeitung durch das Basissystem an das jeweilige Modul
+#  weitergeleitet, damit zusätzlich eine modulspezifische Verarbeitung stattfinden kann.
+#  
+#  
+#  @subsection command_redirect2 Weiterleitung
+#  
+#  Dieses Kommando veranlasst den Web-Server dazu, anstelle der angeforderten URL die angegebene
+#  Seite für die Darstellung im Web-Frontend zurückzuliefern. Das Kommando dient in erster Linie
+#  dazu, modulspezifische Kommandos unabhängig von der im Web-Frontend darzustellenden Seite
+#  anzufordern. Beispielsweise soll beim Klicken einer Schaltfläche, die mit einem Modulkommando
+#  verknüpft ist, die Startseite nicht verlassen werden.
+#  
+#  Kontext		| Eigenschaft 	| Wert
+#  ------------	| -------------	| ---------------
+#  Kommando		| @c strPath	| @e beliebig
+#  Query		| @c redirect2	| `startpage`
+#  
+#  @remark
+#  Derzeit ist als Wert für das `redirect2` Kommando nur der Wert `startpage` zulässig.
+#  
+#  
+#  @subsection command_sound Klangausgabe
+#  
+#  Dieses Kommando spielt den angegebenen Klang ab, sofern eine Übereinstimmung mit einer
+#  installierten Klangdatei besteht. Eine Übereinstimmung mit einer Klangdatei besteht dann, wenn
+#  der angegebene Bezeichner komplett oder mit einem Teil des Dateinamens einer Klangdatei
+#  übereinstimmt. Falls der Bezeichner als Teil für mehrere Klangdateien einen Treffer ergeben
+#  würde, wird immer dem ersten Treffer der Vorzug gegeben.
+#  
+#  Kontext		| Eigenschaft 	| Wert
+#  ------------	| -------------	| ---------------
+#  Kommando		| @c strPath	| @e beliebig
+#  Query		| @c sound		| @e Bezeichner
+#  Form			| @c sound		| @e Bezeichner
+#  
+#  @remark
+#  @c Bezeichner muss komplett oder mit einem Teil des Dateinamens einer installierten Klangdatei
+#  übereinstimmen, damit der angeforderte Klang angespielt werden kann.
+#  
+#  
+#  @subsection command_speak Sprachausgabe
+#  
+#  Dieses Kommando macht eine 'text-to-speech' Umsetzung und spricht den angeforderten Text aus.
+#  
+#  Kontext		| Eigenschaft 	| Wert
+#  ------------	| -------------	| -----------------
+#  Kommando		| @c strPath	| @e beliebig
+#  Query		| @c speak		| @e Text-to-Speech
+#  Form			| @c speak		| @e Text-to-Speech
+#  
+
+## 
+#  @page events Modulereignisse
+#  
+#  Das Konzept der Modulereignisse stellt eine standardisierte Form für den ereignisgesteuerten
+#  Austausch von Informationen zwischen der Infrastruktur des Basissystems (RasPyWeb) und den
+#  installierten Modulen sowie zwischen installierten Modulen untereinander dar.
+#  
+#  
+#  @section external_events Externe Ereignisse
+#  
+#  Externe Ereignisse werden von Quellen ausserhalb des Basissystem generiert. Diese Ereignisse
+#  treffen üblicherweise über die Web-Server Schnittstelle ein und können von einer anderen
+#  RasPyWeb-Instanz oder einem anderen Programm bzw. System ausgehen.
+#  
+#  
+#  @subsection event_crontimer Externer Zeitgeber
+#  
+#  Bei korrekter Installation generiert dieser externe Zeitgeber alle 5 Minuten ein Ereignis
+#  synchron zur Systemzeit:
+#  
+#  Kontext		| Eigenschaft 	| Wert
+#  ------------	| -------------	| ---------------
+#  Ereignis		| @c strPath	| `/ext/evt.src`
+#  Query		| @c timer		| `cron`
+#  
+#  @see
+#  - @ref crontimer
+#  
+
+
 import os
 import subprocess
 import re
 import threading
 import socket
 import html
+import urllib.parse
+import http.client
 
 from datetime import datetime
 
@@ -11,120 +202,41 @@ from Voice import Voice
 from Sound import Sound
 from Globs import Globs
 
-# Return RAM information (unit=kb) in a list                                       
-# Index 0: total RAM                                                               
-# Index 1: used RAM                                                                 
-# Index 2: free RAM  
-# Index 3: shared RAM
-# Index 4: buffered RAM
-# Index 5: cached RAM
-def getRamInfo():
-	strRamInfo = "n/a"
-	regexSep = r"\s\s*"
-	parts = [[1, 7],]
-	strRamInfo = subprocess.check_output(
-		"free",
-		stderr = subprocess.STDOUT,
-		shell = True,
-		universal_newlines = True)
-	nLine = 0
-	for strLine in strRamInfo.splitlines():
-		nLine += 1
-		if nLine == 2:
-			return partList(re.split(regexSep, strLine), parts)
-
-# Return information about disk space as a list (unit included)                     
-# Index 0: total disk space                                                         
-# Index 1: used disk space                                                         
-# Index 2: remaining disk space                                                     
-# Index 3: percentage of disk used                                                 
-def getDiskSpace():
-	strDiskSpace = "n/a"
-	regexSep = r"\s\s*"
-	parts = [[1, 5],]
-	strDiskSpace = subprocess.check_output(
-		"df -h",
-		stderr = subprocess.STDOUT,
-		shell = True,
-		universal_newlines = True)
-	nLine = 0
-	for strLine in strDiskSpace.splitlines():
-		nLine += 1
-		if nLine == 2:
-			return partList(re.split(regexSep, strLine), parts)
-
-# Return current CPU temperature in °C as a floating point value.
-# In case of an error a value of -273.15 is returned
-def getCpuTemp():
-	fResult = 273.15
-	fResult *= -1
-	regexSep = r"[\=\']"
-	parts = [[1, 2],]
-	strResult = subprocess.check_output(
-		"vcgencmd measure_temp",
-		stderr = subprocess.STDOUT,
-		shell = True,
-		universal_newlines = True)
-	temp = partList(re.split(regexSep, strResult), parts)[0]
-	fResult = float(temp)
-	return fResult
-
-# Return current CPU usage in percent as a string value
-def getCpuUse():
-	strResult = "n/a"
-	strResult = subprocess.check_output(
-		"top -b -n1 | awk '/Cpu\(s\):/ {print $2}'",
-		stderr = subprocess.STDOUT,
-		shell = True,
-		universal_newlines = True)
-	return strResult
-	
-# Liefert die aktuelle IP-Adresse zurück
-def getNetworkInfo(strComputerName="google.com"):
-	strIpAddr = ""
-	try:
-		oSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-		oSocket.connect((strComputerName, 0))
-		strIpAddr = oSocket.getsockname()[0]
-		oSocket.close()
-	except:
-		Globs.exc("Ermitteln der IP-Adresse")
-	return strIpAddr
-	
-def setDate(strDate, strFormat):
-	strResult = ""
-	oDate = datetime.strptime(strDate, strFormat).date()
-	oTime = datetime.today().time()
-	oDateTime = datetime.combine(oDate, oTime)
-	return setDateTime(oDateTime)
-
-def setTime(strTime, strFormat):
-	strResult = ""
-	oDate = datetime.today().date()
-	oTime = datetime.strptime(strTime, strFormat).time()
-	oDateTime = datetime.combine(oDate, oTime)
-	return setDateTime(oDateTime)
-
-def setDateTime(oDateTime):
-	strResult = ""
-	strResult = subprocess.check_output(
-		"sudo date -s \"%s\"" % (oDateTime.strftime("%c")),
-		stderr = subprocess.STDOUT,
-		shell = True,
-		universal_newlines = True)
-	return strResult
-
-# Extracts partitions from the given list and returns them as a new list
-def partList(list, indices):
-	output = []
-	for nStart, nStop in indices:
-		output.extend(list[nStart:nStop])
-	return output
-
+## 
+#  @brief Werkzeug zum Erstellen von einfach strukturieren HTML-Seiten.
+#  
 class HtmlPage(list):
 
-	def __init__(self, strPath, strTitle = "", nAutoRefresh=0):
+	## 
+	#  @brief Erzeugt eine Instanz zum Erstellen einer HTML-Seite.
+	#  
+	#  @param [in] self
+	#  Instanzverweis
+	#  
+	#  @param [in] strPath
+	#  Pfad der HTML-Seite. Dies kann entweder ein virtueller Pfad oder eine Pfadangabe im
+	#  Dateisystem sein, die von der Web-Server-Komponente bedient werden kann.
+	#  
+	#  @param [in] strTitle
+	#  Optionaler Titel der HTML-Seite
+	#  
+	#  @param [in] nAutoRefresh
+	#  Numerische Angabe eines Aktualisierungsintervalls für die HTML-Seite in Sekunden oder 0,
+	#  wenn kein Aktualisierungsintervall aktiviert werden soll (standard). Aus Gründen der
+	#  Performance muss die Angabe des Intervalls mindestens 5 Sekunden betragen, ansonsten wird
+	#  kein Aktualisierungsintervall aktiviert.
+	#  
+	#  @return
+	#  Kein Rückgabewert
+	#  
+	#  @details Details
+	#  
+	def __init__(self, strPath, strTitle=None, nAutoRefresh=0):
 		list.__init__([])
+		
+		if (not strTitle):
+			strTitle = ""
+		
 		self.m_strPath = strPath
 		self.m_strTitle = strTitle
 		self.m_bPageEnded = False
@@ -136,19 +248,64 @@ class HtmlPage(list):
 		
 		self.setAutoRefresh(nAutoRefresh)
 		return
-	
+		
+	## 
+	#  @brief Brief
+	#  
+	#  @param [in] self
+	#  Instanzverweis
+	#  
+	#  @param [in] strTitle
+	#  Titel der HTML-Seite
+	#  
+	#  @return
+	#  Kein Rückgabewert
+	#  
+	#  @details Details
+	#  
 	def setTitle(self, strTitle):
 		self.m_strTitle = strTitle
 		return
-		
+	
+	## 
+	#  @brief Ändert das Aktualisierungsintervall der HTML-Seite.
+	#  
+	#  @param [in] self
+	#  Instanzverweis
+	#  
+	#  @param [in] nAutoRefresh
+	#  Numerische Angabe eines Aktualisierungsintervalls für die HTML-Seite in Sekunden oder 0,
+	#  wenn kein Aktualisierungsintervall aktiviert werden soll (standard). Aus Gründen der
+	#  Performance muss die Angabe des Intervalls mindestens 5 Sekunden betragen, ansonsten wird
+	#  kein Aktualisierungsintervall aktiviert.
+	#  
+	#  @return
+	#  Liefert @c True, wenn das Aktualisierungsintervall aktiviert werden konnte oder @c False,
+	#  falls nicht.
+	#  
+	#  @details Details
+	#  	
 	def setAutoRefresh(self, nAutoRefresh=0):
 		if nAutoRefresh >= 5:
 			self.m_strAutoRefresh = "<meta http-equiv=\"refresh\" content=\"%s\">" % (
 				nAutoRefresh)
-		else:
-			self.m_strAutoRefresh = ""
-		return
+			return True
+		self.m_strAutoRefresh = ""
+		return False
 	
+	## 
+	#  @brief Liefert den Inhalt der HTML-Seite als Bytes in Standardkodierung zurück.
+	#  
+	#  @param [in] self
+	#  Instanzverweis
+	#  
+	#  @return
+	#  Liefert den Inhalt der HTML-Seite als Bytes in Standardkodierung zurück.
+	#  
+	#  @details
+	#  Die HTML-Seite wird durch den Aufruf abgeschlossen und darf anschließend nicht weiter
+	#  bearbeitet werden.
+	#  
 	def getContent(self):
 		if not self.m_bPageEnded:
 			self.extend([
@@ -175,6 +332,43 @@ class HtmlPage(list):
 			"<body>" +
 			("\n".join(self))).encode())
 	
+	## 
+	#  @brief Eröffnet ein tabellarisch angelegtes Formular.
+	#  
+	#  @param [in] self
+	#  Instanzverweis
+	#  
+	#  @param [in] strCaption
+	#  Titel des tabellarischen Formulars
+	#  
+	#  @param [in] lstHeader
+	#  Liste der zu verwendenden Spaltenköpfe
+	#  
+	#  @param [in] strChk
+	#  Legt den Titel für die Auswahlspalte fest. Wird kein Titel festgelegt, wird die Spalte nicht
+	#  dargestellt. Wird ein Leerstring angegeben, wird die Spalte ohne Titel dargestellt.
+	#  
+	#  @param [in] strAct
+	#  Legt den Titel für die Aktionsspalte fest. Wird kein Titel festgelegt, wird die Spalte nicht
+	#  dargestellt. Wird ein Leerstring angegeben, wird die Spalte ohne Titel dargestellt.
+	#  
+	#  @param [in] bBorder
+	#  Legt fest, ob die Tabelle mit (@c True) oder ohne (@c False) Rahmen dargestellt werden soll.
+	#  
+	#  @return
+	#  Kein Rückgabewert
+	#  
+	#  @details
+	#  Das tabellarische Formular wird optional zu den angegebenen Spaltenköpfen mit einer
+	#  Auswahlspalte und einer Aktionsspalte versehen.
+	#  
+	#  Auswahlspalte	| benutzerdef. Spaltenköpfe | Aktionsspalte
+	#  ---------------- | ------------------------- | -------------
+	#  Check-Boxen		| Spaltenkopfbezeichnungen	| Schaltflächen
+	#  
+	#  Die Auswahl der Check-Boxen wird unter der Parameterbezeichnung `target` geführt und erhält
+	#  jeweils den beim Einfügen eines Datensatzes angegebenen Referenzwert.
+	#  
 	def openTableForm(self, strCaption, lstHeader, strChk = None, strAct = None, bBorder = False):
 		self.m_bChk = False
 		self.m_bAct = False
@@ -223,11 +417,67 @@ class HtmlPage(list):
 	#		"type" : "primary|success|warning|danger",
 	#	},
 	# }
-	def appendTableForm(self, strRef, lstData, bChk=False, dictAct={}, bEscape=True):
+	
+	## 
+	#  @brief Erweitert ein eröffnetes tabellarisches Formular um einen Datensatz.
+	#  
+	#  @param [in] self 
+	#  Instanzverweis
+	#  
+	#  @param [in] strRef 
+	#  Referenzwert, der bei Auswahl der Auswahl-Check-Box unter der Parameterbezeichnung `target`
+	#  angegeben wird.
+	#  
+	#  @param [in] lstData
+	#  Datensatz, dessen Länge und Reihenfolge der Werte mit dem Spaltenkopf bei der Eröffnung des
+	#  Formulars zusammenpassen muss.
+	#  
+	#  @param [in] bChk
+	#  Gibt an, ob die Auswahl-Check-Box für diesen Datensatz vorausgewählt dargestellt werden soll.
+	#  
+	#  @param [in] dictAct
+	#  Beschreibung der für den Datensatz anzulegenden Aktionsschaltflächen
+	#  
+	#  @param [in] bEscape
+	#  Gibt an, ob die Funktion selbst die Konvertierung von Sonderzeichen in ein HTML-konformes
+	#  Format durchführen soll.
+	#  
+	#  @return
+	#  Kein Rückgabewert
+	#  
+	#  @details
+	#  Für jeden Datensatz kann eine individuelle Anzahl an Aktionsschaltflächen festgelegt werden:
+	#  
+	#  @code
+	#  	dictAct = {
+	#  		"name" : {
+	#  			"query" : "",
+	#  			"content" : "",
+	#  			"type" : "(primary|success|warning|danger)",
+	#  		},
+	#  	}
+	#  @endcode
+	#  
+	#  Für jede Schaltfläche wird unter einem individuellen schlüssel @e name ein Dictionary für
+	#  die Beschreibung der Schaltfläche angelegt:
+	#  - `"query"`: Angabe eines Query-String, dessen Elemente durch `&` getrennt sind
+	#  - `"content"`: Legt den Titel der Schaltfläche fest
+	#  - `"type"`: Legt den Typ der Schaltfläche fest, wobei die folgenden Typen definiert sind:
+	#  		- `primary`: Blaue Schaltfläche
+	#  		- `success`: Grüne Schaltfläche
+	#  		- `warning`: Gelbe Schaltfläche
+	#  		- `danger`: Rote Schaltfläche
+	#  - Alle weiteren Attribute werden als CSS-Klassenattribute in den HTML-Link eingepflegt.
+	# 
+	def appendTableForm(self, strRef, lstData, bChk=False, dictAct=None, bEscape=True):
 		strChecked = ""
 		self.extend([
 			"<tr>",
 		])
+		
+		if (not dictAct):
+			dictAct = {}
+		
 		if bChk:
 			strChecked = "checked"
 		if self.m_bChk:
@@ -393,12 +643,15 @@ class HtmlPage(list):
 		return
 		
 	def closeForm(self,
-		dictButtons={}	# {name : (value, title, class)}
+		dictButtons={},	# {name : (value, title, class)}
+		strUrlCancel=None
 		):
+		if not strUrlCancel:
+			strUrlCancel = self.m_strPath
 		self.append("<div class=\"ym-fbox-footer\">")
 		self.extend([
 			"<a class=\"ym-button ym-primary\" href=\"%s%s\">Abbrechen</a>" % (
-				self.m_strPath, self.m_strQueries),
+				strUrlCancel, self.m_strQueries),
 			"<button type=\"reset\" class=\"reset ym-delete ym-warning\">Zurücksetzen</button>",
 			"<button name=\"submit\" value=\"save\" type=\"submit\" class=\"save ym-save ym-success\">Speichern</button>",
 			"</div>"
@@ -564,8 +817,8 @@ class HtmlPage(list):
 			self.extend([
 				"<label for=\"%s\">%s</label>" % (
 					self.m_nId, strTitle),
-				"<input type=\"%s\" name=\"%s\" value=\"%s\" id=\"%s\" placeholder=\"%s\"/>" % (
-					strTextType, strName, strInput, self.m_nId, html.escape(strInput)),
+				"<input type=\"%s\" name=\"%s\" value=\"%s\" id=\"%s\" %s placeholder=\"%s\"/>" % (
+					strTextType, strName, strInput, self.m_nId, strTypePattern, html.escape(strInput)),
 				"</div>"
 			])
 		return
@@ -745,3 +998,219 @@ class TaskSaveSettings(FastTask):
 	def do(self):
 		Globs.saveSettings()
 		return
+		
+## 
+#  @brief Weiterleitung von Modulereignissen an alle aktiven Module.
+#  		
+class TaskModuleEvt(FastTask):
+	
+	def __init__(self,
+		oWorker,
+		strPath,
+		dictForm=None,
+		dictQuery=None
+		):
+		super(TaskModuleEvt, self).__init__(oWorker)
+		self.m_strPath = strPath
+		self.m_dictForm = dictForm
+		self.m_dictQuery = dictQuery
+		return
+		
+	def __str__(self):
+		strDesc = "Ausführen von Modulereignissen"
+		return  strDesc
+	
+	def do(self):
+		for (strName, oInstance) in self.m_oWorker.m_dictModules.items():
+			self.m_oResult = oInstance.moduleExec(self.m_strPath,
+				None, self.m_dictQuery, self.m_dictForm)
+		return
+		
+class WebResponse:
+	
+	def __init__(self,
+		nStatus,
+		oReason,
+		oHeader,
+		oData
+		):
+		self.m_bOK = (nStatus == http.client.OK)
+		self.m_nStatus = nStatus
+		self.m_strReason = ("%s" % oReason)
+		self.m_dictHeader = dict(oHeader)
+		self.m_oData = oData
+		return
+		
+	def __str__(self):
+		strDesc = "Status=%s, Reason=%s, Headers=%s" % (
+			self.m_nStatus, self.m_strReason, self.m_dictHeader)
+		return  strDesc
+
+class WebClient:
+	
+	def GET(self,
+		strUrl,
+		bFollowRedirects = True
+		):
+		
+		lstRedirect = (
+			http.client.MOVED_PERMANENTLY,
+			http.client.FOUND,
+			http.client.SEE_OTHER,
+			http.client.TEMPORARY_REDIRECT)
+		oConn = None
+		oResp = None
+		oUrlSplit = urllib.parse.urlsplit(strUrl)
+		
+		if (re.match("[Hh][Tt][Tt][Pp][Ss]", oUrlSplit.scheme)):
+			oConn = http.client.HTTPSConnection(oUrlSplit.netloc)
+		else:
+			oConn = http.client.HTTPConnection(oUrlSplit.netloc)
+		
+		oConn.request("GET", strUrl)
+		oResp = oConn.getresponse()
+		
+		if (oResp.status == http.client.OK):
+			oWebResponse = WebResponse(
+				nStatus=oResp.status,
+				oReason=oResp.reason,
+				oHeader=oResp.getheaders(),
+				oData=oResp.read())
+		elif (oResp.status in lstRedirect
+			and oResp.getheader("Location")
+			and bFollowRedirects):
+			Globs.wrn("Weiterleitung von '%s' nach '%s'" % (
+				strUrl, oResp.getheader("Location")))
+			oWebResponse = self.GET(oResp.getheader("Location"))
+		else:
+			Globs.wrn("Fehler beim Abrufen von '%s' (Weiterleitung=%s, Location=%s)" % (
+				strUrl, bFollowRedirects, oResp.getheader("Location")))
+			oWebResponse = WebResponse(
+				nStatus=oResp.status,
+				oReason=oResp.reason,
+				oHeader=oResp.getheaders(),
+				oData=oResp.read())
+				
+		oConn.close()
+		
+		return oWebResponse
+		
+def getShellCmdOutput(strShellCmd):
+	strOutput = ""
+	strOutput = subprocess.check_output(
+		strShellCmd,
+		stderr = subprocess.STDOUT,
+		shell = True,
+		universal_newlines = True)
+	return strOutput.splitlines()
+
+# Return RAM information (unit=kb) in a list                                       
+# Index 0: total RAM                                                               
+# Index 1: used RAM                                                                 
+# Index 2: free RAM  
+# Index 3: shared RAM
+# Index 4: buffered RAM
+# Index 5: cached RAM
+def getRamInfo():
+	strRamInfo = "n/a"
+	regexSep = r"\s\s*"
+	parts = [[1, 7],]
+	strRamInfo = subprocess.check_output(
+		"free",
+		stderr = subprocess.STDOUT,
+		shell = True,
+		universal_newlines = True)
+	nLine = 0
+	for strLine in strRamInfo.splitlines():
+		nLine += 1
+		if nLine == 2:
+			return partList(re.split(regexSep, strLine), parts)
+
+# Return information about disk space as a list (unit included)                     
+# Index 0: total disk space                                                         
+# Index 1: used disk space                                                         
+# Index 2: remaining disk space                                                     
+# Index 3: percentage of disk used                                                 
+def getDiskSpace():
+	strDiskSpace = "n/a"
+	regexSep = r"\s\s*"
+	parts = [[1, 5],]
+	strDiskSpace = subprocess.check_output(
+		"df -h",
+		stderr = subprocess.STDOUT,
+		shell = True,
+		universal_newlines = True)
+	nLine = 0
+	for strLine in strDiskSpace.splitlines():
+		nLine += 1
+		if nLine == 2:
+			return partList(re.split(regexSep, strLine), parts)
+
+# Return current CPU temperature in °C as a floating point value.
+# In case of an error a value of -273.15 is returned
+def getCpuTemp():
+	fResult = 273.15
+	fResult *= -1
+	regexSep = r"[\=\']"
+	parts = [[1, 2],]
+	strResult = subprocess.check_output(
+		"vcgencmd measure_temp",
+		stderr = subprocess.STDOUT,
+		shell = True,
+		universal_newlines = True)
+	temp = partList(re.split(regexSep, strResult), parts)[0]
+	fResult = float(temp)
+	return fResult
+
+# Return current CPU usage in percent as a string value
+def getCpuUse():
+	strResult = "n/a"
+	strResult = subprocess.check_output(
+		"top -b -n1 | awk '/Cpu\(s\):/ {print $2}'",
+		stderr = subprocess.STDOUT,
+		shell = True,
+		universal_newlines = True)
+	return strResult
+	
+# Liefert die aktuelle IP-Adresse zurück
+def getNetworkInfo(strComputerName="google.com"):
+	strIpAddr = ""
+	try:
+		oSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		oSocket.connect((strComputerName, 0))
+		strIpAddr = oSocket.getsockname()[0]
+		oSocket.close()
+	except:
+		Globs.exc("Ermitteln der IP-Adresse")
+	return strIpAddr
+	
+def setDate(strDate, strFormat):
+	strResult = ""
+	oDate = datetime.strptime(strDate, strFormat).date()
+	oTime = datetime.today().time()
+	oDateTime = datetime.combine(oDate, oTime)
+	return setDateTime(oDateTime)
+
+def setTime(strTime, strFormat):
+	strResult = ""
+	oDate = datetime.today().date()
+	oTime = datetime.strptime(strTime, strFormat).time()
+	oDateTime = datetime.combine(oDate, oTime)
+	return setDateTime(oDateTime)
+
+def setDateTime(oDateTime):
+	strResult = ""
+	strResult = subprocess.check_output(
+		"sudo date -s \"%s\"" % (oDateTime.strftime("%c")),
+		stderr = subprocess.STDOUT,
+		shell = True,
+		universal_newlines = True)
+	return strResult
+
+# Extracts partitions from the given list and returns them as a new list
+def partList(list, indices):
+	output = []
+	for nStart, nStop in indices:
+		output.extend(list[nStart:nStop])
+	return output
+		

@@ -618,6 +618,9 @@ class TaskDisplaySystem(FutureTask):
 			"Aktuelle Systemwerte",
 			["System", ""], True, True)
 		self.m_oHtmlPage.appendTable([
+			"Version", "V%s" % (Globs.getVersion())],
+				bFirstIsHead=True, bEscape=False)
+		self.m_oHtmlPage.appendTable([
 			"Datum", "<a href=\"%s\">&#x0270E; %s</a>" % (
 				"/system/values.html?edit=date",
 				dt.strftime("%d.%m.%Y"))],

@@ -29,6 +29,7 @@ from SDK import FastTask
 from SDK import LongTask
 from SDK import HtmlPage
 from SDK import TaskModuleEvt
+from SDK import TaskSaveSettings
 
 from Worker import FutureTask
 from Worker import TaskExit
@@ -425,7 +426,6 @@ class TaskInstallModule(FastTask):
 	
 	def do(self):
 		Globs.s_dictSettings["dictModules"].update({self.m_strComponent : self.m_strName})
-		Globs.saveSettings()
 		return
 		
 class TaskRemoveModule(FastTask):
@@ -440,15 +440,10 @@ class TaskRemoveModule(FastTask):
 		return  strDesc
 	
 	def do(self):
-		bRemoved = False
 		if self.m_strComponent in Globs.s_dictSettings["listInactiveModules"]:
 			Globs.s_dictSettings["listInactiveModules"].remove(self.m_strComponent)
-			bRemoved = True
 		if self.m_strComponent in Globs.s_dictSettings["dictModules"]:
 			Globs.s_dictSettings["dictModules"].pop(self.m_strComponent)
-			bRemoved = True
-		if bRemoved:
-			Globs.saveSettings()
 		return
 		
 class TaskEnableModule(FastTask):
@@ -766,39 +761,46 @@ class TaskDisplaySettings(FutureTask):
 		try:
 			bOpened = False
 			for (strKey, dictValues) in Globs.s_dictUserSettings.items():
-				if strKey in Globs.s_dictSettings and Globs.s_dictSettings[strKey]:
-					if bOpened:
-						self.m_oHtmlPage.appendHeader([strKey, ""])
-					else:
-						bOpened = True
-						self.m_oHtmlPage.openTable("Konfigurationseinstellungen",
-							[strKey, ""], True, True)
-					for (strValueName, dictProperties) in sorted(dictValues.items()):
-						if strValueName in Globs.s_dictSettings[strKey]:
-							strTitle = strValueName
-							if ("title" in dictProperties):
-								strTitle = dictProperties["title"]
-							if ("readonly" in dictProperties and dictProperties["readonly"]):
-								self.m_oHtmlPage.appendTable([
-									strTitle,
-									"%s" % (Globs.s_dictSettings[strKey][strValueName])
-									], bFirstIsHead=True, bEscape=False)
-							elif ("showlink" in dictProperties and dictProperties["showlink"]
-								and "description" in dictProperties
-								and dictProperties["description"]):
-								self.m_oHtmlPage.appendTable([
-									strTitle,
-									"<a href=\"%s\">&#x027A5; %s</a>" % (
-										Globs.s_dictSettings[strKey][strValueName],
-										dictProperties["description"])
-									], bFirstIsHead=True, bEscape=False)
-							else:
-								self.m_oHtmlPage.appendTable([
-									strTitle,
-									"<a href=\"%s?edit=%s&key=%s\">&#x0270E; %s</a>" % (
-										"/system/settings.html", strValueName, strKey,
-										Globs.s_dictSettings[strKey][strValueName])
-									], bFirstIsHead=True, bEscape=False)
+				
+				if (strKey not in Globs.s_dictSettings or not Globs.s_dictSettings[strKey]):
+					continue
+				if (strKey not in ("System") and strKey not in Globs.s_dictSettings["dictModules"]):
+					continue
+				if (strKey in Globs.s_dictSettings["listInactiveModules"]):
+					continue
+				
+				if bOpened:
+					self.m_oHtmlPage.appendHeader([strKey, ""])
+				else:
+					bOpened = True
+					self.m_oHtmlPage.openTable("Konfigurationseinstellungen",
+						[strKey, ""], True, True)
+				for (strValueName, dictProperties) in sorted(dictValues.items()):
+					if strValueName in Globs.s_dictSettings[strKey]:
+						strTitle = strValueName
+						if ("title" in dictProperties):
+							strTitle = dictProperties["title"]
+						if ("readonly" in dictProperties and dictProperties["readonly"]):
+							self.m_oHtmlPage.appendTable([
+								strTitle,
+								"%s" % (Globs.s_dictSettings[strKey][strValueName])
+								], bFirstIsHead=True, bEscape=False)
+						elif ("showlink" in dictProperties and dictProperties["showlink"]
+							and "description" in dictProperties
+							and dictProperties["description"]):
+							self.m_oHtmlPage.appendTable([
+								strTitle,
+								"<a href=\"%s\">&#x027A5; %s</a>" % (
+									Globs.s_dictSettings[strKey][strValueName],
+									dictProperties["description"])
+								], bFirstIsHead=True, bEscape=False)
+						else:
+							self.m_oHtmlPage.appendTable([
+								strTitle,
+								"<a href=\"%s?edit=%s&key=%s\">&#x0270E; %s</a>" % (
+									"/system/settings.html", strValueName, strKey,
+									Globs.s_dictSettings[strKey][strValueName])
+								], bFirstIsHead=True, bEscape=False)
 			if bOpened:
 				self.m_oHtmlPage.closeTable()
 		except:
@@ -1394,6 +1396,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		# Tasks ausführen
 		TaskInstallModule(g_oHttpdWorker, strComponent, strName).start()
 		TaskModuleInit(g_oHttpdWorker, strComponent).start()
+		TaskSaveSettings(g_oHttpdWorker).start()
 		oTask = TaskDisplayModules(g_oHttpdWorker, oHtmlPage)
 		if oTask.start():
 			oTask.wait()
@@ -1503,6 +1506,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			# Modul installieren
 			TaskInstallModule(g_oHttpdWorker, strTarget, strName).start()
 			TaskModuleInit(g_oHttpdWorker, strTarget).start()
+			TaskSaveSettings(g_oHttpdWorker).start()
 		elif strAction == "enable" or strAction == "disable":
 			lstTarget = dictForm["target"]
 			bEnable = True
@@ -1512,11 +1516,13 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			for strTarget in lstTarget:
 				TaskEnableModule(g_oHttpdWorker, strTarget, bEnable).start()
 				TaskModuleInit(g_oHttpdWorker, strTarget).start()
+			TaskSaveSettings(g_oHttpdWorker).start()
 		elif strAction == "delete":
 			lstTarget = dictForm["target"]
 			for strTarget in lstTarget:
 				TaskRemoveModule(g_oHttpdWorker, strTarget).start()
 				TaskModuleInit(g_oHttpdWorker, strTarget).start()
+			TaskSaveSettings(g_oHttpdWorker).start()
 		else:
 			oHtmlPage.createBox(
 				"Achtung",

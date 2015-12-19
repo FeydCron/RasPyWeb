@@ -292,6 +292,14 @@ class TaskModuleInit(FastTask):
 			Globs.s_dictUserSettings.update({self.m_strComponent : dictCfgUsr})
 			return
 		if (self.m_strComponent not in Globs.s_dictSettings["dictModules"]):
+			# >>> Critical Section
+			Globs.s_oSettingsLock.acquire()
+			if self.m_strComponent in Globs.s_dictSettings:
+				Globs.s_dictSettings.pop(self.m_strComponent)
+			if self.m_strComponent in Globs.s_dictUserSettings:
+				Globs.s_dictUserSettings.pop(self.m_strComponent)
+			Globs.s_oSettingsLock.release()
+			# <<< Critical Section
 			strMsg = "Das Modul %s wurde dauerhaft entfernt." % (self.m_strComponent)
 			Globs.log(strMsg)
 			TaskSpeak(self.m_oWorker, strMsg).start()

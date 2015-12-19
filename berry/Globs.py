@@ -241,7 +241,7 @@ class Globs:
 		return
 	
 	def getVersion():
-		return float(0.1)
+		return float(0.3)
 	
 	def getRedirect(strID, strDefault):
 		if ("Redirects" in Globs.s_dictSettings

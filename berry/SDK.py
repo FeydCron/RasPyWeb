@@ -2,12 +2,253 @@
 #  @mainpage
 #  
 #  RasPyWeb ist ein auf Python3 basierendes Basissystem für den Raspberry und stellt in erster Linie
-#  ein Web-Frontend zur Verfügung. Das Basissystem kann durch die Installation Modulen beliebig
+#  ein Web-Frontend zur Verfügung. Das Basissystem kann durch die Installation von Modulen beliebig
 #  erweitert werden.
 #  
 #  @see
 #  - @ref setup
-#  - @ref commands
+#  - @ref raspyweb
+#  - @ref modules
+#  
+#  @page raspyweb RasPyWeb
+#  
+#  RasPyWeb arbeitet kommando- beziehungsweise ereignisgesteuert. Kommandos und Ereignisse werden
+#  über Systemschnittstellen empfangen und lösen eine bestimmte Verarbeitung an einer adressierten
+#  Ressource aus. Bei der adressierten Ressource kann es sich um eine Systemressource oder ein
+#  installiertes und aktiviertes Modul handeln.
+#  
+#  Das Konzept der Ereignis- und Kommandoverarbeitung stellt eine standardisierte Form für den
+#  Austausch von Informationen zwischen der Infrastruktur von RasPyWeb und den installierten Modulen
+#  sowie zwischen den installierten Modulen untereinander dar.
+#  
+#  RasPyWeb verfügt im Endausbau über die folgenden Schnittstellen, wobei derzeit noch nicht alle
+#  Schnittstellen angebunden sind:
+#  
+#  - @ref http_interface (Web-Server)
+#  - GPIO-Schnittstelle (derzeit noch nicht angebunden)
+#  
+#  Der Unterschied zwischen einem Ereignis und einem Kommando besteht darin, dass obwohl beide eine
+#  Verarbeitung auslösen, nur bei Kommandos eine Ergebnismenge erwartet wird. Daraus ergibt sich,
+#  dass über die HTTP-Schnittstelle hauptsächlich Kommandos empfangen werden, da der interaktive
+#  Charakter eines HTTP-Clients in der Regel immer einen HTML-Inhalt als Ergebnis auf eine Aktion,
+#  im Sinne einer GET- beziehungsweise POST-Anfrage, erwartet.
+#  Über eine GPIO-Schnittstelle werden in Regel nur Ereignisse empfangen, da beispielsweise ein
+#  Eingabetaster auf seine Betätigung hin, keine Ergebnismenge in irgend einer Form erwartet.
+#  
+#  Die Kommando- und Ereignisverarbeitung unterscheidet sich also nur darin, dass bei einem
+#  Kommando über die Verarbeitung hinaus ein HTML-Inhalt bereitzustellen ist.
+#  
+#  Erfolgt die Verarbeitung von Kommandos beziehungsweise Ereignissen durch RasPyWeb selbst, werden
+#  diese als Systemkommandos beziehungsweise Systemereignisse bezeichnet. Erfolgt die Verarbeitung
+#  hingegen durch ein Modul, wird von Modulkommandos beziehungsweise Modulereignissen gesprochen.
+#  
+#  
+#  @section http_interface HTTP-Schnittstelle
+#  
+#  Die Anbindung der HTTP-Schnittstelle wird durch RasPyWeb selbst übernommen, indem es einen
+#  eigenen Web-Server implementiert. Durch die Formulierung einer URL kann per nachfolgender
+#  Konvention je nach Bedarf das Basissystem selbst oder ein bestimmtes Modul adressiert werden, um
+#  die gewünschten Kommandos und Ereignisse verarbeiten zu lassen.
+#  
+#  Für die Formulierung dieser URLs gelten die folgenden Konventionen:
+#  
+#  - @b scheme entspricht dem Netzwerkprotokoll und ist derzeit auf @c HTTP festgelegt. Zukünftig
+#  				wird es eine Unterstützung für @c HTTPS geben.
+#  - @b host gibt den Hostnamen beziehungsweise die IP-Adresse des Raspberry an, auf dem eine
+#  				RasPyWeb-Instanz läuft
+#  - @b port gibt die Portnummer an, auf welcher der Web-Server der RasPyWeb-Instanz Verbindungen
+#  				annehmen kann, sofern die Portnummer vom Standard des verwendeten Netzwerkprotokolls
+#  				abweicht (Für HTTP Portnummer 80, für HTTPS Portnummer 443).
+#  - @b url-path adressiert eine Ressource, also entweder
+#   - eine HTML-Seite des Basissystems (@ref system_resources) oder
+#   - eine HTML-Seite eines installierten Moduls (@ref module_resources).
+#  - @b query gibt alle Kommandos an, die bei der Verarbeitung durch die adressierte Ressource zu
+#  				berücksichtigen sind. In der Regel bestehen bei RasPyWeb die Kommandos aus einer
+#  				Zuordnung von Schlüssel und Wert, wobei der Schlüssel dem Kommando und der Wert dem
+#  				Argument entspricht.
+#  - @b fragment kann entsprechend seiner ursprünglichen Bedeutung verwendet werden.
+#  
+#  
+#  @section system_resources Systemressourcen
+#  
+#  RasPyWeb selbst stellt eine Reihe von Systemressourcen zur Verfügung, die über die jeweilige URL
+#  adressiert werden können.
+#  
+#  - @b Start (Einstiegsseite) 	- @c "/index.html" mit dem folgenden dynamischen Inhalt:
+#   - @b Startseite 				- @c "/system/startpage.html" (Standard)
+#  - @b System 					- @c "/system/index.html" mit den folgenden dynamischen Inhalten:
+#   - @b Systemwerte 				- @c "/system/values.html" (Standard)
+#   - @b Modulverwaltung			- @c "/system/modules.html"
+#   - @b Konfiguration				- @c "/system/settings.html"
+#   - @b Modulinstallation			- @c "/system/install.html"
+#   - @b Protokollierung			- @c "/system/logging.html"
+#  - @b Klänge					- @c "/sound/index.html" mit den folgenden dynamischen Inhalten:
+#   - @b Verfügbare Klänge		- @c "/sound/values.html" (Standard)
+#   - @b Klanginstallation			- @c "/sound/install.html"
+#  - @b Beenden					- @c "/exit/exit.html"
+#  - @b Herunterfahren			- @c "/exit/halt.html"
+#  - @b Neustart				- @c "/exit/boot.html"
+#  
+#  Die Adressierung einer Systemressource ohne die explizite Angabe von Kommandos, führt zur
+#  Ausführung der jeweiligen Standardverarbeitung.
+#  
+#  Der zurückgelieferte HTML-Inhalt besteht in der Regel aus einem statischen HTML-Antweil und
+#  einem eingebetteten dynamischen HTML-Anteil, welcher über eine separate URL implizit durch die
+#  Hinterlegung im statischen HTML-Anteil adressiert wird. Auf die URLs der dynamischen Inhalte
+#  wird hier nicht näher eingegangen, da das explizite Abrufen dieser URLs in einem Browser das
+#  Web-Frontend von RasPyWeb korrumpieren würde.
+#  
+#  
+#  @section module_resources Modulressourcen
+#  
+#  Alle in RasPyWeb installierten und aktivierten Module können ähnlich wie Systemressourcen über
+#  URLs adressiert werden. Dabei gelten für die Angabe von @c url-path die folgenden Konventionen:
+#  
+#  - Anfordern von modulspezifischen HTML-Inhalten beziehungsweise von Modulkommandos:
+#   - `/modules/<Modulname>[/*].(htm|html|gif|png|jpg|jpeg)`
+#  
+#  @note
+#  Wenn ein Modulkommando über die Startseite ausgelöst werden soll, so ist zusätzlich zu den
+#  modulspezifischen Kommandos noch das Systemkommando für die @ref command_redirect2 anzugeben,
+#  sofern nicht die Darstellung eines modulspezifischen Inhaltes im Web-Frontend gewünscht ist oder
+#  das Modul keinen entsprechenden Inhalt liefern kann.
+#  
+#  
+#  @section system_commands Systemkommandos
+#  
+#  Es gibt spezielle Kommandos, die durch RasPyWeb direkt verarbeitet werden, ohne dass dafür ein
+#  spezielles Modul notwendig wäre. Es handelt sich dabei jedoch nicht um reservierte Kommandos.
+#  Wenn ein konkretes Modul für die Verarbeitung von diesen Systemkommandos adressiert wird (oder
+#  beispielsweise eine Namensüberlappung vorliegt), werden diese Kommandos unabhängig von der
+#  Verarbeitung durch RasPyWeb an das jeweilige Modul weitergeleitet, damit zusätzlich eine
+#  modulspezifische Verarbeitung stattfinden kann.
+#  
+#  
+#  @subsection command_redirect2 Weiterleitung
+#  
+#  Dieses Kommando veranlasst den Web-Server dazu, anstelle der angeforderten URL die angegebene
+#  Seite für die Darstellung im Web-Frontend zurückzuliefern. Das Kommando dient in erster Linie
+#  dazu, modulspezifische Ereignisse über das Web-Frontend anzufordern, ohne dabei vom jeweiligen
+#  Modul die Bereitstellung eines HTML-Inhalts zu fordern. Meistens ist es sogar gewünscht oder
+#  ausgesprochen sinnvoll, dass beim Klicken einer Schaltfläche auf der Startseite, diese durch die
+#  Kommandoverarbeitung eines Moduls nicht verlassen wird.
+#  
+#  Kontext		| Eigenschaft 	| Wert
+#  ------------	| -------------	| ---------------
+#  Kommando		| @c strPath	| @e beliebig
+#  Query		| @c redirect2	| `startpage`
+#  
+#  @remark
+#  Derzeit ist als Wert für das `redirect2` Kommando nur der Wert `startpage` zulässig.
+#  
+#  
+#  @subsection command_sound Klangausgabe
+#  
+#  Dieses Kommando spielt den angegebenen Klang ab, sofern eine Übereinstimmung mit einer
+#  installierten Klangdatei besteht. Eine Übereinstimmung mit einer Klangdatei besteht dann, wenn
+#  der angegebene Bezeichner komplett oder mit einem Teil des Dateinamens einer Klangdatei
+#  übereinstimmt. Falls der Bezeichner als Teil für mehrere Klangdateien einen Treffer ergeben
+#  würde, wird immer dem ersten Treffer der Vorzug gegeben.
+#  
+#  Kontext		| Eigenschaft 	| Wert
+#  ------------	| -------------	| ---------------
+#  Kommando		| @c strPath	| @e beliebig
+#  Query		| @c sound		| @e Bezeichner
+#  Form			| @c sound		| @e Bezeichner
+#  
+#  @remark
+#  @c Bezeichner muss komplett oder mit einem Teil des Dateinamens einer installierten Klangdatei
+#  übereinstimmen, damit der angeforderte Klang angespielt werden kann.
+#  
+#  
+#  @subsection command_speak Sprachausgabe
+#  
+#  Dieses Kommando macht eine 'text-to-speech' Umsetzung und spricht den angeforderten Text aus.
+#  
+#  Kontext		| Eigenschaft 	| Wert
+#  ------------	| -------------	| -----------------
+#  Kommando		| @c strPath	| @e beliebig
+#  Query		| @c speak		| @e Text-to-Speech
+#  Form			| @c speak		| @e Text-to-Speech
+#  
+#  
+#  @section startpage Startseite
+#  
+#  Die Startseite dient zur Platzierung von Schaltflächen, um damit verknüpfte Modulkommandos
+#  beziehungsweise Modulereignisse auslösen zu können. Natürlich kann auch auf Systemressourcen
+#  zurückgegriffen oder Systemkommandos ausgeführt werden.
+#  
+#  
+#  @subsection edit_startpage Bearbeitungsmodus Startseite
+#  
+#  Dieses Kommando wechselt in den Bearbeitungsmodus der Startseite.
+#  
+#  Kontext		| Eigenschaft 	| Wert
+#  ------------	| -------------	| -----------------
+#  Kommando		| @c strPath	| `/system/startpage.html`
+#  Query		| @c edit		| `startpage`
+#  
+#  @note
+#  Der Bearbeitungsmodus der Startseite kann durch Aufrufen der Startseite ohne @c query Anzeil
+#  wieder verlassen werden.
+#  
+#  
+#  @section system_termination RasPyWeb beenden
+#  
+#  Die jeweilige Systemressource erlaubt das Beenden von RasPyWeb 
+#  
+#  @subsection system_exit RasPyWeb beenden
+#  
+#  Dieses Kommando veranlasst RasPyWeb dazu sich zu beenden.
+#  
+#  Kontext		| Eigenschaft 	| Wert
+#  ------------	| -------------	| -----------------
+#  Kommando		| @c strPath	| `/system/exit.html`
+#  Query		| @c exit		| `term`
+#  
+#  
+#  @subsection system_halt System herunterfahren
+#  
+#  Dieses Kommando veranlasst RasPyWeb dazu das System, also den Raspberry PI herunter zu fahren.
+#  
+#  Kontext		| Eigenschaft 	| Wert
+#  ------------	| -------------	| -----------------
+#  Kommando		| @c strPath	| `/system/halt.html`
+#  Query		| @c exit		| `halt`
+#  
+#  
+#  @subsection system_boot System neu starten
+#  
+#  Dieses Kommando veranlasst RasPyWeb dazu das System, also den Raspberry PI neu zu booten.
+#  
+#  Kontext		| Eigenschaft 	| Wert
+#  ------------	| -------------	| -----------------
+#  Kommando		| @c strPath	| `/system/boot.html`
+#  Query		| @c exit		| `boot`
+#  
+#  
+#  @section module_commands Modulkommandos
+#  
+#  
+#  @section external_events Externe Ereignisse
+#  
+#  Externe Ereignisse werden von Quellen ausserhalb des Basissystem generiert. Diese Ereignisse
+#  treffen üblicherweise über die Web-Server Schnittstelle ein und können von einer anderen
+#  RasPyWeb-Instanz oder einem anderen Programm bzw. System ausgehen.
+#  
+#  
+#  @subsection event_crontimer Externer Zeitgeber
+#  
+#  Bei korrekter Installation generiert dieser externe Zeitgeber alle 5 Minuten ein Ereignis
+#  synchron zur Systemzeit:
+#  
+#  Kontext		| Eigenschaft 	| Wert
+#  ------------	| -------------	| ---------------
+#  Ereignis		| @c strPath	| `/ext/evt.src`
+#  Query		| @c timer		| `cron`
+#  
+#  @see
+#  - @ref crontimer
 #  
 
 ## 
@@ -83,14 +324,109 @@
 #  - @ref event_crontimer
 #  
 
-## 
-#  @page commands Modulkommandos
+##  
+#  @page modules Module
+#  
+#  Der Funktionsumfang von RasPyWeb kann durch sogenannte Module erweitert und den jeweiligen
+#  Ansprüchen angepasst werden. Module können Kommandos verarbeiten und somit auf Ereignisse
+#  reagieren. Dabei können Module über diese Mechanismen auch miteinander agieren.
+#  
+#  Das Konzept der Modulereignisse stellt eine standardisierte Form für den ereignisgesteuerten
+#  Austausch von Informationen zwischen der Infrastruktur des Basissystems (RasPyWeb) und den
+#  installierten Modulen sowie zwischen installierten Modulen untereinander dar.
+#  
+#  
+#  
+#  Die Funktion eines Moduls
+#  sollte immer einen bestimmten Zweck erfüllen, sodass man sich durch die Auswahl eines Moduls
+#  auf granularer Ebene für eine bestimmte Funktion entscheiden kann.
+#  
+#  @note
+#  Alle Module müssen von der Basisklasse SDK::ModuleBase abgeleitet sein.
+#  
+#  @section moduleinit Modulinitialisierung
+#  
+#  Die Modulinitialisierung erfolgt einmalig durch Aufruf der Methode SDK::ModuleBase::moduleInit
+#  zu den folgenden Zeitpunkten:
+#  
+#  - nach dem Systemstart
+#  - nachdem ein deaktiviertes Modul über die Modulkonfiguration aktiviert wurde
+#  - nachdem ein Modul über die Modulkonfiguration installiert und aktiviert wurde
+#  
+#  Für die Modulinitialisierung wird die Modulkonfiguration übergeben und das Modul kann für seine
+#  spezifischen Konfigurationseinstellungen eine Modulkonfigurationsbeschreibung festlegen.
+#  
+#  Die Modulkonfiguration enthält alle modulspezifischen Konfigurationsinformationen und
+#  entspricht einem Dictionary. Das Dictionary ist eine direkte Referenz auf den Knoten innerhalb
+#  der Systemkonfiguration, welcher für das Modul verwaltet wird.
+#  
+#  @attention
+#  Der Zugriff auf das Dictionary ist nur innerhalb des Methodenaufrufs thread-sicher. Alle
+#  Zugriffe auf die Modulkonfiguration ausserhalb des Methodenaufrufs müssen daher über die
+#  bereitgestellten Zugriffsfunktionen für das Lesen und Schreiben von Einstellungen erfolgen.
+#  
+#  @see Globs::Globs::getSetting
+#  @see Globs::Globs::setSetting
+#  
+#  @subsection moduleconfig Modulkonfiguration
+#  
+#  Die Modulkonfiguration erfolgt über ein Dictionary mit einer einfachen Zuordnung von eindeutigen
+#  Schlüsseln zu Werten. Die Schlüssel für die Zuordnung von Werten muss für das jeweilige Modul
+#  eindeutig sein.
+#  
+#  @subsection moduleconfigdesc Modulkonfigurationsbeschreibung
+#  
+#  Die Modulkonfigurationsbeschreibung erlaubt dem Modul eine Beschreibung für seine spezifischen
+#  Konfigurationseinstellungen festzulegen, damit RasPyWeb diese Einstellungen in der
+#  Konfigurationsseite darstellen und die Konfiguration durch den Benutzer erlauben kann.
+#  
+#  Auf oberster Ebene erfolgt in einem Dictionary die Festlegung der Konfigurationsoption als
+#  Schlüssel und als Wert ist ein Dictionary anzugeben, in welchem die nähere Beschreibung der
+#  Konfigurationsoption enthalten ist.
+#  
+#  - "Konfigurationsoption"	: Dictionary 	(Beschreibung der Konfigurationsoption)
+#   - "Eigenschaft" 		: "Wert" 		Zulässige Beschreibungselemente für die
+#  											Konfigurationsoption sind:
+#    -# @c title 			: Bezeichnung oder Titel der Konfigurationsoption.
+#    -# @c description 		: Detailierte textuelle Beschreibung der Konfigurationoption.
+#    -# @c default 			: Standardwert der Konfigurationsoption, wobei gleichzeitig der Datentyp
+#                    			festgelegt wird.
+#    -# @c choices 			: Dictionary Optional kann eine Auswahl von zulässigen Werten in einem Dictionary
+#                               festgelegt werden, wobei der Datentyp mit dem Standardwert
+#                               übereinstimmen sollte.
+#     - Titel (Darstellung) : Wert
+#    -# @c readonly 		: (@c True | @c False)
+#  								Optional kann die Konfigurationsoption als schreibgeschützt
+#  								festgelegt werden. Auf diese Weise können Informationen dargestellt
+#  								werden, die nur zu lesen sind und nicht verändert werden können.
+#    -# @c showlink			: (@c True | @c False)
+#  								Optional kann der Wert der Konfiguration als URL für die
+#  								Erzeugung eines Links interpretiert werden. Auf diese Weise können
+#  								Links auf HTML-Inhalte erzeugt werden, die durch das Modul
+#  								bereitgestellt werden. Die Konfigurationsoption ist implizit
+#  								schreibgeschützt, sodass die hinterlegte URL nicht verändert werden
+#  								kann.
+#  
+#  @section moduleexit Modulterminierung
+#  
+#  Die Modulterminierung erfolgt einmalig durch Aufruf der Methode SDK::ModuleBase::moduleExit
+#  zu den folgenden Zeitpunkten:
+#  
+#  - vor dem Herunterfahren des Systems
+#  - wenn ein aktiviertes Modul über die Modulkonfiguration deaktiviert wird
+#  - wenn ein Modul über die Modulkonfiguration deinstalliert und deaktiviert wird
+#  
+#  @section moduleexec Modulkommandos
 #  
 #  Das Konzept der Modulkommandos stellt eine standardisierte Form für den Austausch von Daten
-#  bzw. Informationen zwischen dem Web-Frontend und einem konkret angesprochenen installierten
-#  Modul dar. Modulkommandos sind zwangsläufig modulspezifisch und werden durch das jeweilige
-#  Modul festgelegt. Eine Beschreibung der verfügbaren Kommandos ist daher der Dokumentation des
-#  jeweiligen Moduls zu entnehmen.
+#  beziehungsweise Informationen zwischen dem Web-Frontend und einem konkret angesprochenen und 
+#  installierten Modul dar.
+#  
+#  Die Ausführung von Modulkommandos erfolgt durch Aufruf der Methode SDK::ModuleBase::moduleExec.
+#  
+#  Modulkommandos sind zwangsläufig modulspezifisch und werden durch das jeweilige Modul festgelegt.
+#  Eine Beschreibung der verfügbaren Kommandos ist daher der Dokumentation des jeweiligen Moduls zu
+#  entnehmen.
 #  
 #  Jedes Modul kann aufgrund eines Kommandos, eine eigene HTML-Seite für die Anzeige im Web-Frontend
 #  generieren. Falls das Modul keine HTML-Seiten generiert, muss für die Kommandobearbeitung die
@@ -98,92 +434,7 @@
 #  
 #  @see
 #  - @ref command_redirect2
-#  
-#  
-#  @section special_commands Spezialkommandos
-#  
-#  Es gibt spezielle Kommandos, die durch die Infrastruktur des Basissystems (RasPyWeb) direkt
-#  verarbeitet werden, ohne dass dafür ein spezielles Modul notwendig wäre. Es handelt sich dabei
-#  jedoch nicht um reservierte Kommandos. Wenn ein konkretes Modul für die Verarbeitung von diesen
-#  Spezialkommandos adressiert wird (oder beispielsweise eine Namensüberlappung vorliegt), werden
-#  diese Kommandos unabhängig von der Verarbeitung durch das Basissystem an das jeweilige Modul
-#  weitergeleitet, damit zusätzlich eine modulspezifische Verarbeitung stattfinden kann.
-#  
-#  
-#  @subsection command_redirect2 Weiterleitung
-#  
-#  Dieses Kommando veranlasst den Web-Server dazu, anstelle der angeforderten URL die angegebene
-#  Seite für die Darstellung im Web-Frontend zurückzuliefern. Das Kommando dient in erster Linie
-#  dazu, modulspezifische Kommandos unabhängig von der im Web-Frontend darzustellenden Seite
-#  anzufordern. Beispielsweise soll beim Klicken einer Schaltfläche, die mit einem Modulkommando
-#  verknüpft ist, die Startseite nicht verlassen werden.
-#  
-#  Kontext		| Eigenschaft 	| Wert
-#  ------------	| -------------	| ---------------
-#  Kommando		| @c strPath	| @e beliebig
-#  Query		| @c redirect2	| `startpage`
-#  
-#  @remark
-#  Derzeit ist als Wert für das `redirect2` Kommando nur der Wert `startpage` zulässig.
-#  
-#  
-#  @subsection command_sound Klangausgabe
-#  
-#  Dieses Kommando spielt den angegebenen Klang ab, sofern eine Übereinstimmung mit einer
-#  installierten Klangdatei besteht. Eine Übereinstimmung mit einer Klangdatei besteht dann, wenn
-#  der angegebene Bezeichner komplett oder mit einem Teil des Dateinamens einer Klangdatei
-#  übereinstimmt. Falls der Bezeichner als Teil für mehrere Klangdateien einen Treffer ergeben
-#  würde, wird immer dem ersten Treffer der Vorzug gegeben.
-#  
-#  Kontext		| Eigenschaft 	| Wert
-#  ------------	| -------------	| ---------------
-#  Kommando		| @c strPath	| @e beliebig
-#  Query		| @c sound		| @e Bezeichner
-#  Form			| @c sound		| @e Bezeichner
-#  
-#  @remark
-#  @c Bezeichner muss komplett oder mit einem Teil des Dateinamens einer installierten Klangdatei
-#  übereinstimmen, damit der angeforderte Klang angespielt werden kann.
-#  
-#  
-#  @subsection command_speak Sprachausgabe
-#  
-#  Dieses Kommando macht eine 'text-to-speech' Umsetzung und spricht den angeforderten Text aus.
-#  
-#  Kontext		| Eigenschaft 	| Wert
-#  ------------	| -------------	| -----------------
-#  Kommando		| @c strPath	| @e beliebig
-#  Query		| @c speak		| @e Text-to-Speech
-#  Form			| @c speak		| @e Text-to-Speech
-#  
-
-## 
-#  @page events Modulereignisse
-#  
-#  Das Konzept der Modulereignisse stellt eine standardisierte Form für den ereignisgesteuerten
-#  Austausch von Informationen zwischen der Infrastruktur des Basissystems (RasPyWeb) und den
-#  installierten Modulen sowie zwischen installierten Modulen untereinander dar.
-#  
-#  
-#  @section external_events Externe Ereignisse
-#  
-#  Externe Ereignisse werden von Quellen ausserhalb des Basissystem generiert. Diese Ereignisse
-#  treffen üblicherweise über die Web-Server Schnittstelle ein und können von einer anderen
-#  RasPyWeb-Instanz oder einem anderen Programm bzw. System ausgehen.
-#  
-#  
-#  @subsection event_crontimer Externer Zeitgeber
-#  
-#  Bei korrekter Installation generiert dieser externe Zeitgeber alle 5 Minuten ein Ereignis
-#  synchron zur Systemzeit:
-#  
-#  Kontext		| Eigenschaft 	| Wert
-#  ------------	| -------------	| ---------------
-#  Ereignis		| @c strPath	| `/ext/evt.src`
-#  Query		| @c timer		| `cron`
-#  
-#  @see
-#  - @ref crontimer
+#  - @ref moduleconfigdesc
 #  
 
 
@@ -408,16 +659,7 @@ class HtmlPage(list):
 			"<tbody>",
 		])
 		return
-		
-	# dictAct = {
-	# 	"name" : {
-	#		"title" : "",
-	#		"query" : "",
-	#		"content" : "",
-	#		"type" : "primary|success|warning|danger",
-	#	},
-	# }
-	
+
 	## 
 	#  @brief Erweitert ein eröffnetes tabellarisches Formular um einen Datensatz.
 	#  
@@ -868,13 +1110,32 @@ class ModuleBase:
 	def getWorker(self):
 		return self.m_oWorker
 		
-	## Modulinitialisierung
-	# @param self This-Pointer
-	# @param dictModCfg Modulkonfiguration {<"Param"> : <Value>}
-	# @param dictCfgUsr Konfigurationsbeschreibung {<"Param"> : {<"(title|description|default|choice)"> : <"Value"|{<"Choice"> : <"Value">}>}}
-	def moduleInit(self, dictModCfg={}, dictCfgUsr={}):
+	## 
+	#  @brief
+	#  Führt die Initialisierung eines installierten Moduls durch. Siehe auch @ref moduleinit
+	#  
+	#  @param [in] self
+	#  			This-Pointer auf die Modulinstanz
+	#  @param [in] dictModCfg
+	#  			Modulkonfiguration (Dictionary), siehe auch @ref moduleconfig
+	#  @param [in] dictCfgUsr
+	#  			Konfigurationsbeschreibung {<"Param"> : {<"(title|description|default|choice)"> : <"Value"|{<"Choice"> : <"Value">}>}}
+	#  @return
+	#  Liefert @c True, wenn die Initialisierung des Moduls erfolgreich durchgeführt werden konnte
+	#  oder liefert @c False, wenn während der Initialisierung ein Fehler aufgetreten ist, welcher
+	#  die weitere Verwendung des Moduls verhindert.
+	#  
+	def moduleInit(self, dictModCfg=None, dictCfgUsr=None):
 		return True
-		
+	
+	## 
+	#  @brief Brief
+	#  
+	#  @param [in] self Parameter_Description
+	#  @return Return_Description
+	#  
+	#  @details Details
+	#  	
 	def moduleExit(self):
 		return True
 		

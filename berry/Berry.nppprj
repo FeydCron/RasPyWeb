@@ -10,6 +10,7 @@
         <File name="Tasks.py" />
         <File name="Voice.py" />
         <File name="Worker.py" />
+        <File name="debugtest.py" />
         <Folder name="www" />
         <Folder name="modules">
             <File name="modules\__init__.py" />

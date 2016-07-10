@@ -13,14 +13,9 @@ from SDK import ModuleBase
 class Test(ModuleBase):
 	
 	## 
-	#  @brief Brief
+	#  @copydoc SDK::ModuleBase::moduleInit
 	#  
-	#  @param [in] self Parameter_Description
-	#  @return Return_Description
-	#  
-	#  @details Details
-	#  
-	def moduleInit(self, dictModCfg={}, dictCfgUsr={}):
+	def moduleInit(self, dictModCfg=None, dictCfgUsr=None):
 		print("%r::moduleInit(%s) Version 5" % (self, SDK.getCpuTemp()))
 		return True
 	

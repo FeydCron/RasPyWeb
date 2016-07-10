@@ -174,8 +174,7 @@ class Clock(ModuleBase):
 			nHour += 1
 		
 		# Ansage "Uhr" nur um die volle Stunde herum
-		if (self.m_nMinutes > 55
-			or (self.m_nMinutes >= 0 and self.m_nMinutes <= 10)):
+		if self.m_nMinutes > 55:
 			strHour = "Uhr"
 			
 		# Nächste volle Stunde innerhalb des 12h-Intervalls beachten

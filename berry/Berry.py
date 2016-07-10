@@ -1,4 +1,7 @@
-﻿import sys
+﻿import ptvsd
+ptvsd.enable_attach("debug")
+
+import sys
 import os
 import re
 import traceback

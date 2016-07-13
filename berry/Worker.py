@@ -78,7 +78,7 @@ class TaskSystemWatchDog(FastTask):
 	s_strIpAddr = ""
 	s_nCpuTooHot = 0
 	s_nIpFailCnt = 0
-	s_bCpuTempWrn = False
+	s_nCpuTempLvl = 0
 	s_bHistory = False
 	
 	def __str__(self):
@@ -90,6 +90,12 @@ class TaskSystemWatchDog(FastTask):
 		strCpuUse = SDK.getCpuUse().strip()
 		lstRamInfo = SDK.getRamInfo()
 		lstDiskSpace = SDK.getDiskSpace()
+
+		fCpuTempA = Globs.getSetting("System", "fCpuTempA", "\\d{2,}\\.\\d+", 60.0)
+		fCpuTempB = Globs.getSetting("System", "fCpuTempB", "\\d{2,}\\.\\d+", 56.0)
+		fCpuTempC = Globs.getSetting("System", "fCpuTempC", "\\d{2,}\\.\\d+", 53.0)
+		fCpuTempH = Globs.getSetting("System", "fCpuTempH", "\\d{2,}\\.\\d+", 1.0)
+
 		try:
 			fCpuUse = float(strCpuUse.replace(",", ".", 1))
 		except:
@@ -177,41 +183,59 @@ class TaskSystemWatchDog(FastTask):
 		# CPU-Temperatur auswerten
 		strCpuTemp = ("%0.1f Grad" % (TaskSystemWatchDog.s_fCpuTempAvg)
 			).replace(".", " Komma ")
-		if TaskSystemWatchDog.s_fCpuTempAvg > Globs.getSetting("System", "fCpuTempA", "\\d{2,}\\.\\d+", 60.0):
-			TaskSystemWatchDog.s_bCpuTempWrn = True
+		if TaskSystemWatchDog.s_fCpuTempAvg > fCpuTempA:
+			#
+			# Warn-Level 3 - Notabschaltung
+			#
 			TaskSystemWatchDog.s_nCpuTooHot += 1
-			TaskSpeak(self.m_oWorker, "Achtung!").start()
-			TaskSpeak(self.m_oWorker, "Temperaturüberschreitung mit %s!" % (
-				strCpuTemp)).start()
+			if TaskSystemWatchDog.s_nCpuTempLvl != 3: 
+				TaskSpeak(self.m_oWorker, "Achtung!").start()
+				TaskSpeak(self.m_oWorker, "Temperaturüberschreitung mit %s!" % (
+					strCpuTemp)).start()
+			TaskSystemWatchDog.s_nCpuTempLvl = 3
 			if (TaskSystemWatchDog.s_nCpuTooHot >= 10):
 				TaskSpeak(self.m_oWorker, "Notabschaltung eingeleitet!").start()
 				TaskExit(self.m_oWorker, "term").start()
 				Globs.stop()
 			else:
 				TaskSpeak(self.m_oWorker,
-					"Notabschaltung zu %s Prozent wahrscheinlich!" % (
+					"Für Abkühlung sorgen! Notabschaltung %s Prozent!" % (
 					TaskSystemWatchDog.s_nCpuTooHot * 10)).start()
-		elif TaskSystemWatchDog.s_fCpuTempAvg > Globs.getSetting("System", "fCpuTempB", "\\d{2,}\\.\\d+", 56.0):
-			TaskSystemWatchDog.s_bCpuTempWrn = True
-			if TaskSystemWatchDog.s_nCpuTooHot > 0:
-				TaskSystemWatchDog.s_nCpuTooHot -= 1
-			TaskSpeak(self.m_oWorker,
-				"Die Temperatur ist mit %s zu hoch!" % (
-				strCpuTemp)).start()
-		elif TaskSystemWatchDog.s_fCpuTempAvg > Globs.getSetting("System", "fCpuTempC", "\\d{2,}\\.\\d+", 53.0):
-			TaskSystemWatchDog.s_bCpuTempWrn = True
+		elif (TaskSystemWatchDog.s_fCpuTempAvg > fCpuTempB
+			and TaskSystemWatchDog.s_fCpuTempAvg < (fCpuTempA - fCpuTempH)):
+			#
+			# Warn-Level 2
+			#
 			TaskSystemWatchDog.s_nCpuTooHot = 0
-			TaskSpeak(self.m_oWorker,
-				"Die Temperatur ist mit %s relativ hoch" % (
-				strCpuTemp)).start()
-		elif TaskSystemWatchDog.s_bCpuTempWrn:
-			TaskSystemWatchDog.s_bCpuTempWrn = False
+#			if TaskSystemWatchDog.s_nCpuTooHot > 0:
+#				TaskSystemWatchDog.s_nCpuTooHot -= 1
+			if TaskSystemWatchDog.s_nCpuTempLvl != 2:
+				TaskSpeak(self.m_oWorker,
+					"Die Temperatur ist mit %s zu hoch!" % (
+					strCpuTemp)).start()
+			TaskSystemWatchDog.s_nCpuTempLvl = 2
+		elif (TaskSystemWatchDog.s_fCpuTempAvg > fCpuTempC
+			and TaskSystemWatchDog.s_fCpuTempAvg < (fCpuTempB - fCpuTempH)):
+			#
+			# Warn-Level 1
+			#
+			TaskSystemWatchDog.s_nCpuTooHot = 0
+			if TaskSystemWatchDog.s_nCpuTempLvl != 1:
+				TaskSpeak(self.m_oWorker,
+					"Die Temperatur ist mit %s erhöht!" % (
+					strCpuTemp)).start()
+			TaskSystemWatchDog.s_nCpuTempLvl = 1
+		elif (TaskSystemWatchDog.s_nCpuTempLvl != 0
+			and TaskSystemWatchDog.s_fCpuTempAvg < (fCpuTempC - fCpuTempH)):
+			#
+			# Warn-Level 0 - Normalbereich
+			#
 			TaskSystemWatchDog.s_nCpuTooHot = 0
 			TaskSpeak(self.m_oWorker,
 				"Die Temperatur ist mit %s wieder im normalen Bereich" % (
 				strCpuTemp)).start()
+			TaskSystemWatchDog.s_nCpuTempLvl = 0
 		elif not TaskSystemWatchDog.s_bHistory:
-			pass
 			TaskSpeak(self.m_oWorker, 
 				"Die Temperatur liegt mit %s im normalen Bereich" % (
 				strCpuTemp)).start()

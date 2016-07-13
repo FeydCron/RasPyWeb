@@ -1,5 +1,8 @@
-﻿import ptvsd
-ptvsd.enable_attach("debug")
+﻿try:
+	import ptvsd
+	ptvsd.enable_attach("debug")
+except:
+	pass
 
 import sys
 import os

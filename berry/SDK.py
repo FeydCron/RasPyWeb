@@ -446,6 +446,7 @@ import socket
 import html
 import urllib.parse
 import http.client
+import queue
 
 from datetime import datetime
 
@@ -1421,6 +1422,11 @@ def getCpuTemp():
 		universal_newlines = True)
 	temp = partList(re.split(regexSep, strResult), parts)[0]
 	fResult = float(temp)
+
+	if (Globs.getSetting("System", "bTestMode", "True|False", False)
+	 and not Globs.s_oQueueTestCpuTempValues.empty()):
+		fResult = Globs.s_oQueueTestCpuTempValues.get(False)
+
 	return fResult
 
 # Return current CPU usage in percent as a string value

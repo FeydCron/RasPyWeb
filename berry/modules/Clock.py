@@ -108,6 +108,23 @@ class Clock(ModuleBase):
 						self.speakTime()
 						bResult = True
 						continue
+					# Modultest ausführen
+					if (strArg == "test"):
+						TaskSpeak(self.getWorker(), "Der Modultest für die Uhr wird jetzt gestartet").start()
+						nHour = 1
+						nMinute = 0
+						while (nHour <= 12):
+							self.m_nHour12h = nHour
+							TaskSpeak(self.getWorker(), "Stunde " + str(self.m_nHour12h)).start()
+							while (nMinute <= 59):
+								self.m_nMinutes = nMinute
+								TaskSpeak(self.getWorker(), "Minute " + str(self.m_nMinutes)).start()
+								self.speakTime()
+								self.m_nTimeSpoken = 0
+								nMinute += 1
+							nMinute = 0
+							nHour += 1
+						TaskSpeak(self.getWorker(), "Der Modultest für die Uhr ist jetzt beendet").start()
 		# Unbekanntes Kommando
 		return bResult
 	
@@ -156,8 +173,6 @@ class Clock(ModuleBase):
 		self.m_nTimeSpoken += 1
 		
 		# Zeitansage in Bezug auf nächste volle Stunde zusammenbasteln
-		strPart = ""
-		strNext = "viertel"
 		strHour = ""
 		nHour = self.m_nHour12h
 		if self.m_nMinutes >= 45:
@@ -172,9 +187,14 @@ class Clock(ModuleBase):
 			strPart = "viertel"
 			strNext = "halb"
 			nHour += 1
+		else:
+			strPart = ""
+			strNext = "viertel"
+			if self.m_nMinutes >= 8:
+				nHour += 1
 		
 		# Ansage "Uhr" nur um die volle Stunde herum
-		if self.m_nMinutes > 55:
+		if self.m_nMinutes >= 53 or self.m_nMinutes < 8:
 			strHour = "Uhr"
 			
 		# Nächste volle Stunde innerhalb des 12h-Intervalls beachten

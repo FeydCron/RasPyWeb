@@ -9,6 +9,7 @@ import threading
 import socket
 import imp
 import getopt
+import queue
 
 from collections import deque
 from collections import OrderedDict
@@ -44,6 +45,10 @@ class LogEntry:
 
 class Globs:
 	
+	# Defines test values for CPU temperatures for being used with
+	# a module test
+	s_oQueueTestCpuTempValues = queue.Queue()
+
 	# ------------------------------------------------
 	# Signalisierung der Art der  Programmterminierung
 	# ------------------------------------------------
@@ -80,6 +85,7 @@ class Globs:
 			"fCpuTempA" 		: 60.0,			# Abschalt-Temperaturgrenze
 			"fCpuTempB" 		: 56.0,			# Kritische Temperaturgrenze
 			"fCpuTempC" 		: 53.0,			# Warn-Temperaturgrenze
+			"fCpuTempH" 		: 1.0,			# Hysterese Temperaturgrenze
 			"strSoundLocation"	: "/usr/share/scratch/Media/Sounds",
 			"fVersion"			: 0.1,
 		},
@@ -160,6 +166,13 @@ class Globs:
 									"Betriebstemperatur der CPU zu veranlassen ist."),
 				"default"		: "53.0"
 			},
+			"fCpuTempH" : {
+				"title"			: "Hysterese um Temperaturgrenzen",
+				"description"	: ("Legt die Hysterese um die Temperaturgrenzen für die CPU in "+
+									"Grad Celsius fest, um ein zu häufiges Wechseln des erfassten "+
+									"Betriebstemperaturbereichs der CPU zu vermeiden."),
+				"default"		: "1.0"
+			},
 			"strSoundLocation" : {
 				"title"			: "Sound-Datei Ablageort",
 				"description"	: ("Legt den Ablageort der Sound-Dateien fest, die für das System, "+
@@ -211,10 +224,10 @@ class Globs:
 	
 	def onDelayedShutdown():
 		if (Globs.s_evtShutdown.isSet()):
-			print("No critical activity since last shutdown indication. Shutdown now.")
+			Globs.log("No critical activity since last shutdown indication. Shutdown now.")
 			Globs.stop()
 			return
-		print("Recognized critical activity since last shutdown indication.")
+		Globs.wrn("Recognized critical activity since last shutdown indication.")
 		Globs.shutdown()
 		return
 		

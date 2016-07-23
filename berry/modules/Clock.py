@@ -31,15 +31,16 @@ class Clock(ModuleBase):
 									"sollen. Zusammen mit dem Ende der Ruhezeit kann so ein "+
 									"Zeitfenster der Stille festgelegt werden, um Ruhestörungen "+
 									"zu vermeiden."),
-				"default"		: "19"
+				"default"		: "0"
 			},
 			"nSilenceTo" : {
 				"title"			: "Ende der Ruhezeit",
-				"description"	: ("Das Ende der Ruhezeit gibt an, ab welcher Stunde (0..23) "+
-									"Glockenschläge und Zeitansagen ausgegeben werden dürfen "+
-									"Zusammen mit dem Beginn der Ruhezeit kann so ein Zeitfenster "+
-									"der Stille festgelegt werden, um Ruhestörungen zu vermeiden."),
-				"default"		: "19"
+				"description"	: ("Das Ende der Ruhezeit gibt an, bis zu welcher Stunde (0..23) "+
+									"keine Glockenschläge und keine Zeitansagen ausgegeben werden "+
+									"sollen. Zusammen mit dem Beginn der Ruhezeit kann so ein "+
+									"Zeitfenster der Stille festgelegt werden, um Ruhestörungen "+
+									"zu vermeiden."),
+				"default"		: "0"
 			},
 			"nTellTimeInt" : {
 				"title"			: "Uhrzeitansage",

@@ -89,11 +89,9 @@ class Clock(ModuleBase):
 					TaskSpeak(self.getWorker(), "Entschuldigung. Test.").start()
 					self.gong()
 					self.speakTime()
-				elif (self.m_nHour24h < self.m_nSilenceFrom
-					and self.m_nHour24h > self.m_nSilenceTo):
-					if (self.m_nMinutes % self.m_nTellTimeInt) == 0:
-						self.gong()
-						self.speakTime()
+				elif (self.isAllowed() and (self.m_nMinutes % self.m_nTellTimeInt) == 0):
+					self.gong()
+					self.speakTime()
 				bResult = True
 			elif (strCmd == "clock"):
 				for strArg in lstArg:
@@ -127,6 +125,18 @@ class Clock(ModuleBase):
 						TaskSpeak(self.getWorker(), "Der Modultest für die Uhr ist jetzt beendet").start()
 		# Unbekanntes Kommando
 		return bResult
+
+	# Bereichsprüfung
+	def isAllowed(self):
+		if self.m_nSilenceFrom > self.m_nSilenceTo:
+			# Inside-Range
+			return (self.m_nHour24h < self.m_nSilenceFrom and self.m_nHour24h > self.m_nSilenceTo)
+		elif self.m_nSilenceFrom < self.m_nSilenceTo:
+			# Outside-Range
+			return (self.m_nHour24 < self.m_nSilenceFrom or self.m_nHour24h > self.m_nSilenceTo)
+
+		# No range
+		return True
 	
 	# Aktuelle Zeit holen und in globalen Variablen speichern
 	def updateTime(self):

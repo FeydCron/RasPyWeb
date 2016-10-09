@@ -1470,7 +1470,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		elif not re.match("\\.[Ww][Aa][Vv]|\\.[Mm][Pp]3", strExt):
 			return False
 		else:
-			this.installSoundFile(oSoundFile.file, os.path.join(strSoundPath, strFilename))
+			self.installSoundFile(oSoundFile.file, os.path.join(strSoundPath, strFilename))
 			bResult = True
 		return bResult
 		

@@ -18,12 +18,12 @@ class AMatisGPIO(ModuleBase):
 		
 		STATUS = 1
 		
-		print('init PI ' + str(IO.RPI_REVISION) + ' V'  + str(IO.VERSION))
+		print('init PI ' + str(IO.RPI_REVISION) + ' V' + str(IO.VERSION))
 		IO.setmode(IO.BOARD)
 		IO.setup(I0,IO.IN,pull_up_down=IO.PUD_DOWN)
 		IO.add_event_detect(I0, IO.BOTH, callback=in_cllbck, bouncetime=50)
 		IO.setup(I1,IO.IN,pull_up_down=IO.PUD_DOWN)
-		IO.add_event_detect(I1, IO.BOTH, callback=in_cllbck, bouncetime=50)  
+		IO.add_event_detect(I1, IO.BOTH, callback=in_cllbck, bouncetime=50) 
 		IO.setup(QBerry, IO.OUT)
 		IO.setup(ch_list, IO.OUT)
 		IO.output(ch_list,0)
@@ -75,42 +75,42 @@ class AMatisGPIO(ModuleBase):
 		return True
 
 def prnt(text):
-  if(VERBOSE and text):
-    print(text)
+	if(VERBOSE and text):
+		print(text)
 
 class DuoLed:
-  def __init__(self,r,g,io):#(Pin Rot, Pin Gruen, GPIO)
-    self.r = r
-    self.g = g
-    self.IO = io
-  def off(self):
-    self.IO.output((self.r,self.g),0)
-  def red(self):
-    self.IO.output((self.r,self.g),0)
-    self.IO.output(self.r,1)
-  def grn(self):
-    self.IO.output((self.r,self.g),0)
-    self.IO.output(self.g,1)
-  def ylw(self):
-    self.IO.output((self.r,self.g),0)
-    self.IO.output((self.r,self.g),1)
-  def set(self, color):
-    #r|R = red
-    #y|Y = red
-    #g|G = red
-    #r|R = red
-    if(color == '0' or color == 'o' or color == 'O'):
-      self.IO.output((self.r,self.g),0)
-    elif(color == 'r' or color == 'R'):
-      self.IO.output((self.g),0)
-      self.IO.output((self.r),1)
-    elif(color == 'g' or color == 'G'):
-      self.IO.output((self.r),0)
-      self.IO.output((self.g),1)
-    elif(color == 'y' or color == 'Y'):
-      self.IO.output((self.r,self.g),1)
-  #class DuoLed
-  
+	def __init__(self,r,g,io):#(Pin Rot, Pin Gruen, GPIO)
+		self.r = r
+		self.g = g
+		self.IO = io
+	def off(self):
+		self.IO.output((self.r,self.g),0)
+	def red(self):
+		self.IO.output((self.r,self.g),0)
+		self.IO.output(self.r,1)
+	def grn(self):
+		self.IO.output((self.r,self.g),0)
+		self.IO.output(self.g,1)
+	def ylw(self):
+		self.IO.output((self.r,self.g),0)
+		self.IO.output((self.r,self.g),1)
+	def set(self, color):
+		#r|R = red
+		#y|Y = red
+		#g|G = red
+		#r|R = red
+		if(color == '0' or color == 'o' or color == 'O'):
+			self.IO.output((self.r,self.g),0)
+		elif(color == 'r' or color == 'R'):
+			self.IO.output((self.g),0)
+			self.IO.output((self.r),1)
+		elif(color == 'g' or color == 'G'):
+			self.IO.output((self.r),0)
+			self.IO.output((self.g),1)
+		elif(color == 'y' or color == 'Y'):
+			self.IO.output((self.r,self.g),1)
+ #class DuoLed
+
 STATUS=1
 I0 = 24
 I1 = 26
@@ -144,102 +144,102 @@ PORT = 80
 isAlive = 0
 
 def setLeds(leds):
-  global STATUS
-  print('setLeds' + str(bin(leds)))
-  if(STATUS > 0):
-    IO.output(Q0r,(leds>>1)&1)
-    IO.output(QRel,(leds>>0)&1)
-    IO.output(Q0g,(leds>>0)&1)
-    IO.output(Q1r,(leds>>3)&1)
-    IO.output(Q1g,(leds>>2)&1)
-    IO.output(Q2r,(leds>>5)&1)
-    IO.output(Q2g,(leds>>4)&1)
-    IO.output(Q3r,(leds>>7)&1)
-    IO.output(Q3g,(leds>>6)&1)
+	global STATUS
+	print('setLeds' + str(bin(leds)))
+	if(STATUS > 0):
+		IO.output(Q0r,(leds>>1)&1)
+		IO.output(QRel,(leds>>0)&1)
+		IO.output(Q0g,(leds>>0)&1)
+		IO.output(Q1r,(leds>>3)&1)
+		IO.output(Q1g,(leds>>2)&1)
+		IO.output(Q2r,(leds>>5)&1)
+		IO.output(Q2g,(leds>>4)&1)
+		IO.output(Q3r,(leds>>7)&1)
+		IO.output(Q3g,(leds>>6)&1)
 
 def ampel(ryg):
-  global STATUS
-  if(STATUS > 0):
-    if(ryg == 'r' or ryg == 'R'):
-      IO.output([QAR],1)
-    elif(ryg == 'y' or ryg == 'Y'):
-      IO.output([QAY],1)
-    elif(ryg == 'g' or ryg == 'G'):
-      IO.output([QAG],1)
-    elif(ryg == 'o' or ryg == 'O' or ryg == '0'):
-      IO.output([QAY,QAG],0)
+	global STATUS
+	if(STATUS > 0):
+		if(ryg == 'r' or ryg == 'R'):
+			IO.output([QAR],1)
+		elif(ryg == 'y' or ryg == 'Y'):
+			IO.output([QAY],1)
+		elif(ryg == 'g' or ryg == 'G'):
+			IO.output([QAG],1)
+		elif(ryg == 'o' or ryg == 'O' or ryg == '0'):
+			IO.output([QAY,QAG],0)
 
 
 def alarm(al):
-  global STATUS
-  if(STATUS > 0):
-    if(al == 'on' or al == '1'):
-      IO.output(QRel,1)
-    elif(al == 'o' or al == 'O' or al == '0'):
-      IO.output(QRel,0)
+	global STATUS
+	if(STATUS > 0):
+		if(al == 'on' or al == '1'):
+			IO.output(QRel,1)
+		elif(al == 'o' or al == 'O' or al == '0'):
+			IO.output(QRel,0)
 
 def setAlive():
-  global isAlive
-  if(isAlive<3):
-    isAlive = isAlive+1
+	global isAlive
+	if(isAlive<3):
+		isAlive = isAlive+1
 
 def alive():
-  global STATUS
-  if(STATUS > 0):
-    if(isAlive > 1):
-      IO.output([QAG],1)
-    else:
-      IO.output([QAG],0)
-      IO.output([QAR],1)
+	global STATUS
+	if(STATUS > 0):
+		if(isAlive > 1):
+			IO.output([QAG],1)
+		else:
+			IO.output([QAG],0)
+			IO.output([QAR],1)
 
 def status(st):
-  global STATUS
-  if(STATUS > 0):
-    ls = list(st)
-    L0.set(ls[0])
-    L1.set(ls[1])
-    L2.set(ls[2])
-    L3.set(ls[3])
-    L4.set(ls[4])
-    ampel(ls[5])
-    alarm(ls[6])
+	global STATUS
+	if(STATUS > 0):
+		ls = list(st)
+		L0.set(ls[0])
+		L1.set(ls[1])
+		L2.set(ls[2])
+		L3.set(ls[3])
+		L4.set(ls[4])
+		ampel(ls[5])
+		alarm(ls[6])
 
 def in_cllbck(ch):
-  print('in_cllbck ' + str(ch) + str(IO.input(ch)))
-  if(IO.input(I1)):
-    eHlt.set()
-  elif(IO.input(I0)):
-    IO.output(ch_list,0)
+	print('in_cllbck ' + str(ch) + str(IO.input(ch)))
+	if(IO.input(I1)):
+		eHlt.set()
+	elif(IO.input(I0)):
+		IO.output(ch_list,0)
 	
 def sysCall(cmd):
-  try:
-    call(cmd.split())
-  except Exception as e:
-    print(e)
+	try:
+		call(cmd.split())
+	except Exception as e:
+		print(e)
 	
 def heartBeat():
-  global STATUS
-  while(STATUS != 0):
-    on=0.5
-    #getCPUuse()
-    #off=(((60.0/(getCpuTemp()-20)))*1.5)-on
-    off=(60.0/SDK.getCpuTemp())-on
-    if(off>0.0):
-      IO.output(QBerry,0)
-      time.sleep(off)
-    IO.output(QBerry,1)
-    time.sleep(on)
+	global STATUS
+	while(STATUS != 0):
+		on=0.5
+		#getCPUuse()
+		#off=(((60.0/(getCpuTemp()-20)))*1.5)-on
+		off=(60.0/SDK.getCpuTemp())-on
+		if(off>0.0):
+			IO.output(QBerry,0)
+			time.sleep(off)
+		IO.output(QBerry,1)
+		time.sleep(on)
 	
 def checkAlive():
-  global isAlive, STATUS
-  i=0
-  while(STATUS != 0):
-    time.sleep(1.0)
-    if(i>7200):
-      i=0
-      isAlive = isAlive-1
-    if(isAlive < 0):
-      isAlive = 0
-    i = i+1
-    alive()
+	global isAlive, STATUS
+	i=0
+	while(STATUS != 0):
+		time.sleep(1.0)
+		if(i>7200):
+			i=0
+			isAlive = isAlive-1
+		if(isAlive < 0):
+			isAlive = 0
+		i = i+1
+		alive()
 	

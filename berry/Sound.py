@@ -79,7 +79,7 @@ class Sound:
 	def sound(self, strSound):
 		strFile = None
 		strPlay = "aplay"
-	    
+		
 		# >>> Critical Section
 		Globs.s_oSettingsLock.acquire()
 		try:

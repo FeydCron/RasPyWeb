@@ -35,12 +35,7 @@ class Updater(ModuleBase):
 	s_strPrefix = "RasPyWeb-latest/berry/"
 	
 	## 
-	#  @brief Brief
-	#  
-	#  @param [in] self Parameter_Description
-	#  @return Return_Description
-	#  
-	#  @details Details
+	#  @copydoc SDK::ModuleBase::moduleInit
 	#  
 	def moduleInit(self, dictModCfg={}, dictCfgUsr={}):
 		dictSettings = {

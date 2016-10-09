@@ -163,10 +163,10 @@ sounds = {
 # Sound abspielen
 def sound(strSound):
 	global sounds
-    
+	
 	strFile = "/usr/share/scratch/Media/Sounds"
 	strPlay = "aplay"
-    
+	
 	for strDir, listSounds in sounds.items():
 		if strSound in listSounds:
 			strFile += "/" + strDir + "/" + strSound

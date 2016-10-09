@@ -31,15 +31,16 @@ class Clock(ModuleBase):
 									"sollen. Zusammen mit dem Ende der Ruhezeit kann so ein "+
 									"Zeitfenster der Stille festgelegt werden, um Ruhestörungen "+
 									"zu vermeiden."),
-				"default"		: "19"
+				"default"		: "0"
 			},
 			"nSilenceTo" : {
 				"title"			: "Ende der Ruhezeit",
-				"description"	: ("Das Ende der Ruhezeit gibt an, ab welcher Stunde (0..23) "+
-									"Glockenschläge und Zeitansagen ausgegeben werden dürfen "+
-									"Zusammen mit dem Beginn der Ruhezeit kann so ein Zeitfenster "+
-									"der Stille festgelegt werden, um Ruhestörungen zu vermeiden."),
-				"default"		: "19"
+				"description"	: ("Das Ende der Ruhezeit gibt an, bis zu welcher Stunde (0..23) "+
+									"keine Glockenschläge und keine Zeitansagen ausgegeben werden "+
+									"sollen. Zusammen mit dem Beginn der Ruhezeit kann so ein "+
+									"Zeitfenster der Stille festgelegt werden, um Ruhestörungen "+
+									"zu vermeiden."),
+				"default"		: "0"
 			},
 			"nTellTimeInt" : {
 				"title"			: "Uhrzeitansage",
@@ -89,11 +90,9 @@ class Clock(ModuleBase):
 					TaskSpeak(self.getWorker(), "Entschuldigung. Test.").start()
 					self.gong()
 					self.speakTime()
-				elif (self.m_nHour24h < self.m_nSilenceFrom
-					and self.m_nHour24h > self.m_nSilenceTo):
-					if (self.m_nMinutes % self.m_nTellTimeInt) == 0:
-						self.gong()
-						self.speakTime()
+				elif (self.isAllowed() and (self.m_nMinutes % self.m_nTellTimeInt) == 0):
+					self.gong()
+					self.speakTime()
 				bResult = True
 			elif (strCmd == "clock"):
 				for strArg in lstArg:
@@ -108,8 +107,37 @@ class Clock(ModuleBase):
 						self.speakTime()
 						bResult = True
 						continue
+					# Modultest ausführen
+					if (strArg == "test"):
+						TaskSpeak(self.getWorker(), "Der Modultest für die Uhr wird jetzt gestartet").start()
+						nHour = 1
+						nMinute = 0
+						while (nHour <= 12):
+							self.m_nHour12h = nHour
+							TaskSpeak(self.getWorker(), "Stunde " + str(self.m_nHour12h)).start()
+							while (nMinute <= 59):
+								self.m_nMinutes = nMinute
+								TaskSpeak(self.getWorker(), "Minute " + str(self.m_nMinutes)).start()
+								self.speakTime()
+								self.m_nTimeSpoken = 0
+								nMinute += 1
+							nMinute = 0
+							nHour += 1
+						TaskSpeak(self.getWorker(), "Der Modultest für die Uhr ist jetzt beendet").start()
 		# Unbekanntes Kommando
 		return bResult
+
+	# Bereichsprüfung
+	def isAllowed(self):
+		if self.m_nSilenceFrom > self.m_nSilenceTo:
+			# Inside-Range
+			return (self.m_nHour24h < self.m_nSilenceFrom and self.m_nHour24h > self.m_nSilenceTo)
+		elif self.m_nSilenceFrom < self.m_nSilenceTo:
+			# Outside-Range
+			return (self.m_nHour24 < self.m_nSilenceFrom or self.m_nHour24h > self.m_nSilenceTo)
+
+		# No range
+		return True
 	
 	# Aktuelle Zeit holen und in globalen Variablen speichern
 	def updateTime(self):
@@ -156,8 +184,6 @@ class Clock(ModuleBase):
 		self.m_nTimeSpoken += 1
 		
 		# Zeitansage in Bezug auf nächste volle Stunde zusammenbasteln
-		strPart = ""
-		strNext = "viertel"
 		strHour = ""
 		nHour = self.m_nHour12h
 		if self.m_nMinutes >= 45:
@@ -172,10 +198,14 @@ class Clock(ModuleBase):
 			strPart = "viertel"
 			strNext = "halb"
 			nHour += 1
+		else:
+			strPart = ""
+			strNext = "viertel"
+			if self.m_nMinutes >= 8:
+				nHour += 1
 		
 		# Ansage "Uhr" nur um die volle Stunde herum
-		if (self.m_nMinutes > 55
-			or (self.m_nMinutes >= 0 and self.m_nMinutes <= 10)):
+		if self.m_nMinutes >= 53 or self.m_nMinutes < 8:
 			strHour = "Uhr"
 			
 		# Nächste volle Stunde innerhalb des 12h-Intervalls beachten

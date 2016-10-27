@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<rexpfd>
+    <destination path="ASUS.Raspberry:/home/pi/berry"/>
+    <options createDirectoryStructure="false" createSelectedOnly="true" descriptionFilePath="/berry/Raspberry.rexpfd" overWriteExistingFiles="true" reviewSynchronize="false" saveSettings="true"/>
+    <selectedElements>
+        <file path="/berry/Berry.py"/>
+        <file path="/berry/Event.py"/>
+        <file path="/berry/Globs.py"/>
+        <file path="/berry/Httpd.py"/>
+        <file path="/berry/SDK.py"/>
+        <file path="/berry/Sound.py"/>
+        <file path="/berry/Tasks.py"/>
+        <file path="/berry/Voice.py"/>
+        <file path="/berry/Worker.py"/>
+        <file path="/berry/__init__.py"/>
+        <file path="/berry/debugtest.py"/>
+        <folder path="/berry/modules"/>
+    </selectedElements>
+</rexpfd>

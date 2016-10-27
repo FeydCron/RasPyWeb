@@ -1,14 +1,10 @@
 import cgi
 import os
-import subprocess
 import re
-import threading
-import traceback
 import uuid
 import html
 import zipfile
 
-from http.server import BaseHTTPRequestHandler
 from http.server import SimpleHTTPRequestHandler
 from http.server import HTTPServer
 from socketserver import ThreadingMixIn
@@ -18,15 +14,13 @@ from datetime import datetime
 from collections import OrderedDict
 from zipfile import ZipFile
 
-from Sound import Sound
-from Globs import Globs
+import Globs
 from Worker import TaskModuleInit
 
 import SDK
 from SDK import TaskSpeak
 from SDK import TaskSound
 from SDK import FastTask
-from SDK import LongTask
 from SDK import HtmlPage
 from SDK import TaskModuleEvt
 from SDK import TaskSaveSettings
@@ -57,8 +51,7 @@ class StartPage(OrderedDict):
 		if self.editTarget(oHtmlPage, secEdt, artEdt, btnEdt):
 			return
 		bIsEmpty = True
-		for (strSecName, oSection) in self.items():
-			bSecEdt = (strSecName == secEdt)
+		for (_, oSection) in self.items():
 			oSection.writeToPage(oHtmlPage)
 			bIsEmpty = False
 			
@@ -203,8 +196,7 @@ class Section(OrderedDict):
 			oHtmlPage.append("<section>")
 		else:
 			oHtmlPage.append("<section class=\"ym-grid linearize-level-2\">")
-		for (strArtName, oArticle) in self.items():
-			bIsEmpty = False
+		for (_, oArticle) in self.items():
 			if self.m_bPrimary:
 				oHtmlPage.append(
 					"<article>")
@@ -813,7 +805,6 @@ class TaskDisplaySettings(FutureTask):
 		return
 		
 	def createForm(self):
-		dictValue = None
 		dictProperties = None
 		dictChoices = {}
 		strTitle = self.m_strVal
@@ -880,7 +871,6 @@ class TaskDisplaySettings(FutureTask):
 		return True
 		
 	def updateValue(self):
-		strResult = ""
 		if Globs.setSetting(self.m_strKey, self.m_strFxn, self.m_strVal):
 			Globs.saveSettings()
 			return True
@@ -1051,7 +1041,7 @@ class TaskDisplaySounds(FutureTask):
 				strAnchor = uuid.uuid1().hex
 				self.m_oHtmlPage.append("<li id=\"Default\"><span>Eigene Klänge</span>")
 				self.m_oHtmlPage.append("<ul>")
-				for (strName, strFile) in sorted(dictSounds["Default"].items()):
+				for (strName, _) in sorted(dictSounds["Default"].items()):
 					if strName == strSound:
 						strActive = "&#x0266B;"
 					else:
@@ -1068,7 +1058,7 @@ class TaskDisplaySounds(FutureTask):
 				strAnchor = uuid.uuid1().hex
 				self.m_oHtmlPage.append("<li id=\"%s\"><span>%s</span>" % (strCategory, strCategory))
 				self.m_oHtmlPage.append("<ul>")
-				for (strName, strFile) in sorted(dictSounds.items()):
+				for (strName, _) in sorted(dictSounds.items()):
 					if strName == strSound:
 						strActive = "&#x0266B;"
 					else:
@@ -1084,7 +1074,67 @@ class TaskDisplaySounds(FutureTask):
 			"</div>"
 		])
 		return
+
+class TaskConfigSound(FutureTask):
+	
+	def __init__(self,
+		oWorker,
+		oHtmlPage
+		):
+		super(TaskConfigSound, self).__init__(oWorker)
+		self.m_oHtmlPage = oHtmlPage
+		return
 		
+	def __str__(self):
+		strDesc = "Konfiguration der Klangeinstellungen"
+		return  strDesc
+		
+	def do(self):
+		self.createForm()
+		return
+
+	def createForm(self):
+		
+		strOut = SDK.getAlsaControlValue("PCM Playback Route")
+		strVol = SDK.getAlsaControlValue("PCM Playback Volume")
+		
+		#
+		# (x% / 100%) = (y + 10239) / 10639
+		#
+		# x% = 100% * (y + 10239) / 10639
+		# ===============================
+		#
+		# (y + 10239) = 10639 * (x% / 100%)
+		#
+		# y = (10639 * (x% / 100%)) - 10239
+		# =================================
+		#
+		
+		nVol = int(100 * (int(strVol) + 10239) / 10639)
+		
+		self.m_oHtmlPage.createBox(
+			"Konfiguration Klangausgabe",
+			"Hier können Schnittstelle und Lautstärke für die Klangausgabe eingestellt werden.",
+			bClose = False)
+		self.m_oHtmlPage.openForm()
+		self.m_oHtmlPage.appendForm(
+			"SoundOutput",
+			strInput = strOut,
+			strTitle = "Ausgang",
+			dictChoice={
+				"Automatisch"	: "0",
+				"Klinke analog"	: "1",
+				"HDMI"			: "2"})
+		self.m_oHtmlPage.appendForm(
+			"SoundVolume",
+			strInput = str(nVol),
+			strTitle = "Lautstärke",
+			strTextType = "range",
+			strTypePattern = "min=\"0\" max=\"100\"")
+		self.m_oHtmlPage.closeForm()
+		self.m_oHtmlPage.closeBox()
+		return
+	
 class TaskStartPage(FutureTask):
 	
 	def __init__(self,
@@ -1159,7 +1209,6 @@ class TaskStartPage(FutureTask):
 		
 		strSec = ""
 		strArt = ""
-		strBtn = ""
 		
 		Globs.dbg(
 			"doAdd(addSec=\"%s\", addArt=\"%s\", addBtn=\"%s\")" % (
@@ -1229,7 +1278,7 @@ class TaskStartPage(FutureTask):
 								oSection.pop(strArt)
 								return True
 							elif strBtn:
-								for (strName, oButton) in oArticle.items():
+								for (strName, _) in oArticle.items():
 									if strName == strBtn:
 										if strType == "btn":
 											oArticle.pop(strBtn)
@@ -1366,7 +1415,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		oModuleFile = dictForm["ModuleFile"][0]
 		strFilename = oModuleFile.filename
 		strFilename = strFilename.replace("\\", "/")
-		strHead, strFilename = os.path.split(strFilename)
+		_, strFilename = os.path.split(strFilename)
 		strComponent, strExt = os.path.splitext(strFilename)
 		if not re.match("\\.[Pp][Yy]", strExt):
 			oHtmlPage = HtmlPage(strPath, strTitle = "Modulinstallation")
@@ -1446,13 +1495,64 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		if oTask.start():
 			oTask.wait()
 		return oHtmlPage
+
+	def configSound(self, strPath, dictForm):
+		oHtmlPage = HtmlPage(strPath, strTitle = "Klangeinstellungen")
+		if ("submit" not in dictForm):
+			oHtmlPage.createBox(
+				"Fehler",
+				"Im Formular fehlt die Angabe der auszuführenden Aktion (Parameter \"submit\").",
+				strType="error")
+			return oHtmlPage
+		strAction = dictForm["submit"][0]
+		if strAction == "save":
+			if (("SoundOutput" not in dictForm)
+				or (int(dictForm["SoundOutput"][0]) not in [0, 1, 2])
+				or ("SoundVolume" not in dictForm)
+				or not (0 <= int(dictForm["SoundVolume"][0]) <= 100)):
+				oHtmlPage.createBox(
+					"Achtung",
+					"Bei der Konfiguration der Klangeinstellungen wurden ungültige Werte übermittelt.",
+					strType="error")
+				return oHtmlPage
+			
+			strOut = str(dictForm["SoundOutput"][0])
+			strVol = str(dictForm["SoundVolume"][0])
+			
+			#nVol = int((10639 * (int(strVol) / 100)) - 10239)
+			
+			print("Out = " + strOut + ", Vol = " + strVol + "%")
+			
+			bOkOut = SDK.setAlsaControlValue("PCM Playback Route", strOut)
+			bOkVol = SDK.setAlsaControlValue("PCM Playback Volume", strVol + "%")
+			
+			if (not bOkOut):
+				oHtmlPage.createBox(
+					"Achtung",
+					"Die Einstellung ('"+strOut+"') für den Audio-Ausgang konnte nicht übernommen werden.",
+					strType="error")
+				return oHtmlPage
+			
+			if (not bOkVol):
+				oHtmlPage.createBox(
+					"Achtung",
+					"Die Einstellung ('"+strVol+"') für die Lautstärke konnte nicht übernommen werden.",
+					strType="error")
+				return oHtmlPage
+			
+			print("Output="+strOut+", Volume="+strVol)
+
+		oTask = TaskConfigSound(g_oHttpdWorker, oHtmlPage)
+		if oTask.start():
+			oTask.wait()
+		return oHtmlPage
 		
 	def processSoundFile(self, oSoundFile):
 		strSoundPath = Globs.getSetting("System", "strSoundLocation",
 			varDefault="/usr/share/scratch/Media/Sounds")
 		strFilename = oSoundFile.filename
 		strFilename = strFilename.replace("\\", "/")
-		strHead, strFilename = os.path.split(strFilename)
+		_, strFilename = os.path.split(strFilename)
 		strComponent, strExt = os.path.splitext(strFilename)
 		bResult = False
 		if (zipfile.is_zipfile(oSoundFile.file)):
@@ -1462,7 +1562,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			with ZipFile(oSoundFile.file, "r") as oZipFile:
 				for oZipInfo in (oZipFile.infolist()):
 					foFile = oZipFile.open(oZipInfo)
-					strHead, strFilename = os.path.split(oZipInfo.filename)
+					_, strFilename = os.path.split(oZipInfo.filename)
 					if re.match("\\.[Ww][Aa][Vv]|\\.[Mm][Pp]3", strFilename):
 						continue
 					self.installSoundFile(foFile, os.path.join(strDirname, strFilename))
@@ -1592,6 +1692,10 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 						oHtmlPage,
 						dictQuery=dictQuery,
 						dictForm=dictForm)
+				elif strPath == "/sound/config.html":
+					oHtmlPage = HtmlPage(strPath)
+					oFutureTask = TaskConfigSound(g_oHttpdWorker,
+						oHtmlPage)
 						
 			if oFutureTask:
 				if oFutureTask.start():
@@ -1650,6 +1754,8 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				oHtmlPage = self.installModule(strPath, dictForm)
 			elif strPath == "/sound/install.html":
 				oHtmlPage = self.installSound(strPath, dictForm)
+			elif strPath == "/sound/config.html":
+				oHtmlPage = self.configSound(strPath, dictForm)
 			elif strPath == "/system/modules.html":
 				oHtmlPage = self.changeModules(strPath, dictForm)
 			
@@ -1748,13 +1854,10 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			if p not in dictQuery:
 				dictQuery.update({p : []})
 			dictQuery[p].append(v.strip())
-		bRedirect = False
 		strRedirect = None
 		# HTTP-Server redirect commands
 		if ("redirect2" in dictQuery):
-			bRedirect = True
 			strRedirect = Globs.getRedirect(dictQuery["redirect2"][0], strPath)
-		oHtmlPage = None
 		# Angeforderten Inhalt liefern
 		self.serveGet(strPath,
 			strRedirect=strRedirect,

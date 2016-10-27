@@ -1,8 +1,7 @@
-import os
 import os.path
 import re
 
-from Globs import Globs
+import Globs
 
 class Sound:
 	# Animal/           

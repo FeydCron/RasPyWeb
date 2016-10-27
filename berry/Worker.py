@@ -1,11 +1,7 @@
-import sys
-import traceback
-import time
 import threading
 import queue
-import traceback
 
-from Globs import Globs
+import Globs
 
 import SDK
 from SDK import FastTask
@@ -428,7 +424,7 @@ class Worker:
 				bDone = True
 			except:
 				Globs.exc("Schwere Aufgabenbearbeitung: %s" % (oTask))
-			oTask.done()
+			oTask.done(bResult = bDone)
 		Globs.log("Schwere Aufgabenbearbeitung: Beendet")
 		return
 	

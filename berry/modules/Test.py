@@ -4,10 +4,8 @@
 #  @file Test.py
 #  @brief Plug-In für Testzwecke.
 #  
-import os
-import sys
 
-from Globs import Globs
+import Globs
 
 import SDK
 from SDK import ModuleBase

@@ -4,17 +4,12 @@
 except:
 	pass
 
-import sys
-import os
 import re
 import traceback
-import time
 import subprocess
-from subprocess import call
 
-from Sound import Sound
 from Voice import Voice
-from Globs import Globs
+import Globs
 from Worker import Worker
 from Httpd import Httpd
 
@@ -27,7 +22,6 @@ class Berry:
 		
 		self.m_oWorker = Worker()
 		self.m_oHttpd = Httpd(self.m_oWorker)
-		self.m_oGlobs = Globs()
 		
 		return
 	

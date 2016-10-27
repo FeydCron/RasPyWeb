@@ -499,6 +499,9 @@
     <Compile Include="berry\Httpd.py" />
     <Compile Include="berry\modules\AMatisGPIO.py" />
     <Compile Include="berry\modules\Clock.py" />
+    <Compile Include="berry\modules\PiFaceIO.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="berry\modules\Test.py" />
     <Compile Include="berry\modules\Updater.py" />
     <Compile Include="berry\modules\__init__.py" />

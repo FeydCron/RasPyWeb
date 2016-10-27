@@ -6,7 +6,6 @@
 #  
 import os
 import re
-import sys
 import tempfile
 import time
 import zipfile
@@ -17,12 +16,10 @@ from zipfile import ZipFile
 from io import BytesIO
 from collections import OrderedDict
 
-from Globs import Globs
+import Globs
 
-import SDK
 from SDK import ModuleBase
 from SDK import WebClient
-from SDK import WebResponse
 from SDK import TaskSpeak
 from SDK import TaskModuleEvt
 
@@ -127,7 +124,7 @@ class Updater(ModuleBase):
 				"default"		: None,
 				"showlink"		: True
 			},
-			})
+		})
 		self.updateContext()
 		return True
 	
@@ -184,7 +181,6 @@ class Updater(ModuleBase):
 			return False
 			
 		# Zyklische Prüfung
-		bResult = False
 		bCheck = False
 		bFetch = False
 		bSetup = False
@@ -441,7 +437,6 @@ class Updater(ModuleBase):
 		
 	def doCheckUpdate(self):
 		oClient = WebClient()
-		oResp = None
 		
 		if (not self.m_strChkUpdUrl):
 			Globs.err("Die URL für die Aktualisierungsinformation ('%s') ist ungültig" % (
@@ -543,7 +538,6 @@ class Updater(ModuleBase):
 				ZipFile(self.m_oSystemUpdateIO, "r") as oSysZipFile:
 				# Aktualisierung vorbereiten
 				for oZipInfo in (oSysZipFile.infolist()):
-					foFile = oSysZipFile.open(oZipInfo)
 					if (os.path.isabs(oZipInfo.filename)):
 						Globs.err("Absolute Pfadangabe in Zip-Datei: '%s'" % (
 							oZipInfo.filename))

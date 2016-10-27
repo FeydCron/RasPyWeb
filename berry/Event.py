@@ -61,7 +61,8 @@ def watchScheduledEvents():
 			isTrigger = nMonYear in param['Month']
 			scheduled = True
 		if param['Day'] and isTrigger:
-			isTrigger = nDay
+			#isTrigger = nDay
+			pass
 		
 
 # Aktuelle Zeit holen und in globalen Variablen speichern

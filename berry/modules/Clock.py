@@ -1,7 +1,7 @@
 ﻿import time
 from datetime import datetime
 
-from Globs import Globs
+import Globs
 
 from SDK import ModuleBase
 from SDK import TaskSound

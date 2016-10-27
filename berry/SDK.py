@@ -30,9 +30,9 @@
 #  Der Unterschied zwischen einem Ereignis und einem Kommando besteht darin, dass obwohl beide eine
 #  Verarbeitung auslösen, nur bei Kommandos eine Ergebnismenge erwartet wird. Daraus ergibt sich,
 #  dass über die HTTP-Schnittstelle hauptsächlich Kommandos empfangen werden, da der interaktive
-#  Charakter eines HTTP-Clients in der Regel immer einen HTML-Inhalt als Ergebnis auf eine Aktion,
-#  im Sinne einer GET- beziehungsweise POST-Anfrage, erwartet.
-#  Über eine GPIO-Schnittstelle werden in Regel nur Ereignisse empfangen, da beispielsweise ein
+#  Charakter eines HTTP-Clients in der Regel immer einen HTML-Inhalt als Ergebnis auf eine Aktion
+#  im Sinne einer GET- beziehungsweise POST-Anfrage erwartet.
+#  Über eine GPIO-Schnittstelle werden in der Regel nur Ereignisse empfangen, da beispielsweise ein
 #  Eingabetaster auf seine Betätigung hin, keine Ergebnismenge in irgend einer Form erwartet.
 #  
 #  Die Kommando- und Ereignisverarbeitung unterscheidet sich also nur darin, dass bei einem
@@ -438,21 +438,18 @@
 #  
 
 
-import os
 import subprocess
 import re
-import threading
 import socket
 import html
 import urllib.parse
 import http.client
-import queue
 
 from datetime import datetime
 
+import Globs
 from Voice import Voice
 from Sound import Sound
-from Globs import Globs
 
 ## 
 #  @brief Werkzeug zum Erstellen von einfach strukturieren HTML-Seiten.
@@ -1247,7 +1244,7 @@ class TaskSound(LongTask):
 		return  strDesc
 	
 	def do(self):
-		for i in range(self.m_nLoops):
+		for _ in range(self.m_nLoops):
 			self.s_oSound.sound(self.m_strSound)
 		return
 
@@ -1283,7 +1280,7 @@ class TaskModuleEvt(FastTask):
 		return  strDesc
 	
 	def do(self):
-		for (strName, oInstance) in self.m_oWorker.m_dictModules.items():
+		for oInstance in self.m_oWorker.m_dictModules.values():
 			self.m_oResult = oInstance.moduleExec(self.m_strPath,
 				None, self.m_dictQuery, self.m_dictForm)
 		return
@@ -1321,7 +1318,6 @@ class WebClient:
 			http.client.SEE_OTHER,
 			http.client.TEMPORARY_REDIRECT)
 		oConn = None
-		oResp = None
 		oUrlSplit = urllib.parse.urlsplit(strUrl)
 		
 		if (re.match("[Hh][Tt][Tt][Pp][Ss]", oUrlSplit.scheme)):
@@ -1358,7 +1354,6 @@ class WebClient:
 		return oWebResponse
 		
 def getShellCmdOutput(strShellCmd):
-	strOutput = ""
 	strOutput = subprocess.check_output(
 		strShellCmd,
 		stderr = subprocess.STDOUT,
@@ -1374,7 +1369,6 @@ def getShellCmdOutput(strShellCmd):
 # Index 4: buffered RAM
 # Index 5: cached RAM
 def getRamInfo():
-	strRamInfo = "n/a"
 	regexSep = r"\s\s*"
 	parts = [[1, 7],]
 	strRamInfo = subprocess.check_output(
@@ -1394,7 +1388,6 @@ def getRamInfo():
 # Index 2: remaining disk space                                                     
 # Index 3: percentage of disk used                                                 
 def getDiskSpace():
-	strDiskSpace = "n/a"
 	regexSep = r"\s\s*"
 	parts = [[1, 5],]
 	strDiskSpace = subprocess.check_output(
@@ -1431,7 +1424,6 @@ def getCpuTemp():
 
 # Return current CPU usage in percent as a string value
 def getCpuUse():
-	strResult = "n/a"
 	strResult = subprocess.check_output(
 		"top -b -n1 | awk '/Cpu\(s\):/ {print $2}'",
 		stderr = subprocess.STDOUT,
@@ -1452,21 +1444,18 @@ def getNetworkInfo(strComputerName="google.com"):
 	return strIpAddr
 	
 def setDate(strDate, strFormat):
-	strResult = ""
 	oDate = datetime.strptime(strDate, strFormat).date()
 	oTime = datetime.today().time()
 	oDateTime = datetime.combine(oDate, oTime)
 	return setDateTime(oDateTime)
 
 def setTime(strTime, strFormat):
-	strResult = ""
 	oDate = datetime.today().date()
 	oTime = datetime.strptime(strTime, strFormat).time()
 	oDateTime = datetime.combine(oDate, oTime)
 	return setDateTime(oDateTime)
 
 def setDateTime(oDateTime):
-	strResult = ""
 	strResult = subprocess.check_output(
 		"sudo date -s \"%s\"" % (oDateTime.strftime("%c")),
 		stderr = subprocess.STDOUT,
@@ -1474,10 +1463,115 @@ def setDateTime(oDateTime):
 		universal_newlines = True)
 	return strResult
 
+###
+# pi@raspberrypi ~ $ amixer contents
+# numid=3,iface=MIXER,name='PCM Playback Route'
+#   ; type=INTEGER,access=rw------,values=1,min=0,max=2,step=0
+#   : values=1
+# numid=2,iface=MIXER,name='PCM Playback Switch'
+#   ; type=BOOLEAN,access=rw------,values=1
+#   : values=on
+# numid=1,iface=MIXER,name='PCM Playback Volume'
+#   ; type=INTEGER,access=rw---R--,values=1,min=-10239,max=400,step=0
+#   : values=400
+#   | dBscale-min=-102.39dB,step=0.01dB,mute=1
+# numid=5,iface=PCM,name='IEC958 Playback Con Mask'
+#   ; type=IEC958,access=r-------,values=1
+#   : values=[AES0=0x02 AES1=0x00 AES2=0x00 AES3=0x00]
+# numid=4,iface=PCM,name='IEC958 Playback Default'
+#   ; type=IEC958,access=rw------,values=1
+#   : values=[AES0=0x00 AES1=0x00 AES2=0x00 AES3=0x00]
+# 
+# pi@raspberrypi ~ $ amixer controls
+# numid=3,iface=MIXER,name='PCM Playback Route'
+# numid=2,iface=MIXER,name='PCM Playback Switch'
+# numid=1,iface=MIXER,name='PCM Playback Volume'
+# numid=5,iface=PCM,name='IEC958 Playback Con Mask'
+# numid=4,iface=PCM,name='IEC958 Playback Default'
+#
+# pi@raspberrypi ~ $ amixer cget numid=3
+# numid=3,iface=MIXER,name='PCM Playback Route'
+# ; type=INTEGER,access=rw------,values=1,min=0,max=2,step=0
+# : values=1
+# 
+#
+#
+def getAlsaControlValue(
+		strName):
+	strIdent = ""
+	
+	strName = re.escape(strName)
+	
+	strResult = subprocess.check_output(
+		"amixer controls",
+		stderr = subprocess.STDOUT,
+		shell = True,
+		universal_newlines = True)
+	
+	regexSep = r"[\n\r]"
+	lstLines = re.split(regexSep, strResult)
+	for strLine in lstLines:
+		if (re.match(".*name\=\'" + strName + "\'", strLine)):
+			regexSep = r"[\,]"
+			strIdent = re.split(regexSep, strLine)[0]
+			break
+		
+	if not strIdent:
+		return ""
+	
+	strResult = subprocess.check_output(
+		"amixer cget " + strIdent,
+		stderr = subprocess.STDOUT,
+		shell = True,
+		universal_newlines = True)
+	
+	regexSep = r"[\n\r]"
+	lstLines = re.split(regexSep, strResult)
+	strResult = ""
+	for strLine in lstLines:
+		if (re.match("\s+\: values\=", strLine)):
+			regexSep = r"[\=]"
+			strResult = re.split(regexSep, strLine)[1]
+			break
+
+	return strResult
+
+def setAlsaControlValue(
+		strName, strValue):
+	strIdent = ""
+	
+	strName = re.escape(strName)
+	
+	strResult = subprocess.check_output(
+		"amixer controls",
+		stderr = subprocess.STDOUT,
+		shell = True,
+		universal_newlines = True)
+	
+	regexSep = r"[\n\r]"
+	lstLines = re.split(regexSep, strResult)
+	for strLine in lstLines:
+		if (re.match(".*name\=\'" + strName + "\'", strLine)):
+			regexSep = r"[\,]"
+			strIdent = re.split(regexSep, strLine)[0]
+			break
+		
+	if not strIdent:
+		return False
+	
+	strResult = subprocess.check_output(
+		"amixer cset " + strIdent + " " + strValue,
+		stderr = subprocess.STDOUT,
+		shell = True,
+		universal_newlines = True)
+		
+	return True
+
+
 # Extracts partitions from the given list and returns them as a new list
-def partList(list, indices):
+def partList(lstList, lstIndices):
 	output = []
-	for nStart, nStop in indices:
-		output.extend(list[nStart:nStop])
+	for nStart, nStop in lstIndices:
+		output.extend(lstList[nStart:nStop])
 	return output
 		

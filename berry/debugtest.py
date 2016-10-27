@@ -1,5 +1,7 @@
-﻿import ptvsd
-ptvsd.enable_attach("debug")
+﻿#import ptvsd
+#ptvsd.enable_attach("debug")
+
+import SDK
 
 import threading
 
@@ -25,4 +27,17 @@ def onTimer():
 	return
 
 if __name__ == '__main__':
-	main()
+#	main()
+	pass
+	print("SDK-Tests:")
+	print("SDK.getAlsaControlValue() ...")
+	output = SDK.getAlsaControlValue("PCM Playback Volume")
+	print(output);
+	
+	print("SDK.setAlsaControlValue() ...")
+	
+	bOk, strValue = SDK.setAlsaControlValue("PCM Playback Volume", "400");
+	if (bOk):
+		print("OK, "+strValue)
+	else:
+		print("FAILED")

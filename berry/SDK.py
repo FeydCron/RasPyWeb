@@ -287,7 +287,7 @@
 #  Fügen Sie die folgende Zeile hinzu, sofern diese noch nicht existiert:
 #  
 #  @verbatim
-#  @reboot     python3 <directory>/Berry.py
+#  @reboot     python3 <directory>/RasPyWeb.py
 #  @endverbatim
 #  
 #  @e @<directory@> entspricht dem @ref installdir von RasPyWeb.
@@ -365,8 +365,8 @@
 #  Zugriffe auf die Modulkonfiguration ausserhalb des Methodenaufrufs müssen daher über die
 #  bereitgestellten Zugriffsfunktionen für das Lesen und Schreiben von Einstellungen erfolgen.
 #  
-#  @see Globs::Globs::getSetting
-#  @see Globs::Globs::setSetting
+#  @see globs::globs::getSetting
+#  @see globs::globs::setSetting
 #  
 #  @subsection moduleconfig Modulkonfiguration
 #  
@@ -438,18 +438,20 @@
 #  
 
 
-import subprocess
+from datetime import datetime
+import email
+import html
+import http.client
+import imaplib
 import re
 import socket
-import html
+import subprocess
 import urllib.parse
-import http.client
+import threading
 
-from datetime import datetime
-
-import Globs
-from Voice import Voice
-from Sound import Sound
+import globs
+from sound import Sound
+from voice import Voice
 
 ## 
 #  @brief Werkzeug zum Erstellen von einfach strukturieren HTML-Seiten.
@@ -1155,7 +1157,7 @@ class QueueTask:
 		
 	def done(self, bResult = True):
 		return
-		
+
 class FastTask(QueueTask):
 	
 	def __str__(self):
@@ -1164,26 +1166,47 @@ class FastTask(QueueTask):
 	
 	def start(self):
 		bResult = False
-		Globs.dbg("'%s' (leicht) starten: Warten auf Freigabe" % (self))
+		globs.dbg("'%s' (leicht) starten: Warten auf Freigabe" % (self))
 		# >>> Critical Section
 		self.m_oWorker.m_oLock.acquire()
-		Globs.dbg("'%s' (leicht) starten: Freigabe erhalten" % (self))
+		globs.dbg("'%s' (leicht) starten: Freigabe erhalten" % (self))
 		if (self.m_oWorker.m_evtRunning.isSet()):
-			Globs.dbg("'%s' (leicht) starten: In Warteschlange" % (self))
+			globs.dbg("'%s' (leicht) starten: In Warteschlange" % (self))
 			self.m_oWorker.m_oQueueFast.put(self)
 			bResult = True
 		else:
-			Globs.wrn("'%s' (leicht) starten: Bearbeitung verweigert" % (self))
+			globs.wrn("'%s' (leicht) starten: Bearbeitung verweigert" % (self))
 		self.m_oWorker.m_oLock.release()
 		# <<< Critical Section
-		Globs.dbg("'%s' (leicht) starten: Freigabe abgegeben (%r)" % (self, bResult))
+		globs.dbg("'%s' (leicht) starten: Freigabe abgegeben (%r)" % (self, bResult))
 		return bResult
 		
 	def done(self, bResult = True):
-		Globs.dbg("'%s' (leicht): Bearbeitung abgeschlossen (%r)" % (self, bResult))
+		globs.dbg("'%s' (leicht): Bearbeitung abgeschlossen (%r)" % (self, bResult))
 		self.m_oWorker.m_oQueueFast.task_done()
 		return
+	
+class FutureTask(FastTask):
+
+	def __init__(self, oWorker):	
+		super(FutureTask, self).__init__(oWorker)
+		self.m_evtDone = threading.Event()
+		self.m_evtDone.clear()
+		return
 		
+	def __str__(self):
+		strDesc = "Warten auf die Fertigstellung einer Aufgabe"
+		return  strDesc
+	
+	def done(self, bResult = True):
+		self.m_oWorker.m_oQueueFast.task_done()
+		self.m_evtDone.set()
+		return
+		
+	def wait(self):
+		self.m_evtDone.wait()
+		return
+
 class LongTask(QueueTask):
 	
 	def __str__(self):
@@ -1192,23 +1215,23 @@ class LongTask(QueueTask):
 		
 	def start(self):
 		bResult = False
-		Globs.dbg("'%s' (schwer) starten: Warten auf Freigabe" % (self))
+		globs.dbg("'%s' (schwer) starten: Warten auf Freigabe" % (self))
 		# >>> Critical Section
 		self.m_oWorker.m_oLock.acquire()
-		Globs.dbg("'%s' (schwer) starten: Freigabe erhalten" % (self))
+		globs.dbg("'%s' (schwer) starten: Freigabe erhalten" % (self))
 		if (self.m_oWorker.m_evtRunning.isSet()):
-			Globs.dbg("'%s' (schwer) starten: In Warteschlange" % (self))
+			globs.dbg("'%s' (schwer) starten: In Warteschlange" % (self))
 			self.m_oWorker.m_oQueueLong.put(self)
 			bResult = True
 		else:
-			Globs.wrn("'%s' (schwer) starten: Bearbeitung verweigert" % (self))
+			globs.wrn("'%s' (schwer) starten: Bearbeitung verweigert" % (self))
 		self.m_oWorker.m_oLock.release()
 		# <<< Critical Section
-		Globs.dbg("'%s' (schwer) starten: Freigabe abgegeben (%r)" % (self, bResult))
+		globs.dbg("'%s' (schwer) starten: Freigabe abgegeben (%r)" % (self, bResult))
 		return bResult
 		
 	def done(self, bResult = True):
-		Globs.dbg("'%s' (schwer): Bearbeitung abgeschlossen (%r)" % (self, bResult))
+		globs.dbg("'%s' (schwer): Bearbeitung abgeschlossen (%r)" % (self, bResult))
 		self.m_oWorker.m_oQueueLong.task_done()
 		return
 
@@ -1255,9 +1278,9 @@ class TaskSaveSettings(FastTask):
 		return  strDesc
 		
 	def do(self):
-		Globs.saveSettings()
+		globs.saveSettings()
 		return
-		
+
 ## 
 #  @brief Weiterleitung von Modulereignissen an alle aktiven Module.
 #  		
@@ -1284,7 +1307,7 @@ class TaskModuleEvt(FastTask):
 			self.m_oResult = oInstance.moduleExec(self.m_strPath,
 				None, self.m_dictQuery, self.m_dictForm)
 		return
-		
+
 class WebResponse:
 	
 	def __init__(self,
@@ -1337,11 +1360,11 @@ class WebClient:
 		elif (oResp.status in lstRedirect
 			and oResp.getheader("Location")
 			and bFollowRedirects):
-			Globs.wrn("Weiterleitung von '%s' nach '%s'" % (
+			globs.wrn("Weiterleitung von '%s' nach '%s'" % (
 				strUrl, oResp.getheader("Location")))
 			oWebResponse = self.GET(oResp.getheader("Location"))
 		else:
-			Globs.wrn("Fehler beim Abrufen von '%s' (Weiterleitung=%s, Location=%s)" % (
+			globs.wrn("Fehler beim Abrufen von '%s' (Weiterleitung=%s, Location=%s)" % (
 				strUrl, bFollowRedirects, oResp.getheader("Location")))
 			oWebResponse = WebResponse(
 				nStatus=oResp.status,
@@ -1416,9 +1439,9 @@ def getCpuTemp():
 	temp = partList(re.split(regexSep, strResult), parts)[0]
 	fResult = float(temp)
 
-	if (Globs.getSetting("System", "bTestMode", "True|False", False)
-	 and not Globs.s_oQueueTestCpuTempValues.empty()):
-		fResult = Globs.s_oQueueTestCpuTempValues.get(False)
+	if (globs.getSetting("System", "bTestMode", "True|False", False)
+	 and not globs.s_oQueueTestCpuTempValues.empty()):
+		fResult = globs.s_oQueueTestCpuTempValues.get(False)
 
 	return fResult
 
@@ -1440,7 +1463,7 @@ def getNetworkInfo(strComputerName="google.com"):
 		strIpAddr = oSocket.getsockname()[0]
 		oSocket.close()
 	except:
-		Globs.exc("Ermitteln der IP-Adresse")
+		globs.exc("Ermitteln der IP-Adresse")
 	return strIpAddr
 	
 def setDate(strDate, strFormat):
@@ -1463,39 +1486,6 @@ def setDateTime(oDateTime):
 		universal_newlines = True)
 	return strResult
 
-###
-# pi@raspberrypi ~ $ amixer contents
-# numid=3,iface=MIXER,name='PCM Playback Route'
-#   ; type=INTEGER,access=rw------,values=1,min=0,max=2,step=0
-#   : values=1
-# numid=2,iface=MIXER,name='PCM Playback Switch'
-#   ; type=BOOLEAN,access=rw------,values=1
-#   : values=on
-# numid=1,iface=MIXER,name='PCM Playback Volume'
-#   ; type=INTEGER,access=rw---R--,values=1,min=-10239,max=400,step=0
-#   : values=400
-#   | dBscale-min=-102.39dB,step=0.01dB,mute=1
-# numid=5,iface=PCM,name='IEC958 Playback Con Mask'
-#   ; type=IEC958,access=r-------,values=1
-#   : values=[AES0=0x02 AES1=0x00 AES2=0x00 AES3=0x00]
-# numid=4,iface=PCM,name='IEC958 Playback Default'
-#   ; type=IEC958,access=rw------,values=1
-#   : values=[AES0=0x00 AES1=0x00 AES2=0x00 AES3=0x00]
-# 
-# pi@raspberrypi ~ $ amixer controls
-# numid=3,iface=MIXER,name='PCM Playback Route'
-# numid=2,iface=MIXER,name='PCM Playback Switch'
-# numid=1,iface=MIXER,name='PCM Playback Volume'
-# numid=5,iface=PCM,name='IEC958 Playback Con Mask'
-# numid=4,iface=PCM,name='IEC958 Playback Default'
-#
-# pi@raspberrypi ~ $ amixer cget numid=3
-# numid=3,iface=MIXER,name='PCM Playback Route'
-# ; type=INTEGER,access=rw------,values=1,min=0,max=2,step=0
-# : values=1
-# 
-#
-#
 def getAlsaControlValue(
 		strName):
 	strIdent = ""
@@ -1574,4 +1564,203 @@ def partList(lstList, lstIndices):
 	for nStart, nStop in lstIndices:
 		output.extend(lstList[nStart:nStop])
 	return output
+
+##
+# - Return @b all messages:
+# @code
+# "ALL"
+# @endcode
+# - Search for already @b answered emails:
+# @code
+# "ANSWERED"
+# @endcode
+# - Search for messages on a specific @b date:
+# @code
+# "SENTON 05-Mar-2007"
+# @endcode
+# 	- The date string is `DD-Month-YYYY` where Month is: @c Jan, @c Feb,
+#     @c Mar, @c Apr, @c May, @c Jul, @c Aug, @c Sep, @c Oct, @c Nov, @c Dec
+# - Search for messages @b between two @b dates:
+# @code
+#	"SENTSINCE 01-Mar-2007 SENTBEFORE 05-Mar-2007"
+# @endcode
+#	- `SENTBEFORE`: Finds emails @b sent @b before a @b date, and
+#	- `SENTSINCE`: Finds email @b sent @b on or @b after a @b date.
+#	- The `AND` operation is implied by joining criteria, separated by spaces.
+# - Another example of `AND`: Find @b all @b unanswered emails
+# 	@b sent @b after 04-Mar-2007 @b with "Problem" in the subject:
+# 	@code
+#	"UNANSWERED SENTSINCE 04-Mar-2007 Subject \"Problem\""
+#	@endcode
+# - Find messages with a specific @b string in the body:
+#	@code
+#	"BODY \"problem solved\""
+#	@endcode
+# - Using `OR`: The syntax is
+#	@code
+#	OR <criteria1> <criteria2>
+#	@endcode.
+# 	The `OR` comes first, followed by each criteria.
+# 	For example, to match all emails with "Help" or "Question" in the subject.
+# 	You'll notice that literal strings may be quoted or unquoted.
+# 	If a literal contains SPACE characters, quote it:
+# 	@code
+#	"OR SUBJECT Help SUBJECT Question"
+#	@endcode
+# - Find all emails @b sent @b from "yahoo.com" addresses:
+# 	@code
+#	"FROM yahoo.com"
+#	@endcode
+# - Find all emails @b sent @b from anyone @b with "John" in their name:
+# 	@code
+#	"FROM John"
+#	@endcode
+# - Find emails with the @b RECENT flag set:
+#	@code
+#	"RECENT"
+#	@endcode
+# - Find emails that @b don't @b have the @b recent flag set, which is
+#	synonymous with `OLD`:
+#	@code
+#	"NOT RECENT"
+#	"OLD"
+#	@endcode
+# - Find all emails @b marked @b for @b deletion:
+#	@code
+#	"DELETED"
+#	@endcode
+# - Find all emails @b having a specified @b header @b field with a @b value
+# 	containing a substring:
+#	@code
+#	"HEADER DomainKey-Signature paypal.com"
+#	@endcode
+# - Find any emails having a specific @b header @b field present. If the
+# 	2nd argument to the `HEADER` criteria is an empty string,
+# 	any email having the header field is returned regardless
+# 	of the header field's content.
+# 	Find any emails with a `DomainKey-Signature` field:
+# 	@code
+#	"HEADER DomainKey-Signature \"\""
+#	@endcode
+# - Find @b NEW emails: These are emails that have the @b RECENT flag
+# 	set, but not the SEEN flag:
+#	@code
+#	"NEW"
+#	@endcode	
+# - Find emails @b larger than a certain @b number of @b bytes:
+# 	@code
+#	"LARGER 500000"
+#	@endcode
+# - Find emails @b marked as @b seen or @b not already @b seen:
+#	@code
+# 	"SEEN"
+# 	"NOT SEEN"
+#	@endcode
+# - Find emails having a given @b substring in the @b TO header field:
+# 	@code
+#	"TO support@chilkatsoft.com"
+#	"HEADER TO support@chilkatsoft.com"
+#	@endcode
+# - Find emails @b smaller than a size in @b bytes:
+#	@code
+#	"SMALLER 30000"
+#	@endcode
+# - Find emails that have a @b substring @b anywhere in the header
+# 	or body:
+#	@code
+#	"TEXT \"Zip Component\""
+#	@endcode
+#
+# @note
+# Strings are case-insensitive when searching.
+#
+def fetchImapEmail(
+		strMailServer,
+		strUsername,
+		strPassword,
+		strMailbox="INBOX",
+		strSearch="ALL"):
+	strResp = "NO"
+	tupData = []
+	oImapSession = None
+	bMailboxSelected = False
+	try:
+		# Create IMAP-SSL session
+		oImapSession = imaplib.IMAP4_SSL(strMailServer)
+		# Login with username and password
+		strResp, tupData = oImapSession.login(strUsername, strPassword)
+		if (strResp != "OK"):
+			globs.err("IMAP4_SSL login response ("+strResp+"): "+str(tupData))
+			raise
+		globs.log("IMAP4_SSL login response ("+strResp+"): "+str(tupData))
+		# Select a mailbox
+		strResp, tupData = oImapSession.select(strMailbox)
+		if (strResp != "OK"):
+			globs.err("IMAP4_SSL select mailbox response ("+strResp+"): "+str(tupData))
+			raise
+		bMailboxSelected = True
+		globs.dbg("IMAP4_SSL select mailbox response ("+strResp+"): "+str(tupData))
+		strResp, tupData = oImapSession.search(None, strSearch)
+		if (strResp != "OK"):
+			globs.err("IMAP4_SSL search mailbox response ("+strResp+"): "+str(tupData))
+			raise
+		bMailboxSelected = True
+		globs.dbg("IMAP4_SSL search mailbox response ("+strResp+"): "+str(tupData))
+		# Iterate over emails
+		for msgId in tupData[0].split():
+			# Fetch each email
+			strResp, oEmailData = oImapSession.fetch(msgId, "(RFC822)")
+			if (strResp != "OK"):
+				globs.err("IMAP4_SSL fetch response ("+strResp+"): "+str(oEmailData))
+				raise
+			globs.dbg("IMAP4_SSL fetch response ("+strResp+")")
+			try:
+				oRawMail = oEmailData[0][1]
+				strMail = oRawMail.decode("UTF-8")
+				oMail = email.message_from_string(strMail)
+				globs.dbg("Mail object: "+oMail.as_string())
+				for oPart in oMail.walk():
+					globs.dbg("Mail part: "+oPart.as_string())
+					if (oPart.get_content_maintype() == 'multipart'):
+						globs.dbg("Multipart item")
+						continue
+					contentDisposition = oPart.get('Content-Disposition')
+					if (not contentDisposition):
+						globs.dbg("No content disposition")
+						continue
+					dispositions = contentDisposition.strip().split(";")
+					globs.dbg("Item dispositions: "+str(dispositions))
+					if (dispositions[0].lower() != "attachment"):
+						globs.dbg("No attachement: "+str(dispositions))
+						continue
+					#fileName = part.get_filename()
+					# TODO: Get payload
+			except:
+				globs.exc(
+					"Error creating/processing mail object, Fetch response: "+
+					str(oEmailData))
+				raise
+	except:
+		globs.exc("Could not fetch IMAP_SSL e-mail")
 		
+	try:
+		if (oImapSession and bMailboxSelected):
+			strResp, tupData = oImapSession.close()
+			if (strResp != "OK"):
+				globs.err("IMAP4_SSL close mailbox response ("+strResp+"): "+str(tupData))
+			else:
+				globs.log("IMAP_SSL mailbox closed ("+strResp+"): "+str(tupData))
+	except:
+		globs.exc("Could not close IMAP_SSL session")
+		
+	try:
+		if (oImapSession):
+			strResp, tupData = oImapSession.logout()
+			if (strResp != "BYE"):
+				globs.err("IMAP4_SSL session logout response ("+strResp+"): "+str(tupData))
+			else:
+				globs.log("IMAP_SSL session logged out ("+strResp+"): "+str(tupData))
+	except:
+		globs.exc("Could not logout IMAP_SSL session")
+	
+	return

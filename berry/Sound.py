@@ -1,7 +1,7 @@
 import os.path
 import re
 
-import Globs
+import globs
 
 class Sound:
 	# Animal/           
@@ -80,30 +80,30 @@ class Sound:
 		strPlay = "aplay"
 		
 		# >>> Critical Section
-		Globs.s_oSettingsLock.acquire()
+		globs.s_oSettingsLock.acquire()
 		try:
-			if "Sounds" in Globs.s_dictSettings:
+			if "Sounds" in globs.s_dictSettings:
 				# Direkte Übereinstimmung finden
-				for (strCategory, dictSounds) in Globs.s_dictSettings["Sounds"].items():
+				for (strCategory, dictSounds) in globs.s_dictSettings["Sounds"].items():
 					if strSound in dictSounds:
-						strFile = Globs.s_dictSettings["Sounds"][strCategory][strSound]
+						strFile = globs.s_dictSettings["Sounds"][strCategory][strSound]
 						break
 				if not strFile:
 					# Partiellen Treffer finden
-					for (strCategory, dictSounds) in sorted(Globs.s_dictSettings["Sounds"].items()):
+					for (strCategory, dictSounds) in sorted(globs.s_dictSettings["Sounds"].items()):
 						for (strName, strPath) in dictSounds.items():
 							if re.match(".*" + strSound + ".*", strName):
-								Globs.log("Sound '%s' für angeforderten Sound '%s' verwendet." % (
+								globs.log("Sound '%s' für angeforderten Sound '%s' verwendet." % (
 									strName, strSound))
 								strFile = strPath
 								break
 		except:
-			Globs.exc("Sound '%s' finden" % (strSound))
-		Globs.s_oSettingsLock.release()
+			globs.exc("Sound '%s' finden" % (strSound))
+		globs.s_oSettingsLock.release()
 		# <<< Critical Section
 		
 		if not strFile:
-			Globs.wrn("Der angeforderte Sound konnte nicht gefunden werden: '%s'" % (strSound))
+			globs.wrn("Der angeforderte Sound konnte nicht gefunden werden: '%s'" % (strSound))
 			print("\\a")
 			return
 	
@@ -113,11 +113,11 @@ class Sound:
 			elif re.match(".*\\.[Mm][Pp]3", strFile):
 				strPlay = "omxplayer"
 			else:
-				Globs.wrn("Das Format der Sound-Datei wird nicht unterstützt: '%s'" % (strFile))
+				globs.wrn("Das Format der Sound-Datei wird nicht unterstützt: '%s'" % (strFile))
 				print("\\a")
 				return
 		else:
-			Globs.wrn("Die Datei des angeforderten Sounds ist ungültig: '%s'" % (strFile))
+			globs.wrn("Die Datei des angeforderten Sounds ist ungültig: '%s'" % (strFile))
 			print("\\a")
 			return
 			

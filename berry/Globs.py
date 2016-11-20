@@ -7,11 +7,12 @@ import pickle
 import threading
 import socket
 import queue
+import datetime
 
 from collections import deque
 from collections import OrderedDict
-from datetime import datetime
-from Httpd import StartPage
+
+from httpd import StartPage
 
 	
 # Defines test values for CPU temperatures for being used with
@@ -36,6 +37,14 @@ s_strExitMode = ""
 # 4 - Debugging
 s_nLogLvl = 4
 
+s_strBasePath = "/home/pi/berry"
+s_strSoundPath = "/home/pi/berry/sounds"
+s_strModulePath = "/home/pi/berry/modules"
+s_strConfigFile = "/home/pi/berry/config.json"
+s_strLogMemFile = "/home/pi/berry/logmem.pickle"
+s_strStartPageFile = "/home/pi/berry/startpage.pickle"
+s_strStartPageUrl = "/system/startpage.html"
+
 s_dictSettings = {
 	# Registrierung der installierten Module
 	# {"<Paket/Modul>" : "<Klasse>"}
@@ -55,7 +64,8 @@ s_dictSettings = {
 		"fCpuTempB" 		: 56.0,  # Kritische Temperaturgrenze
 		"fCpuTempC" 		: 53.0,  # Warn-Temperaturgrenze
 		"fCpuTempH" 		: 1.0,  # Hysterese Temperaturgrenze
-		"strSoundLocation"	: "/usr/share/scratch/Media/Sounds",
+		"strSysSoundLocation"	: "/usr/share/scratch/Media/Sounds",
+		"strUsrSoundLocation"	: s_strSoundPath,
 		"fVersion"			: 0.1,
 	},
 	# HTTP-Weiterleitungen
@@ -142,13 +152,21 @@ s_dictUserSettings = OrderedDict({
 								"Betriebstemperaturbereichs der CPU zu vermeiden."),
 			"default"		: "1.0"
 		},
-		"strSoundLocation" : {
-			"title"			: "Sound-Datei Ablageort",
-			"description"	: ("Legt den Ablageort der Sound-Dateien fest, die für das System, " + 
-								"zur Verfügung stehen sollen. Beim Installieren neuer Sounds " + 
-								"werden diese dort abgelegt, gegebenenfalls auch in neuen " + 
-								"Unterordnern zur Kategorisierung."),
+		"strSysSoundLocation" : {
+			"title"			: "Ablageort Systemklänge",
+			"description"	: ("Legt den Ablageort von Klangdateien fest, die auf dem System " + 
+								"standardmäßig zur Verfügung stehen. Dieser Ort wird bei der " + 
+								"Installation oder Verwaltung von Klangdateienwerden nicht " + 
+								"verändert."),
 			"default"		: "/usr/share/scratch/Media/Sounds"
+		},
+		"strUsrSoundLocation" : {
+			"title"			: "sound-Datei Ablageort",
+			"description"	: ("Legt den Ablageort von Klangdateien fest, die für das System " + 
+								"zur Verfügung stehen sollen. Bei der Installieren neuer Klänge " + 
+								"werden diese dort abgelegt, gegebenenfalls auch in Unterordnern " + 
+								"kategorisiert."),
+			"default"		: s_strSoundPath
 		}
 	},
 })
@@ -177,13 +195,6 @@ s_dictSystemValues = {
 s_oLogMem = deque([], 255)
 s_oLogMemLock = threading.RLock()
 s_oSettingsLock = threading.RLock()
-
-s_strBasePath = "/home/pi/berry"
-s_strModulePath = "/home/pi/berry/modules"
-s_strConfigFile = "/home/pi/berry/config.json"
-s_strLogMemFile = "/home/pi/berry/logmem.pickle"
-s_strStartPageFile = "/home/pi/berry/startpage.pickle"
-s_strStartPageUrl = "/system/startpage.html"
 
 s_oHttpd = None
 s_lstSnapshot = None
@@ -274,6 +285,8 @@ def loadSettings():
 	s_strStartPageFile = os.path.join(s_strBasePath, "startpage.pickle")
 	# print("StartPageFile=%s" % s_strStartPageFile)
 	
+	dbg("Laden der Konfigurationseinstellungen von '%s'" % (
+		s_strConfigFile))
 	try:
 		foFile = open(s_strConfigFile, "r")
 		oObj = json.load(foFile)
@@ -285,21 +298,32 @@ def loadSettings():
 			else:
 				s_dictSettings.update({strKey : varVal})
 	except:
-		exc("Laden der Einstellungen von %s" % (
+		exc("Laden der Einstellungen von '%s'" % (
 			s_strConfigFile))
 	s_oSettingsLock.release()
 	# <<< Critical Section
-			
+	
+	dbg("Wiederherstellen des Fehlerspeichers von '%s'" % (
+		s_strLogMemFile))
 	# Fehlerspeicher wiederherstellen
 	oLogMem = None
-	try:
-		with open(s_strLogMemFile, "rb") as f:
-			oLogMem = pickle.load(f)
-	except:
-		exc("Laden des Fehlerspeichers von %s" % (
+	bRetry = os.path.isfile(s_strLogMemFile)
+	if not bRetry:
+		log("Fehlerspeicher nicht vorhanden: '%s'" % (
 			s_strLogMemFile))
+	while bRetry and os.path.isfile(s_strLogMemFile):
+		try:
+			with open(s_strLogMemFile, "rb") as f:
+				oLogMem = pickle.load(f)
+			bRetry = False
+		except:
+			exc("Laden des Fehlerspeichers von '%s'" % (
+				s_strLogMemFile))
+			bRetry = migrateFile(s_strLogMemFile)
+	
 	# Aktuellen und gelesenen Fehlerspeicher konsistent zusammenführen
 	if oLogMem:
+		dbg("Zusammenführen des aktuellen und wiederhergestellten Fehlerspeichers")
 		# >>> Critical Section
 		s_oLogMemLock.acquire()
 		oBackup = list(s_oLogMem)
@@ -310,29 +334,64 @@ def loadSettings():
 		# <<< Critical Section
 		del oLogMem
 		del oBackup
-		
+	
+	bRetry = os.path.isfile(s_strStartPageFile)
+	if not bRetry:
+		log("Startseite nicht vorhanden: '%s'" % (
+			s_strLogMemFile))
+	while bRetry and os.path.isfile(s_strStartPageFile):
+		# Startseite lesen
+		try:
+			with open(s_strStartPageFile, "rb") as f:
+				s_oStartPage = pickle.load(f)
+			bRetry = False
+		except:
+			exc("Laden der Startseite von '%s'" % (
+				s_strStartPageFile))
+			bRetry = migrateFile(s_strStartPageFile)
+	
+	dbg("Klangdateien erfassen")
+	# Sounds einmalig scannen
+	scanSoundFiles()
+	
+	dbg("Konfigurationsparameter synchronisieren")
 	# Konfigurationsparameter synchronisieren
 	if ("System" in s_dictSettings):
 		if ("strLogLvl" in s_dictSettings["System"]):
 			setLogLvl(s_dictSettings["System"]["strLogLvl"])
 			
-	# Startseite lesen
-	try:
-		with open(s_strStartPageFile, "rb") as f:
-			s_oStartPage = pickle.load(f)
-	except:
-		exc("Laden der Startseite von %s" % (
-			s_strStartPageFile))
-		s_oStartPage = StartPage()
-			
-	# Sounds einmalig scannen
-	scanSoundFiles()
-			
-	log("Konfiguration: %r" % (s_dictSettings))
-	log("Startseite: %r" % (s_oStartPage))
+	dbg("Konfiguration: %r" % (s_dictSettings))
+	dbg("Startseite: %r" % (s_oStartPage))
 	return
+
+def migrateFile(strFilename):
+	# Migration step: Replace old references to 'HTTPD.' with 'httpd.'
+	#
+	oData = None
+	bOld = bytes("Httpd\n", "UTF-8")
+	bNew = bytes("httpd\n", "UTF-8")
+	bResult = False
+	try:
+		with open(strFilename, "rb") as f:
+			oData = f.read()
+		if oData.find(bOld):
+			with open(strFilename, "wb") as f:
+				f.write(oData.replace(bOld, bNew))
+			log("Migration der Datei '%s' erfolgreich" % (
+				strFilename))
+			bResult = True
+		else:
+			wrn("Migration auf Datei '%s' nicht anwendbar" % (
+				strFilename))
+		if oData:
+			del oData
+	except:
+		exc("Migration der Datei '%s' fehlgeschlagen" % (
+			strFilename))
+	return bResult
 	
 def saveSettings():
+	dbg("Einstellungen für Speichern vorbereiten")
 	# >>> Critical Section
 	s_oSettingsLock.acquire()
 	# Einstellungen vorbereiten
@@ -342,7 +401,9 @@ def saveSettings():
 	s_dictSettings["System"].update({
 		"strLogLvl" : getLogLvl()
 	})
+	
 	# Einstellungen speichern
+	dbg("Speichern der Einstellungen")
 	try:
 		foFile = open(s_strConfigFile, "w")
 		json.dump(s_dictSettings, foFile, sort_keys=True)
@@ -353,21 +414,8 @@ def saveSettings():
 	s_oSettingsLock.release()
 	# <<< Critical Section
 	
-	# Fehlerspeicher speichern
-	# >>> Critical Section
-	s_oLogMemLock.acquire()
-	oSnapshot = list(s_oLogMem)
-	s_oLogMemLock.release()
-	# <<< Critical Section
-	try:
-		with open(s_strLogMemFile, "wb") as f:
-			pickle.dump(oSnapshot, f, pickle.HIGHEST_PROTOCOL)
-	except:
-		exc("Speichern des Fehlerspeichers in %s" % (
-			s_strLogMemFile))				
-	del oSnapshot
-	
 	# Startseite speichern
+	dbg("Speichern der Startseite")
 	if s_oStartPage:
 		try:
 			with open(s_strStartPageFile, "wb") as f:
@@ -375,13 +423,26 @@ def saveSettings():
 		except:
 			exc("Speichern der Startseite in %s" % (
 				s_strStartPageFile))
+	
+	# Snapshot des Fehlerspeichers sichern
+	dbg("Abbild des Fehlerspeichers speichern")
+	# >>> Critical Section
+	s_oLogMemLock.acquire()
+	oSnapshot = list(s_oLogMem)
+	s_oLogMemLock.release()
+	# <<< Critical Section	
+	if oSnapshot:
+		try:
+			with open(s_strLogMemFile, "wb") as f:
+				pickle.dump(oSnapshot, f, pickle.HIGHEST_PROTOCOL)
+		except:
+			exc("Speichern des Fehlerspeichers in %s" % (
+				s_strLogMemFile))				
+		del oSnapshot
 		
 	return
 	
-def scanSoundFiles(strDir=None, bRescan=False, bClear=False):
-	if not strDir:
-		strDir = getSetting("System", "strSoundLocation",
-			varDefault="/usr/share/scratch/Media/Sounds")
+def scanSoundFiles(bRescan=False, bClear=False):
 	# >>> Critical Section
 	s_oSettingsLock.acquire()
 	try:
@@ -391,23 +452,34 @@ def scanSoundFiles(strDir=None, bRescan=False, bClear=False):
 			s_dictSettings["Sounds"].clear()
 			bRescan = True
 	except:
-		exc("Sound-Dateien in '%s' scannen" % (strDir))
+		exc("Erfassen von Klangdateien")
 	s_oSettingsLock.release()
 	# <<< Critical Section
 	if not bRescan:
 		return
-	# Verzeichnisstruktur scannen (Kategorie, Datei)
-	for strCategory in os.listdir(strDir):
-		strFile = None
-		strPath = os.path.join(strDir, strCategory)
-		if os.path.isdir(strPath):
-			for strEntry in os.listdir(strPath):
-				strFile = os.path.join(strPath, strEntry)
-				if os.path.isfile(strFile):
-					registerSoundFile(strFile, strCategory)
-		elif os.path.isfile(strPath):
-			strFile = strPath
-			registerSoundFile(strFile)
+	
+	lstDir = (
+		getSetting("System", "strSysSoundLocation",
+			varDefault="/usr/share/scratch/Media/Sounds"),
+		getSetting("System", "strUsrSoundLocation",
+			varDefault=s_strSoundPath))
+		
+	for strDir in lstDir:
+		# Verzeichnisstruktur scannen (Kategorie, Datei)
+		try:
+			for strCategory in os.listdir(strDir):
+				strFile = None
+				strPath = os.path.join(strDir, strCategory)
+				if os.path.isdir(strPath):
+					for strEntry in os.listdir(strPath):
+						strFile = os.path.join(strPath, strEntry)
+						if os.path.isfile(strFile):
+							registerSoundFile(strFile, strCategory)
+				elif os.path.isfile(strPath):
+					strFile = strPath
+					registerSoundFile(strFile)
+		except:
+			exc("Erfassen von Klangdateien aus: '%s'" % (strDir))
 	return
 	
 def registerSoundFile(strFile, strCategory="Default"):
@@ -428,7 +500,7 @@ def registerSoundFile(strFile, strCategory="Default"):
 			s_dictSettings["Sounds"].update({strCategory : {}})
 		s_dictSettings["Sounds"][strCategory].update({strName : strFile})
 	except:
-		exc("Sound-Datei '%s' registrieren" % (strFile))
+		exc("Klangdatei erfassen: '%s'" % (strFile))
 	s_oSettingsLock.release()
 	# <<< Critical Section
 	return
@@ -649,7 +721,7 @@ class LogEntry:
 		strText="",
 		lstTB=None):
 		self.m_strType = strType
-		self.m_strDate = datetime.today().strftime("%d.%m.%Y  %H:%M:%S.%f")
+		self.m_strDate = datetime.datetime.today().strftime("%d.%m.%Y  %H:%M:%S.%f")
 		self.m_strText = strText
 		# Liste von 4-Tuples (filename, line number, function name, text)
 		if not lstTB:

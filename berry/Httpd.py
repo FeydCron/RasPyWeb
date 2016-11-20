@@ -13,20 +13,21 @@ from urllib.parse import parse_qsl
 from datetime import datetime
 from collections import OrderedDict
 from zipfile import ZipFile
+from io import BytesIO
 
-import Globs
-from Worker import TaskModuleInit
+import globs
 
-import SDK
-from SDK import TaskSpeak
-from SDK import TaskSound
-from SDK import FastTask
-from SDK import HtmlPage
-from SDK import TaskModuleEvt
-from SDK import TaskSaveSettings
+from worker import TaskModuleInit
+from worker import TaskExit
 
-from Worker import FutureTask
-from Worker import TaskExit
+import sdk
+from sdk import TaskSpeak
+from sdk import TaskSound
+from sdk import FastTask
+from sdk import FutureTask
+from sdk import HtmlPage
+from sdk import TaskModuleEvt
+from sdk import TaskSaveSettings
 
 g_oHttpdWorker = None
 	
@@ -41,7 +42,7 @@ class StartPage(OrderedDict):
 		btnEdt=""		# Name des zu editierenden Buttons
 		):
 		
-		Globs.dbg(
+		globs.dbg(
 			"StartPage::writeToPage(bEdit=%r, secEdt=\"%s\", artEdt=\"%s\", btnEdt=\"%s\")" % (
 			bEdit, secEdt, artEdt, btnEdt))
 		
@@ -58,7 +59,7 @@ class StartPage(OrderedDict):
 		if bIsEmpty:
 			oHtmlPage.append(
 				"<p class=\"center\"><a href=\"%s?edit=startpage\">&#x1F527; Die Startseite ist noch leer. Jetzt bearbeiten.</a></p>" % (
-				Globs.s_strStartPageUrl))
+				globs.s_strStartPageUrl))
 		return
 		
 	def editStartPage(self,
@@ -79,20 +80,20 @@ class StartPage(OrderedDict):
 				strType = "Hauptaufgaben"
 			oHtmlPage.append(
 				"<li><a href=\"%s?secEdt=%s\">%s Abschnitt \"%s\"</a>" % (
-					Globs.s_strStartPageUrl, strSecName, "&#x0270E;", strType))
+					globs.s_strStartPageUrl, strSecName, "&#x0270E;", strType))
 			oHtmlPage.append("<ul>")
 			for (strArtName, oArticle) in oSection.items():
 				oHtmlPage.append(
 					"<li><a href=\"%s?sec=%s&artEdt=%s\">%s Aufgabe \"%s\"</a></li>" % (
-						Globs.s_strStartPageUrl, strSecName, strArtName, "&#x0270E;", oArticle.m_strTitle))
+						globs.s_strStartPageUrl, strSecName, strArtName, "&#x0270E;", oArticle.m_strTitle))
 			oHtmlPage.append(
 				"<li><a href=\"%s?sec=%s&artAdd=%s\">%s Neue Aufgabe erstellen</a></li>" % (
-					Globs.s_strStartPageUrl, strSecName, uuid.uuid1().hex, "&#x0271A;"))
+					globs.s_strStartPageUrl, strSecName, uuid.uuid1().hex, "&#x0271A;"))
 			oHtmlPage.append("</ul>")
 			oHtmlPage.append("</li>")
 		oHtmlPage.append(
 			"<li><a href=\"%s?secAdd=%s\">%s Neuen Abschnitt anlegen</a></li>" % (
-				Globs.s_strStartPageUrl, uuid.uuid1().hex, "&#x0271A;"))
+				globs.s_strStartPageUrl, uuid.uuid1().hex, "&#x0271A;"))
 		oHtmlPage.extend([
 			"</ul>",
 			"</nav>",
@@ -156,9 +157,9 @@ class StartPage(OrderedDict):
 				"del" : ["sec", "Abschnitt löschen", "ym-delete ym-danger"]
 			})
 		
-		Globs.dbg(
+		globs.dbg(
 			"StartPage::editTarget(secEdt=%r, artEdt=%r, btnEdt=%r): oTarget=%r, oSection=%r, oArticle=%r, oButton=%r, dictTargets=%r, dictQueries=%r, StartPage=%r" % (
-			secEdt, artEdt, btnEdt, oTarget, oSection, oArticle, oButton, dictTargets, dictQueries, Globs.s_oStartPage))		
+			secEdt, artEdt, btnEdt, oTarget, oSection, oArticle, oButton, dictTargets, dictQueries, globs.s_oStartPage))		
 		
 		# Target bearbeiten
 		if oTarget != None:
@@ -297,7 +298,7 @@ class Button:
 				strTitle="Zu dieser Seite navigieren",
 				bUseKeyAsValue=True,
 				bEscape=True,
-				dictChoice = Globs.s_dictSettings["Redirects"])
+				dictChoice = globs.s_dictSettings["Redirects"])
 			oHtmlPage.appendForm("btnIcon",
 				strInput=self.m_strIcon,
 				strTitle="Icon",
@@ -417,7 +418,7 @@ class TaskInstallModule(FastTask):
 		return  strDesc
 	
 	def do(self):
-		Globs.s_dictSettings["dictModules"].update({self.m_strComponent : self.m_strName})
+		globs.s_dictSettings["dictModules"].update({self.m_strComponent : self.m_strName})
 		return
 		
 class TaskRemoveModule(FastTask):
@@ -432,10 +433,10 @@ class TaskRemoveModule(FastTask):
 		return  strDesc
 	
 	def do(self):
-		if self.m_strComponent in Globs.s_dictSettings["listInactiveModules"]:
-			Globs.s_dictSettings["listInactiveModules"].remove(self.m_strComponent)
-		if self.m_strComponent in Globs.s_dictSettings["dictModules"]:
-			Globs.s_dictSettings["dictModules"].pop(self.m_strComponent)
+		if self.m_strComponent in globs.s_dictSettings["listInactiveModules"]:
+			globs.s_dictSettings["listInactiveModules"].remove(self.m_strComponent)
+		if self.m_strComponent in globs.s_dictSettings["dictModules"]:
+			globs.s_dictSettings["dictModules"].pop(self.m_strComponent)
 		return
 		
 class TaskEnableModule(FastTask):
@@ -457,12 +458,12 @@ class TaskEnableModule(FastTask):
 	
 	def do(self):
 		if self.m_bEnable:
-			if self.m_strComponent in Globs.s_dictSettings["listInactiveModules"]:
-				Globs.s_dictSettings["listInactiveModules"].remove(self.m_strComponent)
-				Globs.saveSettings()
-		elif self.m_strComponent not in Globs.s_dictSettings["listInactiveModules"]:
-				Globs.s_dictSettings["listInactiveModules"].append(self.m_strComponent)
-				Globs.saveSettings()
+			if self.m_strComponent in globs.s_dictSettings["listInactiveModules"]:
+				globs.s_dictSettings["listInactiveModules"].remove(self.m_strComponent)
+				globs.saveSettings()
+		elif self.m_strComponent not in globs.s_dictSettings["listInactiveModules"]:
+				globs.s_dictSettings["listInactiveModules"].append(self.m_strComponent)
+				globs.saveSettings()
 		return
 		
 class TaskDisplayModules(FutureTask):
@@ -489,7 +490,7 @@ class TaskDisplayModules(FutureTask):
 		if self.m_dictQuery and "edit" in self.m_dictQuery:
 			self.m_oTargetEdit = self.m_dictQuery["edit"][0]
 		
-		if self.m_oTargetEdit and self.m_oTargetEdit in Globs.s_dictSettings["dictModules"]:
+		if self.m_oTargetEdit and self.m_oTargetEdit in globs.s_dictSettings["dictModules"]:
 			self.createForm()
 		else:
 			self.displayModules()
@@ -503,7 +504,7 @@ class TaskDisplayModules(FutureTask):
 		self.m_oHtmlPage.openForm(dictTargets={"target" : "%s" % (self.m_oTargetEdit)})
 		self.m_oHtmlPage.appendForm(
 			"ModuleClass",
-			strInput = Globs.s_dictSettings["dictModules"][self.m_oTargetEdit],
+			strInput = globs.s_dictSettings["dictModules"][self.m_oTargetEdit],
 			strTitle = "Hauptklasse")
 		self.m_oHtmlPage.closeForm()
 		self.m_oHtmlPage.closeBox()
@@ -514,10 +515,10 @@ class TaskDisplayModules(FutureTask):
 			"Installierte Module",
 			["Modul"],
 			strChk = "Auswahl", strAct = "Status/Aktion")
-		for (strComponent, strName) in sorted(Globs.s_dictSettings["dictModules"].items()):
+		for (strComponent, strName) in sorted(globs.s_dictSettings["dictModules"].items()):
 			strStatus = "primary"
 			strContent = "N/A"
-			if strComponent in Globs.s_dictSettings["listInactiveModules"]:
+			if strComponent in globs.s_dictSettings["listInactiveModules"]:
 				strStatus = "warning ym-forbid"
 				strContent = "Ausgeschaltet"
 			elif strComponent not in self.m_oWorker.m_dictModules:
@@ -610,7 +611,7 @@ class TaskDisplaySystem(FutureTask):
 			"Aktuelle Systemwerte",
 			["System", ""], True, True)
 		self.m_oHtmlPage.appendTable([
-			"Version", "V%s" % (Globs.getVersion())],
+			"Version", "V%s" % (globs.getVersion())],
 				bFirstIsHead=True, bEscape=False)
 		self.m_oHtmlPage.appendTable([
 			"Datum", "<a href=\"%s\">&#x0270E; %s</a>" % (
@@ -623,7 +624,7 @@ class TaskDisplaySystem(FutureTask):
 				dt.strftime("%H:%M:%S"))],
 				bFirstIsHead=True, bEscape=False)
 		# Alle Sektionen durchgehen
-		for (strHeader, dictSection) in sorted(Globs.s_dictSystemValues.items()):
+		for (strHeader, dictSection) in sorted(globs.s_dictSystemValues.items()):
 			# Tabelle mit dem nächsten Tabellenkopf fortsetzen
 			self.m_oHtmlPage.appendHeader([strHeader, ""])
 			# Alle Werte durchgehen
@@ -671,32 +672,32 @@ class TaskDisplaySystem(FutureTask):
 		strResult = ""
 		if (self.m_strFxn == "date"):
 			try:
-				strResult = SDK.setDate(self.m_strArg, "%d.%m.%Y")
+				strResult = sdk.setDate(self.m_strArg, "%d.%m.%Y")
 				self.m_oHtmlPage.createBox("Datum",
 					"Das Datum \"%s\" wurde übernommen und mit folgendem Ergebnis angewendet: %s" % (
 						self.m_strArg, strResult))
 				return False
 			except Exception as ex:
 				strResult = " %s" % (ex)
-				Globs.wrn("Datum einstellen: %s" % (strResult))
+				globs.wrn("Datum einstellen: %s" % (strResult))
 			try:
-				strResult = SDK.setDate(self.m_strArg, "%Y-%m-%d")
+				strResult = sdk.setDate(self.m_strArg, "%Y-%m-%d")
 				self.m_oHtmlPage.createBox("Datum",
 					"Das Datum \"%s\" wurde übernommen und mit folgendem Ergebnis angewendet: %s" % (
 						self.m_strArg, strResult))
 				return False
 			except Exception as ex:
-				Globs.exc("Datum einstellen")
+				globs.exc("Datum einstellen")
 				strResult = " %s" % (ex)
 		elif (self.m_strFxn == "time"):
 			try:
-				strResult = SDK.setTime(self.m_strArg, "%H:%M:%S")
+				strResult = sdk.setTime(self.m_strArg, "%H:%M:%S")
 				self.m_oHtmlPage.createBox("Uhrzeit",
 					"Die Uhrzeit \"%s\" wurde übernommen und mit folgendem Ergebnis angewendet: %s" % (
 						self.m_strArg, strResult))
 				return False
 			except Exception as ex:
-				Globs.exc("Uhrzeit einstellen")
+				globs.exc("Uhrzeit einstellen")
 				strResult = " %s" % (ex)
 		self.m_oHtmlPage.createBox(self.m_strFxn,
 			"Die Einstellung \"%s\" konnte nicht auf den Wert \"%s\" geändert werden.%s" % (
@@ -752,16 +753,16 @@ class TaskDisplaySettings(FutureTask):
 		
 	def displayValues(self):
 		# >>> Critical Section
-		Globs.s_oSettingsLock.acquire()
+		globs.s_oSettingsLock.acquire()
 		try:
 			bOpened = False
-			for (strKey, dictValues) in Globs.s_dictUserSettings.items():
+			for (strKey, dictValues) in globs.s_dictUserSettings.items():
 				
-				if (strKey not in Globs.s_dictSettings or not Globs.s_dictSettings[strKey]):
+				if (strKey not in globs.s_dictSettings or not globs.s_dictSettings[strKey]):
 					continue
-				if (strKey not in ("System") and strKey not in Globs.s_dictSettings["dictModules"]):
+				if (strKey not in ("System") and strKey not in globs.s_dictSettings["dictModules"]):
 					continue
-				if (strKey in Globs.s_dictSettings["listInactiveModules"]):
+				if (strKey in globs.s_dictSettings["listInactiveModules"]):
 					continue
 				
 				if bOpened:
@@ -771,14 +772,14 @@ class TaskDisplaySettings(FutureTask):
 					self.m_oHtmlPage.openTable("Konfigurationseinstellungen",
 						[strKey, ""], True, True)
 				for (strValueName, dictProperties) in sorted(dictValues.items()):
-					if strValueName in Globs.s_dictSettings[strKey]:
+					if strValueName in globs.s_dictSettings[strKey]:
 						strTitle = strValueName
 						if ("title" in dictProperties):
 							strTitle = dictProperties["title"]
 						if ("readonly" in dictProperties and dictProperties["readonly"]):
 							self.m_oHtmlPage.appendTable([
 								strTitle,
-								"%s" % (Globs.s_dictSettings[strKey][strValueName])
+								"%s" % (globs.s_dictSettings[strKey][strValueName])
 								], bFirstIsHead=True, bEscape=False)
 						elif ("showlink" in dictProperties and dictProperties["showlink"]
 							and "description" in dictProperties
@@ -786,7 +787,7 @@ class TaskDisplaySettings(FutureTask):
 							self.m_oHtmlPage.appendTable([
 								strTitle,
 								"<a href=\"%s\">&#x027A5; %s</a>" % (
-									Globs.s_dictSettings[strKey][strValueName],
+									globs.s_dictSettings[strKey][strValueName],
 									dictProperties["description"])
 								], bFirstIsHead=True, bEscape=False)
 						else:
@@ -794,13 +795,13 @@ class TaskDisplaySettings(FutureTask):
 								strTitle,
 								"<a href=\"%s?edit=%s&key=%s\">&#x0270E; %s</a>" % (
 									"/system/settings.html", strValueName, strKey,
-									Globs.s_dictSettings[strKey][strValueName])
+									globs.s_dictSettings[strKey][strValueName])
 								], bFirstIsHead=True, bEscape=False)
 			if bOpened:
 				self.m_oHtmlPage.closeTable()
 		except:
-			Globs.exc("Darstellen der Konfiguration")
-		Globs.s_oSettingsLock.release()
+			globs.exc("Darstellen der Konfiguration")
+		globs.s_oSettingsLock.release()
 		# <<< Critical Section
 		return
 		
@@ -813,15 +814,15 @@ class TaskDisplaySettings(FutureTask):
 		varVal = None
 		bUseKeyAsValue = False
 		# >>> Critical Section
-		Globs.s_oSettingsLock.acquire()
+		globs.s_oSettingsLock.acquire()
 		try:
-			if (self.m_strKey in Globs.s_dictUserSettings
-				and self.m_strKey in Globs.s_dictSettings
-				and self.m_strVal in Globs.s_dictSettings[self.m_strKey]
+			if (self.m_strKey in globs.s_dictUserSettings
+				and self.m_strKey in globs.s_dictSettings
+				and self.m_strVal in globs.s_dictSettings[self.m_strKey]
 				and self.m_strKey not in (
 				"dictModules", "listInactiveModules", "Redirects")):
-				dictValues = Globs.s_dictUserSettings[self.m_strKey]
-				varVal = Globs.s_dictSettings[self.m_strKey][self.m_strVal]
+				dictValues = globs.s_dictUserSettings[self.m_strKey]
+				varVal = globs.s_dictSettings[self.m_strKey][self.m_strVal]
 				strDefault = "%s" % (varVal)
 			if dictValues and self.m_strVal in dictValues:
 				dictProperties = dictValues[self.m_strVal]
@@ -837,9 +838,9 @@ class TaskDisplaySettings(FutureTask):
 				if "keyIsValue" in dictProperties:
 					bUseKeyAsValue = dictProperties["keyIsValue"]
 		except:
-			Globs.exc("Ändern der Konfiguration")
+			globs.exc("Ändern der Konfiguration")
 			varVal = None
-		Globs.s_oSettingsLock.release()
+		globs.s_oSettingsLock.release()
 		# <<< Critical Section
 		if varVal == None:
 			return False
@@ -871,8 +872,8 @@ class TaskDisplaySettings(FutureTask):
 		return True
 		
 	def updateValue(self):
-		if Globs.setSetting(self.m_strKey, self.m_strFxn, self.m_strVal):
-			Globs.saveSettings()
+		if globs.setSetting(self.m_strKey, self.m_strFxn, self.m_strVal):
+			globs.saveSettings()
 			return True
 		self.m_oHtmlPage.createBox(self.m_strFxn,
 			"Die Einstellung \"%s\" konnte nicht auf den Wert \"%s\" geändert werden." % (
@@ -905,14 +906,14 @@ class TaskDisplayLogMem(FutureTask):
 			self.m_strMode = self.m_dictForm["mode"][0]
 		
 		bUpdate = (self.m_strMode and (self.m_strMode == "update"))
-		lstLogMem = Globs.getLogMem(bUpdate)
+		lstLogMem = globs.getLogMem(bUpdate)
 		if self.m_strMode and self.m_strMode == "edit":
 			self.createForm()
 		elif self.m_strMode and self.m_strMode in ("EXC", "ERR", "WRN", "INF", "DBG"):
-			Globs.setLogLvl(self.m_strMode)
+			globs.setLogLvl(self.m_strMode)
 			self.m_oHtmlPage.createBox("Protokollierung",
 				"Die Detail-Tiefe der Protokollierung ist jetzt auf \"%s\" festgelegt." % (
-					Globs.getLogLvl()))
+					globs.getLogLvl()))
 		elif self.m_strMode and self.m_strMode.isdigit():
 			self.showDetail(lstLogMem)
 		else:
@@ -926,7 +927,7 @@ class TaskDisplayLogMem(FutureTask):
 			bClose = False)
 		self.m_oHtmlPage.openForm()
 		self.m_oHtmlPage.appendForm(
-			"mode", Globs.getLogLvl(), "Detail-Tiefe",
+			"mode", globs.getLogLvl(), "Detail-Tiefe",
 			dictChoice = {
 				"Ausnahmen"	: "EXC",
 				"Fehler"	: "ERR",
@@ -1027,19 +1028,19 @@ class TaskDisplaySounds(FutureTask):
 		
 		if self.m_dictQuery and "cache" in self.m_dictQuery:
 			if self.m_dictQuery["cache"][0] == "clear":
-				Globs.scanSoundFiles(bClear=True)
+				globs.scanSoundFiles(bClear=True)
 			if self.m_dictQuery["cache"][0] == "rescan":
-				Globs.scanSoundFiles(bRescan=True)
+				globs.scanSoundFiles(bRescan=True)
 		if self.m_dictQuery and "sound" in self.m_dictQuery:
 			strSound = self.m_dictQuery["sound"][0]
 		
 		self.m_oHtmlPage.append("<ul>")
-		if "Sounds" in Globs.s_dictSettings:
-			dictSounds = Globs.s_dictSettings["Sounds"]
-			# Eigene Klänge darstellen
+		if "Sounds" in globs.s_dictSettings:
+			dictSounds = globs.s_dictSettings["Sounds"]
+			# Standardklänge darstellen
 			if "Default" in dictSounds:
 				strAnchor = uuid.uuid1().hex
-				self.m_oHtmlPage.append("<li id=\"Default\"><span>Eigene Klänge</span>")
+				self.m_oHtmlPage.append("<li id=\"Default\"><span>Standard</span>")
 				self.m_oHtmlPage.append("<ul>")
 				for (strName, _) in sorted(dictSounds["Default"].items()):
 					if strName == strSound:
@@ -1052,7 +1053,7 @@ class TaskDisplaySounds(FutureTask):
 				self.m_oHtmlPage.append("</ul>")
 				self.m_oHtmlPage.append("</li>")
 			# Alle übrigen Klänge darstellen
-			for (strCategory, dictSounds) in sorted(Globs.s_dictSettings["Sounds"].items()):
+			for (strCategory, dictSounds) in sorted(globs.s_dictSettings["Sounds"].items()):
 				if strCategory == "Default":
 					continue
 				strAnchor = uuid.uuid1().hex
@@ -1095,8 +1096,8 @@ class TaskConfigSound(FutureTask):
 
 	def createForm(self):
 		
-		strOut = SDK.getAlsaControlValue("PCM Playback Route")
-		strVol = SDK.getAlsaControlValue("PCM Playback Volume")
+		strOut = sdk.getAlsaControlValue("PCM Playback Route")
+		strVol = sdk.getAlsaControlValue("PCM Playback Volume")
 		
 		#
 		# (x% / 100%) = (y + 10239) / 10639
@@ -1159,8 +1160,8 @@ class TaskStartPage(FutureTask):
 		btnEdt = ""
 		
 		self.m_oHtmlPage.setTitle("Startseite")
-		if (not Globs.s_oStartPage):
-			Globs.s_oStartPage = StartPage()
+		if (not globs.s_oStartPage):
+			globs.s_oStartPage = StartPage()
 			
 		bEdit = ("edit" in self.m_dictQuery and self.m_dictQuery["edit"][0] == "startpage")
 		
@@ -1202,7 +1203,7 @@ class TaskStartPage(FutureTask):
 				artEdt = self.m_dictQuery["artAdd"][0]
 				self.doAdd(addArt=artEdt)
 			
-		Globs.s_oStartPage.writeToPage(self.m_oHtmlPage, bEdit, secEdt, artEdt, btnEdt)
+		globs.s_oStartPage.writeToPage(self.m_oHtmlPage, bEdit, secEdt, artEdt, btnEdt)
 		return
 		
 	def doAdd(self, addSec="", addArt="", addBtn=""):
@@ -1210,7 +1211,7 @@ class TaskStartPage(FutureTask):
 		strSec = ""
 		strArt = ""
 		
-		Globs.dbg(
+		globs.dbg(
 			"doAdd(addSec=\"%s\", addArt=\"%s\", addBtn=\"%s\")" % (
 			addSec, addArt, addBtn))
 		
@@ -1222,7 +1223,7 @@ class TaskStartPage(FutureTask):
 		elif addSec:
 			oSection = Section()
 			oSection.setSection(addSec, True)
-			Globs.s_oStartPage.update({addSec : oSection})
+			globs.s_oStartPage.update({addSec : oSection})
 			return
 		elif (addArt and self.m_dictQuery
 			and "sec" in self.m_dictQuery):
@@ -1230,7 +1231,7 @@ class TaskStartPage(FutureTask):
 		else:
 			return
 		
-		for (strName, oSection) in Globs.s_oStartPage.items():
+		for (strName, oSection) in globs.s_oStartPage.items():
 			if strName == strSec:
 				if addArt:
 					oArticle = Article()
@@ -1262,14 +1263,14 @@ class TaskStartPage(FutureTask):
 		else:
 			return False
 			
-		Globs.dbg(
+		globs.dbg(
 			"doDelete(strType=\"%s\"): strSec=\"%s\", strArt=\"%s\", strBtn=\"%s\"" % (
 			strType, strSec, strArt, strBtn))
 			
-		for (strName, oSection) in Globs.s_oStartPage.items():
+		for (strName, oSection) in globs.s_oStartPage.items():
 			if strName == strSec:
 				if strType == "sec":
-					Globs.s_oStartPage.pop(strSec)
+					globs.s_oStartPage.pop(strSec)
 					return True
 				elif strArt:
 					for (strName, oArticle) in oSection.items():
@@ -1306,7 +1307,7 @@ class TaskStartPage(FutureTask):
 		else:
 			return
 		
-		for (strName, oSection) in Globs.s_oStartPage.items():
+		for (strName, oSection) in globs.s_oStartPage.items():
 			if strName == strSec:
 				if strType == "sec":
 					self.doSubmitSection(oSection)
@@ -1360,7 +1361,7 @@ class Httpd:
 	def __init__(self, oWorker):
 		global g_oHttpdWorker
 		
-		Globs.signalCriticalActivity()
+		globs.signalCriticalActivity()
 		g_oHttpdWorker = oWorker
 		return
 	
@@ -1378,25 +1379,28 @@ class Httpd:
 	#  
 	#  
 	def run(self):
-		strHttpDir = os.path.join(Globs.s_strBasePath, "www")
+		strHttpDir = os.path.join(globs.s_strBasePath, "www")
 		if (os.path.isdir(strHttpDir)):
 			# Das Arbeitsverzeichnis muss das "www"-Verzeichnis sein
 			os.chdir(strHttpDir)
 			# Web-Server instanziieren
-			Globs.s_oHttpd = BerryHttpServer((
-				Globs.getSetting("System", "strHttpIp",
+			globs.s_oHttpd = BerryHttpServer((
+				globs.getSetting("System", "strHttpIp",
 					"\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}",
 					"0.0.0.0"),
-				Globs.getSetting("System", "nHttpPort",
+				globs.getSetting("System", "nHttpPort",
 					"\\d{1,5}",
 					8081)),
 				BerryHttpHandler)
 			# Web-Server starten
 			print("Running HTTP Server on %s at %s ..." % (
-				Globs.s_oHttpd.server_name, Globs.s_oHttpd.server_address))
-			Globs.s_oHttpd.serve_forever()
-		# Ressourcen des Web-Servers freigeben
-		Globs.s_oHttpd.server_close()
+				globs.s_oHttpd.server_name, globs.s_oHttpd.server_address))
+			globs.s_oHttpd.serve_forever()
+			# Ressourcen des Web-Servers freigeben
+			globs.s_oHttpd.server_close()
+		else:
+			globs.err("Arbeitsverzeichnis des Web-Servers nicht gefunden: " +
+				strHttpDir)
 		return
 	
 class BerryHttpHandler(SimpleHTTPRequestHandler):
@@ -1431,18 +1435,18 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			strName = strComponent
 		try:
 			foFile = open("%s/%s" % (
-				Globs.s_strModulePath, strFilename), "w")
+				globs.s_strModulePath, strFilename), "w")
 			oData = oModuleFile.file.read()
 			foFile.write(oData.decode())
 			foFile.close()
 			del oData
 		except:
-			Globs.exc("Schreiben der Moduldatei %s/%s" % (
-				Globs.s_strModulePath, strFilename))
+			globs.exc("Schreiben der Moduldatei %s/%s" % (
+				globs.s_strModulePath, strFilename))
 			oHtmlPage.createBox(
 				"Fehler",
 				"Die hochgeladene Moduldatei '%s'" % (strFilename) +
-				"konnte nicht in '%s' gespeichert werden." % (Globs.s_strModulePath),
+				"konnte nicht in '%s' gespeichert werden." % (globs.s_strModulePath),
 				strType="error")
 			return oHtmlPage
 		# Tasks ausführen
@@ -1463,16 +1467,17 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				strType="warning")
 			return oHtmlPage
 		oHtmlPage = HtmlPage("/sound/values.html", strTitle = "Installierte Klänge")
-		for oSoundFile in dictForm["SoundFile"]:
-			if (not oSoundFile.filename or
-				not oSoundFile.file):
-				oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
-				oHtmlPage.createBox(
-					"Unvollständige Eingabe",
-					"Es konnte keine gültige Klang- oder Zip-Datei empfangen werden.",
-					strType="warning")
-				return oHtmlPage
-			try:
+		
+		try:
+			for oSoundFile in dictForm["SoundFile"]:
+				if (not oSoundFile.filename or
+					not oSoundFile.file):
+					oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
+					oHtmlPage.createBox(
+						"Unvollständige Eingabe",
+						"Es konnte keine gültige Klang- oder Zip-Datei empfangen werden.",
+						strType="warning")
+					return oHtmlPage
 				if not self.processSoundFile(oSoundFile):
 					oHtmlPage = HtmlPage(strPath, strTitle = "Klanginstallation")
 					oHtmlPage.createBox(
@@ -1480,17 +1485,17 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 						"Bitte verwenden Sie nur zulässige Klangdateien (*.wav, *.mp3).",
 						strType="warning")
 					return oHtmlPage
-			except Exception as ex:
-				Globs.exc("Verarbeiten der Klangdatei %s" % (
-					oSoundFile.filename))
-				oHtmlPage.createBox(
-					"Fehler",
-					"Die empfangene Datei '%s' " % (oSoundFile.filename) +
-					"konnte nicht verarbeitet werden (%s)." % (ex),
-					strType="error")
-				return oHtmlPage
+		except Exception as ex:
+			globs.exc("Verarbeiten der Klangdatei %s" % (
+				oSoundFile.filename))
+			oHtmlPage.createBox(
+				"Fehler",
+				"Die empfangene Datei '%s' " % (oSoundFile.filename) +
+				"konnte nicht verarbeitet werden (%s)." % (ex),
+				strType="error")
+			return oHtmlPage
 		# Tasks ausführen
-		Globs.scanSoundFiles(bRescan=True)
+		globs.scanSoundFiles(bRescan=True)
 		oTask = TaskDisplaySounds(g_oHttpdWorker, oHtmlPage)
 		if oTask.start():
 			oTask.wait()
@@ -1523,8 +1528,8 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			
 			print("Out = " + strOut + ", Vol = " + strVol + "%")
 			
-			bOkOut = SDK.setAlsaControlValue("PCM Playback Route", strOut)
-			bOkVol = SDK.setAlsaControlValue("PCM Playback Volume", strVol + "%")
+			bOkOut = sdk.setAlsaControlValue("PCM Playback Route", strOut)
+			bOkVol = sdk.setAlsaControlValue("PCM Playback Volume", strVol + "%")
 			
 			if (not bOkOut):
 				oHtmlPage.createBox(
@@ -1548,18 +1553,20 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		return oHtmlPage
 		
 	def processSoundFile(self, oSoundFile):
-		strSoundPath = Globs.getSetting("System", "strSoundLocation",
-			varDefault="/usr/share/scratch/Media/Sounds")
+		strSoundPath = globs.getSetting("System", "strUsrSoundLocation",
+			varDefault=globs.s_strSoundPath)
 		strFilename = oSoundFile.filename
 		strFilename = strFilename.replace("\\", "/")
 		_, strFilename = os.path.split(strFilename)
 		strComponent, strExt = os.path.splitext(strFilename)
 		bResult = False
-		if (zipfile.is_zipfile(oSoundFile.file)):
+		oData = oSoundFile.file.read()
+		globs.log("Data: %r" % (oData))
+		if (zipfile.is_zipfile(BytesIO(oData))):
 			strDirname = os.path.join(strSoundPath, strComponent)
 			if not (os.path.isdir(strDirname) or os.path.islink(strDirname)):
 				os.mkdir(strDirname)
-			with ZipFile(oSoundFile.file, "r") as oZipFile:
+			with ZipFile(BytesIO(oData), "r") as oZipFile:
 				for oZipInfo in (oZipFile.infolist()):
 					foFile = oZipFile.open(oZipInfo)
 					_, strFilename = os.path.split(oZipInfo.filename)
@@ -1568,15 +1575,19 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 					self.installSoundFile(foFile, os.path.join(strDirname, strFilename))
 					bResult = True
 		elif not re.match("\\.[Ww][Aa][Vv]|\\.[Mm][Pp]3", strExt):
+			del oData
 			return False
 		else:
-			self.installSoundFile(oSoundFile.file, os.path.join(strSoundPath, strFilename))
+			self.installSoundFile(BytesIO(oData), os.path.join(strSoundPath, strFilename))
 			bResult = True
+		del oData
 		return bResult
 		
 	def installSoundFile(self, foSource, strFilename):
-		foFile = open(strFilename, "w+b")
+		globs.log("Klangdatei installieren %r, %r" % (foSource, strFilename))
+		foFile = open(strFilename, "wb")
 		oData = foSource.read()
+		globs.log("Inhalt Klangdatei: %r, Original: %r" % (oData, foSource))
 		foFile.write(oData)
 		foFile.close()
 		del oData
@@ -1654,7 +1665,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				strPath = strRedirect
 				oHtmlPage = None
 				
-			Globs.log("serveGet: '%s', redirect='%s' -> %s" % (strPath, strRedirect, oHtmlPage))
+			globs.log("serveGet: '%s', redirect='%s' -> %s" % (strPath, strRedirect, oHtmlPage))
 			
 			if (not oHtmlPage):
 				if strPath == "/system/settings.html":
@@ -1707,7 +1718,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				SimpleHTTPRequestHandler.do_GET(self)
 				return
 		except:
-			Globs.exc("HTTP GET Version %s: Client '%s' (%s), Path '%s'" % (
+			globs.exc("HTTP GET Version %s: Client '%s' (%s), Path '%s'" % (
 				self.request_version, self.client_address, self.address_string(),
 				strPath))
 			oHtmlPage = HtmlPage(strPath, strTitle = "Fehler")
@@ -1727,28 +1738,8 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			# Formulardaten aufbereiten
 			dictForm = {}
 			for oKey in oForm.keys():
-				strInfo = ""
-				bSkip = False
-				oField = oForm[oKey]
-				if (type(oField) is list or type(oField) is tuple):
-					for oItem in oField:
-						if (oItem.filename):
-							if strInfo:
-								strInfo += ", '%s'" % (oItem.filename)
-							else:
-								strInfo = "mehrerer Dateien: %s='%s'" % (oKey, oItem.filename)
-							if (oKey not in dictForm):
-								dictForm.update({oKey : []})
-							dictForm[oKey].append(oItem)
-							bSkip = True
-				elif (oField.filename):
-					strInfo = "einer Datei: %s=%s" % (oKey, oField.filename)
-					dictForm.update({oKey : [oField]})
-					bSkip = True
-				if strInfo:
-					Globs.log("Hochladen %s" % (strInfo))
-				if (not bSkip):
-					dictForm.update({oKey : oForm.getlist(oKey)})
+				oItem = oForm[oKey]
+				self.buildParams(oForm, oKey, oItem, dictForm)
 				
 			if strPath == "/system/install.html":
 				oHtmlPage = self.installModule(strPath, dictForm)
@@ -1763,7 +1754,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				self.serveGet(strPath, dictForm=dictForm, dictQuery=dictQuery)
 				return
 		except:
-			Globs.exc("HTTP POST Version %s: Client '%s' (%s), Path '%s'" % (
+			globs.exc("HTTP POST Version %s: Client '%s' (%s), Path '%s'" % (
 				self.request_version, self.client_address, self.address_string(),
 				strPath))
 			oHtmlPage = HtmlPage(strPath, strTitle = "Fehler")
@@ -1777,12 +1768,36 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		self.wfile.write(oHtmlPage.getContent())
 		return
 	
+	def buildParams(self,
+		oForm,
+		oKey,
+		oItem,
+		dictForm):
+		
+		if (oKey not in dictForm):
+			dictForm.update({oKey : []})
+		
+		try:
+			if oItem.file and oItem.filename:
+				dictForm[oKey].append(oItem)
+				return
+		except:
+			pass
+
+		if (type(oItem) is list):
+			for oSubItem in oItem:
+				self.buildParams(oForm, oKey, oSubItem, dictForm)
+			return
+				
+		dictForm[oKey].extend(oForm.getlist(oKey))
+		return
+	
 	def doCommand(self,
 		strPath,
 		dictForm=None,
 		dictQuery=None
 		):
-		Globs.dbg("doCommand(strPath=%s, dictForm=%r, dictQuery=%r)" % (
+		globs.dbg("doCommand(strPath=%s, dictForm=%r, dictQuery=%r)" % (
 			strPath, dictForm, dictQuery))
 		# Built-in sound and speak command processing for GET and POST
 		if (dictQuery and "sound" in dictQuery):
@@ -1812,10 +1827,10 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			and dictQuery["exit"]):
 			TaskExit(g_oHttpdWorker, dictQuery["exit"][0]).start()
 			return None
-		Globs.log("doCommand: '%s'" % strPath)
+		globs.log("doCommand: '%s'" % strPath)
 		# Commands being passed to installed modules
 		if (re.match("/modules/.+\\.(cmd|htm|html)", strPath)):
-			Globs.log("Modulkommando: '%s'" % strPath)
+			globs.log("Modulkommando: '%s'" % strPath)
 			oHtmlPage = HtmlPage(strPath)
 			oFutureTask = TaskModuleCmd(g_oHttpdWorker,
 				strPath,
@@ -1844,7 +1859,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 	
 	def do_GET(self):
 		# Webserver-Aktivität signalisieren
-		Globs.signalCriticalActivity()
+		globs.signalCriticalActivity()
 		# Die angeforderten Informationen auswerten
 		oParsedPath = urlparse(self.path)
 		strPath = oParsedPath.path
@@ -1857,7 +1872,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		strRedirect = None
 		# HTTP-Server redirect commands
 		if ("redirect2" in dictQuery):
-			strRedirect = Globs.getRedirect(dictQuery["redirect2"][0], strPath)
+			strRedirect = globs.getRedirect(dictQuery["redirect2"][0], strPath)
 		# Angeforderten Inhalt liefern
 		self.serveGet(strPath,
 			strRedirect=strRedirect,
@@ -1866,7 +1881,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 	
 	def do_POST(self):
 		# Webserver-Aktivität signalisieren
-		Globs.signalCriticalActivity()
+		globs.signalCriticalActivity()
 		# URL analysieren
 		oParsedPath = urlparse(self.path)
 		strPath = oParsedPath.path

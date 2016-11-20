@@ -1,7 +1,7 @@
-import os
+import hashlib
 import os.path
 import time
-import hashlib
+
 
 # Schedule (Experimental)
 # Auslöser:
@@ -13,7 +13,7 @@ import hashlib
 #	'Minute'	- Minimale Auflösung von 5 Minuten
 # Aktionen:
 #	'Time'		- (True|False) Ansage der aktuellen Uhrzeit
-#	'Play'		- <Sound> Abspielen des angegebenen Sounds
+#	'Play'		- <sound> Abspielen des angegebenen Sounds
 #	'Talk'		- <Text> Sprechen des angegebenen Textes
 schedule = {
 	'Test': {
@@ -161,7 +161,7 @@ sounds = {
 		'Join-us',		'Oooo-badada',		'Singer1',
 		'Singer2',		'Sing-me-a-song',	'Ya'}}
 
-# Sound abspielen
+# sound abspielen
 def sound(strSound):
 	global sounds
 	
@@ -188,7 +188,7 @@ def sound(strSound):
 	else:
 		print("*** Error: File <%s> not found!" %strFile);
 
-# Testroutine für Sound abspielen
+# Testroutine für sound abspielen
 def testSound():
 	global sounds
 

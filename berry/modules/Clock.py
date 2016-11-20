@@ -1,11 +1,11 @@
 ﻿import time
 from datetime import datetime
 
-import Globs
+import globs
 
-from SDK import ModuleBase
-from SDK import TaskSound
-from SDK import TaskSpeak
+from sdk import ModuleBase
+from sdk import TaskSound
+from sdk import TaskSpeak
 
 class Clock(ModuleBase):
 	
@@ -59,13 +59,13 @@ class Clock(ModuleBase):
 				"description"	: ("Die akustische Anzeige der Uhrzeit erfolgt durch den "+
 									"angegebenen Klang."),
 				"default"		: "BellToll",
-				"choices"		: Globs.s_dictSettings["Sounds"],
+				"choices"		: globs.s_dictSettings["Sounds"],
 				"keyIsValue" 	: True
 			},
 			})
-		self.m_nSilenceFrom = Globs.getSetting("Clock", "nSilenceFrom", "\\d{1,2}", 19)
-		self.m_nSilenceTo = Globs.getSetting("Clock", "nSilenceTo", "\\d{1,2}", 6)
-		self.m_nTellTimeInt = Globs.getSetting("Clock", "nTellTimeInt", "\\d{1,2}", 30)
+		self.m_nSilenceFrom = globs.getSetting("Clock", "nSilenceFrom", "\\d{1,2}", 19)
+		self.m_nSilenceTo = globs.getSetting("Clock", "nSilenceTo", "\\d{1,2}", 6)
+		self.m_nTellTimeInt = globs.getSetting("Clock", "nTellTimeInt", "\\d{1,2}", 30)
 		return True
 		
 	def moduleExec(self,
@@ -86,7 +86,7 @@ class Clock(ModuleBase):
 			if (strCmd == "timer" and lstArg and lstArg[0] == "cron"):
 				self.updateTime()
 				# Default: Aktustische Zeitanzeige
-				if Globs.getSetting("System", "bTestMode", "True|False", False):
+				if globs.getSetting("System", "bTestMode", "True|False", False):
 					TaskSpeak(self.getWorker(), "Entschuldigung. Test.").start()
 					self.gong()
 					self.speakTime()
@@ -152,9 +152,9 @@ class Clock(ModuleBase):
 		self.m_nHour12h = int(time.strftime("%I"))
 		self.m_nMinutes = int(time.strftime("%M"))
 		self.m_nTimeSpoken = 0
-		self.m_nSilenceFrom = Globs.getSetting("Clock", "nSilenceFrom", "\\d{1,2}", 19)
-		self.m_nSilenceTo = Globs.getSetting("Clock", "nSilenceTo", "\\d{1,2}", 6)
-		self.m_nTellTimeInt = Globs.getSetting("Clock", "nTellTimeInt", "\\d{1,2}", 30)
+		self.m_nSilenceFrom = globs.getSetting("Clock", "nSilenceFrom", "\\d{1,2}", 19)
+		self.m_nSilenceTo = globs.getSetting("Clock", "nSilenceTo", "\\d{1,2}", 6)
+		self.m_nTellTimeInt = globs.getSetting("Clock", "nTellTimeInt", "\\d{1,2}", 30)
 		return
 	
 	# Glockenschlag
@@ -168,12 +168,12 @@ class Clock(ModuleBase):
 			else:
 				nCount = int(self.m_nMinutes / 15)
 		# Testmodus berücksichtigen
-		if (nCount == 0 and Globs.getSetting("System", "bTestMode", "True|False", False)):
+		if (nCount == 0 and globs.getSetting("System", "bTestMode", "True|False", False)):
 			nCount = 1
-		# Ggf. Sound abspielen
+		# Ggf. Ssoundabspielen
 		if (nCount >= 1):
 			TaskSound(self.getWorker(),
-				Globs.getSetting("Clock", "strSoundHour", ".+", "BellToll"),
+				globs.getSetting("Clock", "strSoundHour", ".+", "BellToll"),
 				nLoops = nCount).start()
 		return
 	

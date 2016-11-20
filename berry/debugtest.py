@@ -1,9 +1,9 @@
 ﻿#import ptvsd
 #ptvsd.enable_attach("debug")
 
-import SDK
-
 import threading
+import globs
+import sdk
 
 def main():
 	global nCount
@@ -29,15 +29,7 @@ def onTimer():
 if __name__ == '__main__':
 #	main()
 	pass
-	print("SDK-Tests:")
-	print("SDK.getAlsaControlValue() ...")
-	output = SDK.getAlsaControlValue("PCM Playback Volume")
-	print(output);
-	
-	print("SDK.setAlsaControlValue() ...")
-	
-	bOk, strValue = SDK.setAlsaControlValue("PCM Playback Volume", "400");
-	if (bOk):
-		print("OK, "+strValue)
-	else:
-		print("FAILED")
+	sdk.fetchImapEmail(
+		"imap.gmail.com",
+		"ed303239@gmail.com",
+		"RasPyWeb geht online")

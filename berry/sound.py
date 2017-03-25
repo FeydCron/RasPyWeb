@@ -111,7 +111,7 @@ class Sound:
 			if re.match(".*\\.[Ww][Aa][Vv]", strFile):
 				strPlay = "aplay"
 			elif re.match(".*\\.[Mm][Pp]3", strFile):
-				strPlay = "omxplayer"
+				strPlay = "omxplayer -o both"
 			else:
 				globs.wrn("Das Format der Sound-Datei wird nicht unterstützt: '%s'" % (strFile))
 				print("\\a")

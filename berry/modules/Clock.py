@@ -15,6 +15,7 @@ class Clock(ModuleBase):
 			"nSilenceTo" : 6,
 			"nTellTimeInt" : 30,
 			"strSoundHour" : "BellToll",
+			"bPlayOnce" : False,
 		}
 		if (not dictModCfg):
 			dictModCfg.update(dictSettings)
@@ -61,6 +62,16 @@ class Clock(ModuleBase):
 				"default"		: "BellToll",
 				"choices"		: globs.s_dictSettings["Sounds"],
 				"keyIsValue" 	: True
+			},
+			"bPlayOnce" : {
+				"title"			: "Einmaliges Abspielen",
+				"description"	: ("Der Klang kann als Stundenschlag entsprechend der "+
+									"Stunde oder nur einmalig als Melodie gespielt werden."),
+				"default"		: False,
+				"choices"		: {
+					"Melodie"		: True,
+					"Stundenschlag"	: False
+				}
 			},
 			})
 		self.m_nSilenceFrom = globs.getSetting("Clock", "nSilenceFrom", "\\d{1,2}", 19)
@@ -172,6 +183,8 @@ class Clock(ModuleBase):
 			nCount = 1
 		# Ggf. Ssoundabspielen
 		if (nCount >= 1):
+			if (globs.getSetting("Clock", "bPlayOnce", "True|False", False)):
+				nCount = 1
 			TaskSound(self.getWorker(),
 				globs.getSetting("Clock", "strSoundHour", ".+", "BellToll"),
 				nLoops = nCount).start()

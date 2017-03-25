@@ -1,4 +1,3 @@
-import os
 import os.path
 import hashlib
 
@@ -26,8 +25,8 @@ class Voice:
 	#
 	def speak(self, strSpeak):
 		
-		hash = hashlib.md5(strSpeak.encode())
-		strFile = "/tmp/" + self.m_strLang + "_" + hash.hexdigest() + ".wav"
+		oHash = hashlib.md5(strSpeak.encode())
+		strFile = "/tmp/" + self.m_strLang + "_" + oHash.hexdigest() + ".wav"
 		
 		if not os.path.isfile(strFile):
 			os.system('pico2wave --lang=%s --wave=%s "%s"' %(self.m_strLang, strFile, strSpeak))

@@ -1,37 +1,11 @@
-import sys
-import traceback
-import time
 import threading
 import queue
-import traceback
 
-from Globs import Globs
-
-import SDK
-from SDK import FastTask
-from SDK import LongTask
-from SDK import TaskSpeak
-
-class FutureTask(FastTask):
-
-	def __init__(self, oWorker):	
-		super(FutureTask, self).__init__(oWorker)
-		self.m_evtDone = threading.Event()
-		self.m_evtDone.clear()
-		return
-		
-	def __str__(self):
-		strDesc = "Warten auf die Fertigstellung einer Aufgabe"
-		return  strDesc
-	
-	def done(self, bResult = True):
-		self.m_oWorker.m_oQueueFast.task_done()
-		self.m_evtDone.set()
-		return
-		
-	def wait(self):
-		self.m_evtDone.wait()
-		return
+import globs
+import sdk
+from sdk import LongTask
+from sdk import FastTask
+from sdk import TaskSpeak
 
 class TaskInit(LongTask):
 	
@@ -59,12 +33,12 @@ class TaskExit(FastTask):
 		return  strDesc
 	
 	def do(self):
-		Globs.s_strExitMode = self.m_strMode
+		globs.s_strExitMode = self.m_strMode
 		for oInstance in self.m_oWorker.m_dictModules.values():
 			oInstance.moduleExit()
 		self.m_oWorker.m_dictModules.clear()
-		Globs.saveSettings()
-		Globs.shutdown()
+		globs.saveSettings()
+		globs.shutdown()
 		return
 		
 class TaskSystemWatchDog(FastTask):
@@ -86,15 +60,15 @@ class TaskSystemWatchDog(FastTask):
 		return  strDesc
 
 	def do(self):
-		fCpuTemp = SDK.getCpuTemp()
-		strCpuUse = SDK.getCpuUse().strip()
-		lstRamInfo = SDK.getRamInfo()
-		lstDiskSpace = SDK.getDiskSpace()
+		fCpuTemp = sdk.getCpuTemp()
+		strCpuUse = sdk.getCpuUse().strip()
+		lstRamInfo = sdk.getRamInfo()
+		lstDiskSpace = sdk.getDiskSpace()
 
-		fCpuTempA = Globs.getSetting("System", "fCpuTempA", "\\d{2,}\\.\\d+", 60.0)
-		fCpuTempB = Globs.getSetting("System", "fCpuTempB", "\\d{2,}\\.\\d+", 56.0)
-		fCpuTempC = Globs.getSetting("System", "fCpuTempC", "\\d{2,}\\.\\d+", 53.0)
-		fCpuTempH = Globs.getSetting("System", "fCpuTempH", "\\d{2,}\\.\\d+", 1.0)
+		fCpuTempA = globs.getSetting("System", "fCpuTempA", "\\d{2,}\\.\\d+", 60.0)
+		fCpuTempB = globs.getSetting("System", "fCpuTempB", "\\d{2,}\\.\\d+", 56.0)
+		fCpuTempC = globs.getSetting("System", "fCpuTempC", "\\d{2,}\\.\\d+", 53.0)
+		fCpuTempH = globs.getSetting("System", "fCpuTempH", "\\d{2,}\\.\\d+", 1.0)
 
 		try:
 			fCpuUse = float(strCpuUse.replace(",", ".", 1))
@@ -102,8 +76,8 @@ class TaskSystemWatchDog(FastTask):
 			fCpuUse = 0.0
 		# IP-Adresse ermitteln
 		if not TaskSystemWatchDog.s_strIpAddr:
-			TaskSystemWatchDog.s_strIpAddr = SDK.getNetworkInfo(
-				Globs.getSetting("System", "strNetInfoName"))
+			TaskSystemWatchDog.s_strIpAddr = sdk.getNetworkInfo(
+				globs.getSetting("System", "strNetInfoName"))
 			if TaskSystemWatchDog.s_strIpAddr:
 				TaskSpeak(self.m_oWorker,
 				"Die aktuelle Netzwerkadresse ist: %s" % (
@@ -146,16 +120,16 @@ class TaskSystemWatchDog(FastTask):
 			TaskSystemWatchDog.s_fCpuUseAvg += fCpuUse
 			TaskSystemWatchDog.s_fCpuUseAvg /= 2.0
 		# Systemwerte vorbereiten
-		if "CPU" not in Globs.s_dictSystemValues:
-			Globs.s_dictSystemValues.update({"CPU" : {}})
-		if "RAM" not in Globs.s_dictSystemValues:
-			Globs.s_dictSystemValues.update({"Arbeitsspeicher" : {}})
-		if "MEM" not in Globs.s_dictSystemValues:
-			Globs.s_dictSystemValues.update({"Speicherkapazität" : {}})
-		if "Netzwerk" not in Globs.s_dictSystemValues:
-			Globs.s_dictSystemValues.update({"Netzwerk" : {}})
+		if "CPU" not in globs.s_dictSystemValues:
+			globs.s_dictSystemValues.update({"CPU" : {}})
+		if "RAM" not in globs.s_dictSystemValues:
+			globs.s_dictSystemValues.update({"Arbeitsspeicher" : {}})
+		if "MEM" not in globs.s_dictSystemValues:
+			globs.s_dictSystemValues.update({"Speicherkapazität" : {}})
+		if "Netzwerk" not in globs.s_dictSystemValues:
+			globs.s_dictSystemValues.update({"Netzwerk" : {}})
 		# Systemwerte eintragen
-		Globs.s_dictSystemValues["CPU"].update({
+		globs.s_dictSystemValues["CPU"].update({
 			"Auslastung"		: "%s%%" % (strCpuUse),
 			"Auslastung Min"	: "%0.2f%%" % (TaskSystemWatchDog.s_fCpuUseMin),
 			"Auslastung Max"	: "%0.2f%%" % (TaskSystemWatchDog.s_fCpuUseMax),
@@ -164,18 +138,18 @@ class TaskSystemWatchDog(FastTask):
 			"Temperatur Min"	: "%0.2f°C" % (TaskSystemWatchDog.s_fCpuTempMin),
 			"Temperatur Max"	: "%0.2f°C" % (TaskSystemWatchDog.s_fCpuTempMax),
 			"Temperatur Avg"	: "%0.2f°C" % (TaskSystemWatchDog.s_fCpuTempAvg),})
-		Globs.s_dictSystemValues["Netzwerk"].update({
+		globs.s_dictSystemValues["Netzwerk"].update({
 			"IP-Adresse"		: "%s" % (TaskSystemWatchDog.s_strIpAddr),})
 		lstLabels = ["Gesamt", "Belegt", "Frei", "Geteilt", "Gepuffert", "Im Cache"]
 		nIndex = 0
 		for strData in lstRamInfo:
-			Globs.s_dictSystemValues["RAM"].update({
+			globs.s_dictSystemValues["RAM"].update({
 			lstLabels[nIndex]	: strData + "K"})
 			nIndex += 1
 		lstLabels = ["Gesamt", "Belegt", "Verfügbar", "Belegung"]
 		nIndex = 0
 		for strData in lstDiskSpace:
-			Globs.s_dictSystemValues["MEM"].update({
+			globs.s_dictSystemValues["MEM"].update({
 			lstLabels[nIndex]	: strData})
 			nIndex += 1
 		# Nächsten Durchlauf einplanen
@@ -196,7 +170,7 @@ class TaskSystemWatchDog(FastTask):
 			if (TaskSystemWatchDog.s_nCpuTooHot >= 10):
 				TaskSpeak(self.m_oWorker, "Notabschaltung eingeleitet!").start()
 				TaskExit(self.m_oWorker, "term").start()
-				Globs.stop()
+				globs.stop()
 			else:
 				TaskSpeak(self.m_oWorker,
 					"Für Abkühlung sorgen! Notabschaltung %s Prozent!" % (
@@ -251,9 +225,9 @@ class TaskLoadSettings(FastTask):
 		return  strDesc
 
 	def do(self):
-		Globs.loadSettings()
+		globs.loadSettings()
 		self.m_oWorker.m_evtInit.set()
-		for strComponent in Globs.s_dictSettings["dictModules"].keys():
+		for strComponent in globs.s_dictSettings["dictModules"].keys():
 			TaskModuleInit(self.m_oWorker, strComponent).start()
 		return
 		
@@ -276,65 +250,65 @@ class TaskModuleInit(FastTask):
 			oInstance.moduleExit()
 			del oInstance
 			bUnloaded = True
-		if (self.m_strComponent in Globs.s_dictSettings["dictModules"] and
-			self.m_strComponent not in Globs.s_dictSettings["listInactiveModules"]):
+		if (self.m_strComponent in globs.s_dictSettings["dictModules"] and
+			self.m_strComponent not in globs.s_dictSettings["listInactiveModules"]):
 			# Klasse des Moduls laden
-			clsModule = Globs.importComponent("modules." + self.m_strComponent,
-				Globs.s_dictSettings["dictModules"][self.m_strComponent])
+			clsModule = globs.importComponent("modules." + self.m_strComponent,
+				globs.s_dictSettings["dictModules"][self.m_strComponent])
 			if not clsModule:
 				strMsg = "Das Modul %s kann nicht geladen werden. Wahrscheinlich sind die Einstellungen falsch." % (
 					self.m_strComponent)
-				Globs.wrn(strMsg)
+				globs.wrn(strMsg)
 				TaskSpeak(self.m_oWorker, strMsg).start()
 				return
 			# Module instanziieren
 			oInstance = clsModule(self.m_oWorker)
 			del clsModule
 			# >>> Critical Section
-			Globs.s_oSettingsLock.acquire()
-			if self.m_strComponent not in Globs.s_dictSettings:
-				Globs.s_dictSettings.update({self.m_strComponent : {}})
-			dictModCfg = Globs.s_dictSettings[self.m_strComponent]
-			Globs.s_oSettingsLock.release()
+			globs.s_oSettingsLock.acquire()
+			if self.m_strComponent not in globs.s_dictSettings:
+				globs.s_dictSettings.update({self.m_strComponent : {}})
+			dictModCfg = globs.s_dictSettings[self.m_strComponent]
+			globs.s_oSettingsLock.release()
 			# <<< Critical Section
 			dictCfgUsr = {}
 			try:
 				if not oInstance.moduleInit(dictModCfg=dictModCfg, dictCfgUsr=dictCfgUsr):
 					strMsg = "Das Modul %s konnte nicht initialisiert werden." % (self.m_strComponent)
-					Globs.wrn(strMsg)
+					globs.wrn(strMsg)
 					TaskSpeak(self.m_oWorker, strMsg).start()
 					return
 			except:
-				Globs.exc("Verwalten des Moduls %s" % (self.m_strComponent))
+				globs.exc("Verwalten des Moduls %s" % (self.m_strComponent))
 				strMsg = "Das Modul %s konnte nicht initialisiert werden. Wahrscheinlich ist es veraltet und nicht mehr kompatibel." % (
 					self.m_strComponent)
-				Globs.wrn(strMsg)
+				globs.wrn(strMsg)
 				TaskSpeak(self.m_oWorker, strMsg).start()
 				return
 			# Module registrieren
 			self.m_oWorker.m_dictModules.update({self.m_strComponent : oInstance})
-			Globs.s_dictUserSettings.update({self.m_strComponent : dictCfgUsr})
+			globs.s_dictUserSettings.update({self.m_strComponent : dictCfgUsr})
 			return
-		if (self.m_strComponent not in Globs.s_dictSettings["dictModules"]):
+		if (self.m_strComponent not in globs.s_dictSettings["dictModules"]):
 			# >>> Critical Section
-			Globs.s_oSettingsLock.acquire()
-			if self.m_strComponent in Globs.s_dictSettings:
-				Globs.s_dictSettings.pop(self.m_strComponent)
-			if self.m_strComponent in Globs.s_dictUserSettings:
-				Globs.s_dictUserSettings.pop(self.m_strComponent)
-			Globs.s_oSettingsLock.release()
+			globs.s_oSettingsLock.acquire()
+			if self.m_strComponent in globs.s_dictSettings:
+				globs.s_dictSettings.pop(self.m_strComponent)
+			if self.m_strComponent in globs.s_dictUserSettings:
+				globs.s_dictUserSettings.pop(self.m_strComponent)
+			globs.s_oSettingsLock.release()
 			# <<< Critical Section
 			strMsg = "Das Modul %s wurde dauerhaft entfernt." % (self.m_strComponent)
-			Globs.log(strMsg)
+			globs.log(strMsg)
 			TaskSpeak(self.m_oWorker, strMsg).start()
 			return
 		strMsg = "Das Modul %s wurde ausgeschaltet" % (self.m_strComponent)
 		if (bUnloaded):
 			strMsg += " und entladen"
 		strMsg += "."
-		Globs.log(strMsg)
+		globs.log(strMsg)
 		TaskSpeak(self.m_oWorker, strMsg).start()
-		Globs.log(strMsg)
+		globs.log(strMsg)
 		return
 		
 class TaskQueueFastStop(FastTask):
@@ -384,13 +358,13 @@ class Worker:
 	def runSystemWatchDog(self):
 		self.m_oWatchDogTimer = threading.Timer(
 			10.0, self.onRunSystemWatchDog).start()
-		Globs.dbg("Systemüberwachung: Nächste Prüfung eingeplant (%s)" % (
+		globs.dbg("Systemüberwachung: Nächste Prüfung eingeplant (%s)" % (
 			self.m_oWatchDogTimer))
 		return
 	
 	def fastThreadProc(self):
 		self.m_bIsQueueFastShutdown = False
-		Globs.log("Leichte Aufgabenbearbeitung: Gestartet")
+		globs.log("Leichte Aufgabenbearbeitung: Gestartet")
 		while True:
 			bDone = False
 			try:
@@ -398,21 +372,21 @@ class Worker:
 					block = not self.m_bIsQueueFastShutdown)
 			except:
 				# Abbruchbedingung für "do-while"
-				Globs.log("Leichte Aufgabenbearbeitung: Abbruchbedingung")
+				globs.log("Leichte Aufgabenbearbeitung: Abbruchbedingung")
 				break
-			Globs.dbg("Leichte Aufgabenbearbeitung: %s" % (oTask))
+			globs.dbg("Leichte Aufgabenbearbeitung: %s" % (oTask))
 			try:
 				oTask.do()
 				bDone = True
 			except:
-				Globs.exc("Leichte Aufgabenbearbeitung: %s" % (oTask))
+				globs.exc("Leichte Aufgabenbearbeitung: %s" % (oTask))
 			oTask.done(bResult = bDone)
-		Globs.log("Leichte Aufgabenbearbeitung: Beendet")
+		globs.log("Leichte Aufgabenbearbeitung: Beendet")
 		return
 		
 	def longThreadProc(self):
 		self.m_bIsQueueLongShutdown = False
-		Globs.log("Schwere Aufgabenbearbeitung: Gestartet")
+		globs.log("Schwere Aufgabenbearbeitung: Gestartet")
 		while True:
 			bDone = False
 			try:
@@ -420,23 +394,23 @@ class Worker:
 					block = not self.m_bIsQueueLongShutdown)
 			except:
 				# Abbruchbedingung für "do-while"
-				Globs.log("Schwere Aufgabenbearbeitung: Abbruchbedingung")
+				globs.log("Schwere Aufgabenbearbeitung: Abbruchbedingung")
 				break
-			Globs.dbg("Schwere Aufgabenbearbeitung: %s" % (oTask))
+			globs.dbg("Schwere Aufgabenbearbeitung: %s" % (oTask))
 			try:
 				oTask.do()
 				bDone = True
 			except:
-				Globs.exc("Schwere Aufgabenbearbeitung: %s" % (oTask))
-			oTask.done()
-		Globs.log("Schwere Aufgabenbearbeitung: Beendet")
+				globs.exc("Schwere Aufgabenbearbeitung: %s" % (oTask))
+			oTask.done(bResult = bDone)
+		globs.log("Schwere Aufgabenbearbeitung: Beendet")
 		return
 	
 	def startQueue(self):
-		Globs.dbg("Start Aufgabenbearbeitung: Warten auf Freigabe")
+		globs.dbg("Start Aufgabenbearbeitung: Warten auf Freigabe")
 		# >>> Critical Section
 		self.m_oLock.acquire()
-		Globs.dbg("Start Aufgabenbearbeitung: Freigabe erhalten")
+		globs.dbg("Start Aufgabenbearbeitung: Freigabe erhalten")
 		self.m_oThreadFast = threading.Thread(target=self.fastThreadProc)
 		self.m_oThreadFast.daemon = True
 		self.m_oThreadLong = threading.Thread(target=self.longThreadProc)
@@ -446,28 +420,28 @@ class Worker:
 		self.m_oThreadFast.start()
 		self.m_oThreadLong.start()
 		self.m_evtRunning.set()
-		Globs.dbg("Start Aufgabenbearbeitung: Freigabe abgeben")
+		globs.dbg("Start Aufgabenbearbeitung: Freigabe abgeben")
 		self.m_oLock.release()
 		# <<< Critical Section
 		TaskInit(self).start()
 		# Synchronization Point (Initialisation)
-		Globs.dbg("Start Aufgabenbearbeitung: Warten auf Initialisierung")
+		globs.dbg("Start Aufgabenbearbeitung: Warten auf Initialisierung")
 		self.m_evtInit.wait()
-		Globs.dbg("Start Aufgabenbearbeitung: Initialisierung abgeschlossen")
+		globs.dbg("Start Aufgabenbearbeitung: Initialisierung abgeschlossen")
 		# Set up cyclic monitoring of system values
-		Globs.dbg("Start Aufgabenbearbeitung: Systemüberwachung starten")
+		globs.dbg("Start Aufgabenbearbeitung: Systemüberwachung starten")
 		TaskSystemWatchDog(self).start()
 		return
 	
 	def stopQueue(self):
 		bResult = True
 		if not self.m_evtRunning.isSet:
-			Globs.log("Stop Aufgabenbearbeitung: Wurde bereits angefordert")
+			globs.log("Stop Aufgabenbearbeitung: Wurde bereits angefordert")
 			return bResult
-		Globs.dbg("Stop Aufgabenbearbeitung: Warten auf Freigabe")
+		globs.dbg("Stop Aufgabenbearbeitung: Warten auf Freigabe")
 		# >>> Critical Section
 		self.m_oLock.acquire()
-		Globs.dbg("Stop Aufgabenbearbeitung: Freigabe erhalten")
+		globs.dbg("Stop Aufgabenbearbeitung: Freigabe erhalten")
 		if self.m_oWatchDogTimer:
 			self.m_oWatchDogTimer.cancel()
 			self.m_oWatchDogTimer = None
@@ -478,29 +452,29 @@ class Worker:
 		self.m_evtRunning.clear()
 		self.m_oLock.release()
 		# <<< Critical Section
-		Globs.dbg("Stop Aufgabenbearbeitung: Freigabe abgegeben")
+		globs.dbg("Stop Aufgabenbearbeitung: Freigabe abgegeben")
 		if (self.m_oThreadFast):
 			# Synchronization Point (Fast Thread Termination)
-			Globs.dbg("Stop Aufgabenbearbeitung: Warten auf leichte Bearbeitung")
+			globs.dbg("Stop Aufgabenbearbeitung: Warten auf leichte Bearbeitung")
 			self.m_oThreadFast.join(20.0)
 			if self.m_oThreadFast.is_alive():
-				Globs.err("Stop Aufgabenbearbeitung: Leichte Bearbeitung nicht beendet")
+				globs.err("Stop Aufgabenbearbeitung: Leichte Bearbeitung nicht beendet")
 				bResult = False
 			else:
-				Globs.dbg("Stop Aufgabenbearbeitung: Leichte Bearbeitung beendet")
+				globs.dbg("Stop Aufgabenbearbeitung: Leichte Bearbeitung beendet")
 				self.m_oQueueFast = None
 			self.m_oThreadFast = None
 		if (self.m_oThreadLong):
 			# Synchronization Point (Long Thread Termination)
-			Globs.dbg("Stop Aufgabenbearbeitung: Warten auf schwere Bearbeitung")
+			globs.dbg("Stop Aufgabenbearbeitung: Warten auf schwere Bearbeitung")
 			self.m_oThreadLong.join(60.0)
 			if self.m_oThreadLong.is_alive():
-				Globs.err("Stop Aufgabenbearbeitung: Schwere Bearbeitung nicht beendet")
+				globs.err("Stop Aufgabenbearbeitung: Schwere Bearbeitung nicht beendet")
 				bResult = False
 			else:
-				Globs.dbg("Stop Aufgabenbearbeitung: Schwere Bearbeitung beendet")
+				globs.dbg("Stop Aufgabenbearbeitung: Schwere Bearbeitung beendet")
 				self.m_oQueueLong = None
 			self.m_oThreadLong = None
-		Globs.dbg("Stop Aufgabenbearbeitung: Abgeschlossen (%r)" % (bResult))
+		globs.dbg("Stop Aufgabenbearbeitung: Abgeschlossen (%r)" % (bResult))
 		return bResult
 	

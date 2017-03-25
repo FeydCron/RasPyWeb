@@ -4,22 +4,20 @@
 #  @file Test.py
 #  @brief Plug-In für Testzwecke.
 #  
-import os
-import sys
 
-from Globs import Globs
+import globs
 
-import SDK
-from SDK import ModuleBase
-from SDK import TaskSpeak
+import sdk
+from sdk import ModuleBase
+from sdk import TaskSpeak
 
 class Test(ModuleBase):
 	
 	## 
-	#  @copydoc SDK::ModuleBase::moduleInit
+	#  @copydoc sdk::ModuleBase::moduleInit
 	#  
 	def moduleInit(self, dictModCfg=None, dictCfgUsr=None):
-		print("%r::moduleInit(%s) Version 5" % (self, SDK.getCpuTemp()))
+		print("%r::moduleInit(%s) Version 5" % (self, sdk.getCpuTemp()))
 		return True
 	
 	## 
@@ -33,6 +31,14 @@ class Test(ModuleBase):
 	def moduleExit(self):
 		print("%r::moduleExit()" % (self))
 		return True
+	
+	
+	#==============================================================================
+	# moduleWidget
+	#==============================================================================
+	def moduleWidget(self):
+		pass
+	
 
 	## 
 	#  @brief Ausführung der Modulaktion.
@@ -68,44 +74,44 @@ class Test(ModuleBase):
 					if (strArg == "hysterese"):
 						TaskSpeak(self.getWorker(), "Der Modultest für die Temperaturüberwachung der CPU wird vorbereitet").start()
 						
-						fCpuTempA = Globs.getSetting("System", "fCpuTempA", "\\d{2,}\\.\\d+", 60.0)
-						fCpuTempB = Globs.getSetting("System", "fCpuTempB", "\\d{2,}\\.\\d+", 56.0)
-						fCpuTempC = Globs.getSetting("System", "fCpuTempC", "\\d{2,}\\.\\d+", 53.0)
-						fCpuTempH = Globs.getSetting("System", "fCpuTempH", "\\d{2,}\\.\\d+", 1.0)
+						fCpuTempA = globs.getSetting("System", "fCpuTempA", "\\d{2,}\\.\\d+", 60.0)
+						fCpuTempB = globs.getSetting("System", "fCpuTempB", "\\d{2,}\\.\\d+", 56.0)
+						fCpuTempC = globs.getSetting("System", "fCpuTempC", "\\d{2,}\\.\\d+", 53.0)
+						fCpuTempH = globs.getSetting("System", "fCpuTempH", "\\d{2,}\\.\\d+", 1.0)
 
 						fCpuTempStep = fCpuTempH / 2.0
 						fCpuTempDir = 1.0
-						fCpuTempBase = SDK.getCpuTemp()
+						fCpuTempBase = sdk.getCpuTemp()
 						fCpuTemp = fCpuTempBase
 						fCpuTempHyst = fCpuTempH * 2.0
 						nHysTest = 0
 
-						Globs.s_oQueueTestCpuTempValues.put(fCpuTemp, block=False)
+						globs.s_oQueueTestCpuTempValues.put(fCpuTemp, block=False)
 
 						# Erst steigende, dann sinkende Temperaturen
 						while (fCpuTemp >= (fCpuTempC - (fCpuTempHyst * 2.0))):
 							fCpuTemp += (fCpuTempStep * fCpuTempDir)
-							Globs.s_oQueueTestCpuTempValues.put(fCpuTemp, block=False)
+							globs.s_oQueueTestCpuTempValues.put(fCpuTemp, block=False)
 							
 							# Erste Hysterese testen
 							if (fCpuTemp > (fCpuTempC + fCpuTempHyst) and nHysTest == 0):
 								while (fCpuTemp > (fCpuTempC - fCpuTempHyst)):
 									fCpuTemp -= fCpuTempStep
-									Globs.s_oQueueTestCpuTempValues.put(fCpuTemp, block=False)
+									globs.s_oQueueTestCpuTempValues.put(fCpuTemp, block=False)
 								nHysTest += 1
 
 							# Zweite Hysterese testen
 							if (fCpuTemp > (fCpuTempB + fCpuTempHyst) and nHysTest == 1):
 								while (fCpuTemp > (fCpuTempB - fCpuTempHyst)):
 									fCpuTemp -= fCpuTempStep
-									Globs.s_oQueueTestCpuTempValues.put(fCpuTemp, block=False)
+									globs.s_oQueueTestCpuTempValues.put(fCpuTemp, block=False)
 								nHysTest += 1
 
 							# Dritte Hysterese testen
 							if (fCpuTemp > (fCpuTempA + fCpuTempHyst) and nHysTest == 2):
 								while (fCpuTemp > (fCpuTempA - fCpuTempHyst)):
 									fCpuTemp -= fCpuTempStep
-									Globs.s_oQueueTestCpuTempValues.put(fCpuTemp, block=False)
+									globs.s_oQueueTestCpuTempValues.put(fCpuTemp, block=False)
 								nHysTest += 1
 
 							# Temperaturrichtung umkehren

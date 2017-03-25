@@ -6,8 +6,8 @@ import RPi.GPIO as IO
 from threading import Thread
 from subprocess import call
 
-import SDK
-from SDK import ModuleBase
+import sdk
+from sdk import ModuleBase
 
 VERBOSE = 0
 
@@ -223,7 +223,7 @@ def heartBeat():
 		on=0.5
 		#getCPUuse()
 		#off=(((60.0/(getCpuTemp()-20)))*1.5)-on
-		off=(60.0/SDK.getCpuTemp())-on
+		off=(60.0/sdk.getCpuTemp())-on
 		if(off>0.0):
 			IO.output(QBerry,0)
 			time.sleep(off)

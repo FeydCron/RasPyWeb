@@ -6,7 +6,6 @@
 #  
 import os
 import re
-import sys
 import tempfile
 import time
 import zipfile
@@ -17,16 +16,14 @@ from zipfile import ZipFile
 from io import BytesIO
 from collections import OrderedDict
 
-from Globs import Globs
+import globs
 
-import SDK
-from SDK import ModuleBase
-from SDK import WebClient
-from SDK import WebResponse
-from SDK import TaskSpeak
-from SDK import TaskModuleEvt
+from sdk import ModuleBase
+from sdk import WebClient
+from sdk import TaskSpeak
+from sdk import TaskModuleEvt
 
-from Worker import TaskExit
+from worker import TaskExit
 
 class Updater(ModuleBase):
 	
@@ -35,7 +32,7 @@ class Updater(ModuleBase):
 	s_strPrefix = "RasPyWeb-latest/berry/"
 	
 	## 
-	#  @copydoc SDK::ModuleBase::moduleInit
+	#  @copydoc sdk::ModuleBase::moduleInit
 	#  
 	def moduleInit(self, dictModCfg={}, dictCfgUsr={}):
 		dictSettings = {
@@ -127,7 +124,7 @@ class Updater(ModuleBase):
 				"default"		: None,
 				"showlink"		: True
 			},
-			})
+		})
 		self.updateContext()
 		return True
 	
@@ -184,7 +181,6 @@ class Updater(ModuleBase):
 			return False
 			
 		# Zyklische Prüfung
-		bResult = False
 		bCheck = False
 		bFetch = False
 		bSetup = False
@@ -196,22 +192,22 @@ class Updater(ModuleBase):
 				bCheck = True
 				break
 			if (strCmd == "token" and self.m_strDownloadToken in lstArg):
-				if (self.m_fChkVersion <= Globs.getVersion()):
+				if (self.m_fChkVersion <= globs.getVersion()):
 					# Jetzt auf Aktualisierung prüfen!
-					Globs.log("Jetzt auf Aktualisierung prüfen.")
+					globs.log("Jetzt auf Aktualisierung prüfen.")
 					bCheck = True
 					break
-				if (self.m_fChkVersion > Globs.getVersion()):
+				if (self.m_fChkVersion > globs.getVersion()):
 					# Jetzt Aktualisierung herunterladen!
-					Globs.log("Jetzt Aktualisierung herunterladen.")
+					globs.log("Jetzt Aktualisierung herunterladen.")
 					bFetch = True
 					break
 			if (strCmd == "token" and self.m_strUpdateToken in lstArg):
 				# Jetzt ausstehende Installation ausführen!
-				Globs.log("Jetzt ausstehende Installation ausführen.")
+				globs.log("Jetzt ausstehende Installation ausführen.")
 				bSetup = True
 				break
-			Globs.log("Keine Funktion mit Cmd=%s und Arg=%s" % (strCmd, lstArg))
+			globs.log("Keine Funktion mit Cmd=%s und Arg=%s" % (strCmd, lstArg))
 
 		if bCheck or bFetch or bSetup:
 			# Aktualisierung verfügbar?
@@ -254,7 +250,7 @@ class Updater(ModuleBase):
 		dictQuery,
 		dictForm):
 		
-		Globs.log("Updater::serveHtmlPage()")
+		globs.log("Updater::serveHtmlPage()")
 		
 		if (dictQuery and "token" in dictQuery):
 			if (self.m_strUploadToken in dictQuery["token"]):
@@ -324,7 +320,7 @@ class Updater(ModuleBase):
 			
 		# Wenn die automatische Installation von Aktualisierungen deaktiviert wurde und eine neuere
 		# Version bereitgestellt wurde, dann anbieten, die Installation anzufordern.
-		if ((not self.m_bAutoReboot) and (self.m_fUpdVersion > Globs.getVersion())):
+		if ((not self.m_bAutoReboot) and (self.m_fUpdVersion > globs.getVersion())):
 			oHtmlPage.createBox(
 				"Systemaktualisierung",
 				"Die automatische Installation von Aktualisierungen ist ausgeschaltet aber es "+
@@ -332,7 +328,7 @@ class Updater(ModuleBase):
 				strType="warning", bClose=False)
 			oHtmlPage.createText(
 				"Derzeit ist die Version %s installiert und Version %s steht bereit" % (
-					Globs.getVersion(), self.m_fUpdVersion))
+					globs.getVersion(), self.m_fUpdVersion))
 			oHtmlPage.createButton(
 				"Jetzt installieren",
 				strClass="ym-warning",
@@ -342,7 +338,7 @@ class Updater(ModuleBase):
 		
 		# Wenn das automatische Herunterladen von Aktualisierungen deaktiviert wurde und online
 		# eine neuere Version zur Verfügung steht, dann anbieten, das Herunterladen anzufordern. 
-		if ((not self.m_bAutoUpdate) and (self.m_fChkVersion > Globs.getVersion())):
+		if ((not self.m_bAutoUpdate) and (self.m_fChkVersion > globs.getVersion())):
 			oHtmlPage.createBox(
 				"Systemaktualisierung",
 				"Das automatische Herunterladen von Aktualisierungen ist ausgeschaltet aber es "+
@@ -350,7 +346,7 @@ class Updater(ModuleBase):
 				strType="warning", bClose=False)
 			oHtmlPage.createText(
 				"Derzeit ist die Version %s installiert und Version %s ist verfügbar." % (
-					Globs.getVersion(), self.m_fChkVersion))
+					globs.getVersion(), self.m_fChkVersion))
 			oHtmlPage.createButton(
 				"Jetzt herunterladen",
 				strClass="ym-warning",
@@ -359,7 +355,7 @@ class Updater(ModuleBase):
 			return True
 			
 		# Wenn eine neuere Version bereitsteht, die Versionsinformationen anzeigen
-		if (self.m_fUpdVersion > Globs.getVersion()):
+		if (self.m_fUpdVersion > globs.getVersion()):
 			oHtmlPage.createBox(
 				"Systemaktualisierung",
 				"Es steht eine neuere Version zur Installation bereit, die zum nächsten "+
@@ -367,7 +363,7 @@ class Updater(ModuleBase):
 				strType="info", bClose=False)
 			oHtmlPage.createText(
 				"Derzeit ist die Version %s installiert und Version %s steht bereit" % (
-					Globs.getVersion(), self.m_fUpdVersion))
+					globs.getVersion(), self.m_fUpdVersion))
 			oHtmlPage.createButton(
 				"Aktualisierung hochladen",
 				strHRef="/modules/Updater.html?token=%s" % (self.m_strUploadToken))
@@ -375,7 +371,7 @@ class Updater(ModuleBase):
 			return True
 		
 		# Wenn eine neuere Version gefunden wurde, die Versionsinformationen anzeigen
-		if (self.m_fChkVersion > Globs.getVersion()):
+		if (self.m_fChkVersion > globs.getVersion()):
 			oHtmlPage.createBox(
 				"Systemaktualisierung",
 				"Es steht eine neuere Version zum Herunterladen bereit, die zum nächsten "+
@@ -383,7 +379,7 @@ class Updater(ModuleBase):
 				strType="info", bClose=False)
 			oHtmlPage.createText(
 				"Derzeit ist die Version %s installiert und Version %s ist verfügbar." % (
-					Globs.getVersion(), self.m_fChkVersion))
+					globs.getVersion(), self.m_fChkVersion))
 			oHtmlPage.createButton(
 				"Aktualisierung hochladen",
 				strHRef="/modules/Updater.html?token=%s" % (self.m_strUploadToken))
@@ -391,13 +387,13 @@ class Updater(ModuleBase):
 			return True
 		
 		# Es ist keine Aktualisierung verfügbar
-		if (self.m_fChkVersion == Globs.getVersion()):
+		if (self.m_fChkVersion == globs.getVersion()):
 			oHtmlPage.createBox(
 				"Systemaktualisierung",
 				"Das System ist auf dem aktuellen Stand. Es sind keine Aktualisierungen verfügbar.",
 				strType="success", bClose=False)
 			oHtmlPage.createText(
-				"Derzeit ist die Version %s installiert." % (Globs.getVersion()))
+				"Derzeit ist die Version %s installiert." % (globs.getVersion()))
 			oHtmlPage.createButton(
 				"Aktualisierung suchen",
 				strHRef="/modules/Updater.html?token=%s" % (self.m_strDownloadToken))
@@ -413,7 +409,7 @@ class Updater(ModuleBase):
 			"Es wurde noch nicht nach Aktualisierungen gesucht.",
 			strType="info", bClose=False)
 		oHtmlPage.createText(
-			"Derzeit ist die Version %s installiert." % (Globs.getVersion()))
+			"Derzeit ist die Version %s installiert." % (globs.getVersion()))
 		oHtmlPage.createButton(
 			"Aktualisierung suchen",
 			strHRef="/modules/Updater.html?token=%s" % (self.m_strDownloadToken))
@@ -428,30 +424,29 @@ class Updater(ModuleBase):
 		self.m_nHour24h = int(time.strftime("%H"))
 		self.m_nMinutes = int(time.strftime("%M"))
 		
-		self.m_nUpdateHour = Globs.getSetting("Updater", "nUpdateHour", "\\d{1,2}", 1)
-		self.m_bAutoUpdate = Globs.getSetting("Updater", "bAutoUpdate", "True|False", False)
-		self.m_bAutoReboot = Globs.getSetting("Updater", "bAutoReboot", "True|False", False)
-		self.m_strSystemUrl = Globs.getSetting("Updater", "strSystemUrl",
+		self.m_nUpdateHour = globs.getSetting("Updater", "nUpdateHour", "\\d{1,2}", 1)
+		self.m_bAutoUpdate = globs.getSetting("Updater", "bAutoUpdate", "True|False", False)
+		self.m_bAutoReboot = globs.getSetting("Updater", "bAutoReboot", "True|False", False)
+		self.m_strSystemUrl = globs.getSetting("Updater", "strSystemUrl",
 			"[Hh][Tt][Tt][Pp][Ss]+\\://.+/.+", "")
-		self.m_strChkUpdUrl = Globs.getSetting("Updater", "strChkUpdUrl",
+		self.m_strChkUpdUrl = globs.getSetting("Updater", "strChkUpdUrl",
 			"[Hh][Tt][Tt][Pp][Ss]+\\://.+/.+", "")
 			
-		Globs.setSetting("Updater", "fChkVersion", self.m_fChkVersion)
+		globs.setSetting("Updater", "fChkVersion", self.m_fChkVersion)
 		return
 		
 	def doCheckUpdate(self):
 		oClient = WebClient()
-		oResp = None
 		
 		if (not self.m_strChkUpdUrl):
-			Globs.err("Die URL für die Aktualisierungsinformation ('%s') ist ungültig" % (
+			globs.err("Die URL für die Aktualisierungsinformation ('%s') ist ungültig" % (
 				self.m_strChkUpdUrl))
 			if (not self.m_oSystemUpdateIO):
 				return False
 			
 		oResp = oClient.GET(self.m_strChkUpdUrl)
 		if (not oResp or not oResp.m_bOK):
-			Globs.err("Fehler (%s) beim Herunterladen der Aktualisierungsinformation '%s'" % (
+			globs.err("Fehler (%s) beim Herunterladen der Aktualisierungsinformation '%s'" % (
 				oResp, self.m_strChkUpdUrl))
 			if (not self.m_oSystemUpdateIO):
 				return False
@@ -461,30 +456,30 @@ class Updater(ModuleBase):
 		try:
 			strUpdInf = strUpdInf[:10] + (strUpdInf[10:] and "..")
 			self.m_fChkVersion = float(strUpdInf)
-			Globs.setSetting("Updater", "fChkVersion", self.m_fChkVersion)
+			globs.setSetting("Updater", "fChkVersion", self.m_fChkVersion)
 		except:
-			Globs.exc("Fehler beim Auswerten der Aktualisierungsinformation '%s'" % (
+			globs.exc("Fehler beim Auswerten der Aktualisierungsinformation '%s'" % (
 				strUpdInf))
-			Globs.setSetting("Updater", "strChkUpdUrl", Updater.s_strChkUpdUrl)
+			globs.setSetting("Updater", "strChkUpdUrl", Updater.s_strChkUpdUrl)
 			if (not self.m_oSystemUpdateIO):
 				return False
 			
 		if (self.m_oSystemUpdateIO):
 			if (self.m_fChkVersion > self.m_fUpdVersion):
-				Globs.log("Neuere Aktualisierung '%s' als bereitgestellte '%s' verfügbar" % (
+				globs.log("Neuere Aktualisierung '%s' als bereitgestellte '%s' verfügbar" % (
 					self.m_fChkVersion, self.m_fUpdVersion))
 			else:
-				Globs.log("Eine Aktualisierung '%s' wurde bereitgestellt." % (
+				globs.log("Eine Aktualisierung '%s' wurde bereitgestellt." % (
 					self.m_fUpdVersion))
 			return True
 		
-		if (self.m_fChkVersion <= Globs.getVersion()):
-			Globs.log("Keine Aktualisierung für Version '%s' verfügbar" % (
-				Globs.getVersion()))
+		if (self.m_fChkVersion <= globs.getVersion()):
+			globs.log("Keine Aktualisierung für Version '%s' verfügbar" % (
+				globs.getVersion()))
 			return False
 			
-		Globs.log("Neuere Aktualisierung von Version '%s' auf '%s' verfügbar" % (
-			Globs.getVersion(), self.m_fChkVersion))
+		globs.log("Neuere Aktualisierung von Version '%s' auf '%s' verfügbar" % (
+			globs.getVersion(), self.m_fChkVersion))
 		
 		return True
 		
@@ -493,8 +488,8 @@ class Updater(ModuleBase):
 		oRespSys = None
 		
 		if (not self.m_strSystemUrl):
-			Globs.err("Die URL für die Systemaktualisierung ist ungültig")
-			Globs.setSetting("Updater", "strSystemUrl", Updater.s_strSystemUrl)
+			globs.err("Die URL für die Systemaktualisierung ist ungültig")
+			globs.setSetting("Updater", "strSystemUrl", Updater.s_strSystemUrl)
 			if (not self.m_oSystemUpdateIO):
 				return False
 		
@@ -502,9 +497,9 @@ class Updater(ModuleBase):
 			or (self.m_fChkVersion > self.m_fUpdVersion and not self.m_bUpdateOffline)):
 			oRespSys = oClient.GET(self.m_strSystemUrl)
 			if (not oRespSys or not oRespSys.m_bOK):
-				Globs.err("Fehler (%s) beim Herunterladen der Systemaktualisierungsdatei '%s'" % (
+				globs.err("Fehler (%s) beim Herunterladen der Systemaktualisierungsdatei '%s'" % (
 					oRespSys, self.m_strSystemUrl))
-				Globs.setSetting("Updater", "strSystemUrl", Updater.s_strSystemUrl)
+				globs.setSetting("Updater", "strSystemUrl", Updater.s_strSystemUrl)
 				return False
 			
 			self.m_oSystemUpdateIO = BytesIO(oRespSys.m_oData)
@@ -512,7 +507,7 @@ class Updater(ModuleBase):
 			return True
 		
 		if (self.m_oSystemUpdateIO):
-			Globs.log("Eine Aktualisierung wurde bereitgestellt.")
+			globs.log("Eine Aktualisierung wurde bereitgestellt.")
 			return True
 		
 		return False
@@ -525,7 +520,7 @@ class Updater(ModuleBase):
 			return False
 		
 		if (not zipfile.is_zipfile(self.m_oSystemUpdateIO)):
-			Globs.err("Die Systemaktualisierungsdatei ist keine gültige Zip-Datei")
+			globs.err("Die Systemaktualisierungsdatei ist keine gültige Zip-Datei")
 			del self.m_oSystemUpdateIO
 			self.m_oSystemUpdateIO = None
 			self.m_fUpdVersion = float(0.0)
@@ -543,9 +538,8 @@ class Updater(ModuleBase):
 				ZipFile(self.m_oSystemUpdateIO, "r") as oSysZipFile:
 				# Aktualisierung vorbereiten
 				for oZipInfo in (oSysZipFile.infolist()):
-					foFile = oSysZipFile.open(oZipInfo)
 					if (os.path.isabs(oZipInfo.filename)):
-						Globs.err("Absolute Pfadangabe in Zip-Datei: '%s'" % (
+						globs.err("Absolute Pfadangabe in Zip-Datei: '%s'" % (
 							oZipInfo.filename))
 						del self.m_oSystemUpdateIO
 						self.m_oSystemUpdateIO = None
@@ -555,49 +549,49 @@ class Updater(ModuleBase):
 						continue
 					strEntryName = oZipInfo.filename.replace(Updater.s_strPrefix, "")
 					oSysZipFile.extract(oZipInfo, oTmpDir)
-					Globs.dbg("Extrahieren von '%s' nach '%s'" % (oZipInfo.filename, oTmpDir))
+					globs.dbg("Extrahieren von '%s' nach '%s'" % (oZipInfo.filename, oTmpDir))
 					strFilename = os.path.join(oTmpDir, oZipInfo.filename)
 					if (os.path.isdir(strFilename)):
 						continue
 					if (not os.path.isfile(strFilename)):
-						Globs.err("Die extrahierte Systemdatei '%s' wurde nicht gefunden" % (
+						globs.err("Die extrahierte Systemdatei '%s' wurde nicht gefunden" % (
 							strFilename))
 						del self.m_oSystemUpdateIO
 						self.m_oSystemUpdateIO = None
 						self.m_fUpdVersion = float(0.0)
 						return False
-					Globs.dbg("Das extrahierte Element '%s' liegt unter '%s'" % (
+					globs.dbg("Das extrahierte Element '%s' liegt unter '%s'" % (
 						strEntryName, strFilename))
 					if (re.match("\\Amodules/\\w+\\.[Pp][Yy]\\Z", strEntryName)):
 						dictModUpdate.update({strEntryName : strFilename})
 					elif (re.match(".+\\.([Pp][Yy]|[Pp][Nn][Gg]|[Hh][Tt][Mm][Ll]?|[Cc][Ss][Ss])\\Z", strEntryName)):
 						dictSysUpdate.update({strEntryName : strFilename})
 					else:
-						Globs.dbg("Das element '%s' wird nicht installiert" % (strEntryName))
+						globs.dbg("Das element '%s' wird nicht installiert" % (strEntryName))
 				# Systemaktualisierung durchführen
 				for (strRelDst, strSrcFile) in dictSysUpdate.items():
-					strDstFile = os.path.join(Globs.s_strBasePath, strRelDst)
+					strDstFile = os.path.join(globs.s_strBasePath, strRelDst)
 					if (os.path.isfile(strDstFile)):
 						strDstFileBak = "%s.bak" % strDstFile
 						os.rename(strDstFile, strDstFileBak)
 						dictBackup.update({strDstFile : strDstFileBak})
-						Globs.dbg("Backup von Datei '%s' ('%s') erstellt." % (strDstFile, strDstFileBak))
+						globs.dbg("Backup von Datei '%s' ('%s') erstellt." % (strDstFile, strDstFileBak))
 					foSource = open(strSrcFile, "r+b")
 					self.installFile(foSource, strDstFile)
 					foSource.close()
-					Globs.dbg("Update von Datei '%s' installiert." % (strDstFile))
+					globs.dbg("Update von Datei '%s' installiert." % (strDstFile))
 				# Modulaktualisierung durchführen
 				for (strRelDst, strSrcFile) in dictModUpdate.items():
-					strDstFile = os.path.join(Globs.s_strBasePath, strRelDst)
+					strDstFile = os.path.join(globs.s_strBasePath, strRelDst)
 					if (os.path.isfile(strDstFile)):
 						strDstFileBak = "%s.bak" % strDstFile
 						os.rename(strDstFile, strDstFileBak)
 						dictBackup.update({strDstFile : strDstFileBak})
-						Globs.dbg("Backup von Modul '%s' ('%s') erstellt." % (strDstFile, strDstFileBak))
+						globs.dbg("Backup von Modul '%s' ('%s') erstellt." % (strDstFile, strDstFileBak))
 						foSource = open(strSrcFile, "r+b")
 						self.installFile(foSource, strDstFile)
 						foSource.close()
-						Globs.dbg("Update von Modul '%s' installiert." % (strDstFile))
+						globs.dbg("Update von Modul '%s' installiert." % (strDstFile))
 				bUpdateComplete = True
 				del self.m_oSystemUpdateIO
 				self.m_oSystemUpdateIO = None
@@ -605,7 +599,7 @@ class Updater(ModuleBase):
 				self.m_bUpdateOffline = False
 				TaskExit(self.getWorker(), "boot").start()
 		except:
-			Globs.exc("Ausnahmefall während der Aktualisierung - Wiederherstellung ausführen")
+			globs.exc("Ausnahmefall während der Aktualisierung - Wiederherstellung ausführen")
 			del self.m_oSystemUpdateIO
 			self.m_oSystemUpdateIO = None
 			self.m_fUpdVersion = float(0.0)
@@ -615,10 +609,10 @@ class Updater(ModuleBase):
 			if (not bUpdateComplete):
 				for (strDstFile, strDstFileBak) in dictBackup.items():
 					os.rename(strDstFileBak, strDstFile)
-					Globs.wrn("Das Element '%s' wurde wiederhergestellt" % (strDstFile))
-				Globs.err("Die Aktualisierung ist fehlgeschlagen - Wiederherstellung erfolgreich")
+					globs.wrn("Das Element '%s' wurde wiederhergestellt" % (strDstFile))
+				globs.err("Die Aktualisierung ist fehlgeschlagen - Wiederherstellung erfolgreich")
 		except:
-			Globs.exc("Ausnahmefall während der Wiederherstellung nach Fehler bei Aktualisierung")
+			globs.exc("Ausnahmefall während der Wiederherstellung nach Fehler bei Aktualisierung")
 			del self.m_oSystemUpdateIO
 			self.m_oSystemUpdateIO = None
 			self.m_fUpdVersion = float(0.0)
@@ -633,6 +627,3 @@ class Updater(ModuleBase):
 		foFile.close()
 		del oData
 		return
-		
-class dummy:
-	pass

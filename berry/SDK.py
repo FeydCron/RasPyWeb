@@ -30,9 +30,9 @@
 #  Der Unterschied zwischen einem Ereignis und einem Kommando besteht darin, dass obwohl beide eine
 #  Verarbeitung auslösen, nur bei Kommandos eine Ergebnismenge erwartet wird. Daraus ergibt sich,
 #  dass über die HTTP-Schnittstelle hauptsächlich Kommandos empfangen werden, da der interaktive
-#  Charakter eines HTTP-Clients in der Regel immer einen HTML-Inhalt als Ergebnis auf eine Aktion,
-#  im Sinne einer GET- beziehungsweise POST-Anfrage, erwartet.
-#  Über eine GPIO-Schnittstelle werden in Regel nur Ereignisse empfangen, da beispielsweise ein
+#  Charakter eines HTTP-Clients in der Regel immer einen HTML-Inhalt als Ergebnis auf eine Aktion
+#  im Sinne einer GET- beziehungsweise POST-Anfrage erwartet.
+#  Über eine GPIO-Schnittstelle werden in der Regel nur Ereignisse empfangen, da beispielsweise ein
 #  Eingabetaster auf seine Betätigung hin, keine Ergebnismenge in irgend einer Form erwartet.
 #  
 #  Die Kommando- und Ereignisverarbeitung unterscheidet sich also nur darin, dass bei einem
@@ -287,7 +287,7 @@
 #  Fügen Sie die folgende Zeile hinzu, sofern diese noch nicht existiert:
 #  
 #  @verbatim
-#  @reboot     python3 <directory>/Berry.py
+#  @reboot     python3 <directory>/RasPyWeb.py
 #  @endverbatim
 #  
 #  @e @<directory@> entspricht dem @ref installdir von RasPyWeb.
@@ -365,8 +365,8 @@
 #  Zugriffe auf die Modulkonfiguration ausserhalb des Methodenaufrufs müssen daher über die
 #  bereitgestellten Zugriffsfunktionen für das Lesen und Schreiben von Einstellungen erfolgen.
 #  
-#  @see Globs::Globs::getSetting
-#  @see Globs::Globs::setSetting
+#  @see globs::globs::getSetting
+#  @see globs::globs::setSetting
 #  
 #  @subsection moduleconfig Modulkonfiguration
 #  
@@ -438,21 +438,20 @@
 #  
 
 
-import os
-import subprocess
-import re
-import threading
-import socket
-import html
-import urllib.parse
-import http.client
-import queue
-
 from datetime import datetime
+import email
+import html
+import http.client
+import imaplib
+import re
+import socket
+import subprocess
+import urllib.parse
+import threading
 
-from Voice import Voice
-from Sound import Sound
-from Globs import Globs
+import globs
+from sound import Sound
+from voice import Voice
 
 ## 
 #  @brief Werkzeug zum Erstellen von einfach strukturieren HTML-Seiten.
@@ -1158,7 +1157,7 @@ class QueueTask:
 		
 	def done(self, bResult = True):
 		return
-		
+
 class FastTask(QueueTask):
 	
 	def __str__(self):
@@ -1167,26 +1166,47 @@ class FastTask(QueueTask):
 	
 	def start(self):
 		bResult = False
-		Globs.dbg("'%s' (leicht) starten: Warten auf Freigabe" % (self))
+		globs.dbg("'%s' (leicht) starten: Warten auf Freigabe" % (self))
 		# >>> Critical Section
 		self.m_oWorker.m_oLock.acquire()
-		Globs.dbg("'%s' (leicht) starten: Freigabe erhalten" % (self))
+		globs.dbg("'%s' (leicht) starten: Freigabe erhalten" % (self))
 		if (self.m_oWorker.m_evtRunning.isSet()):
-			Globs.dbg("'%s' (leicht) starten: In Warteschlange" % (self))
+			globs.dbg("'%s' (leicht) starten: In Warteschlange" % (self))
 			self.m_oWorker.m_oQueueFast.put(self)
 			bResult = True
 		else:
-			Globs.wrn("'%s' (leicht) starten: Bearbeitung verweigert" % (self))
+			globs.wrn("'%s' (leicht) starten: Bearbeitung verweigert" % (self))
 		self.m_oWorker.m_oLock.release()
 		# <<< Critical Section
-		Globs.dbg("'%s' (leicht) starten: Freigabe abgegeben (%r)" % (self, bResult))
+		globs.dbg("'%s' (leicht) starten: Freigabe abgegeben (%r)" % (self, bResult))
 		return bResult
 		
 	def done(self, bResult = True):
-		Globs.dbg("'%s' (leicht): Bearbeitung abgeschlossen (%r)" % (self, bResult))
+		globs.dbg("'%s' (leicht): Bearbeitung abgeschlossen (%r)" % (self, bResult))
 		self.m_oWorker.m_oQueueFast.task_done()
 		return
+	
+class FutureTask(FastTask):
+
+	def __init__(self, oWorker):	
+		super(FutureTask, self).__init__(oWorker)
+		self.m_evtDone = threading.Event()
+		self.m_evtDone.clear()
+		return
 		
+	def __str__(self):
+		strDesc = "Warten auf die Fertigstellung einer Aufgabe"
+		return  strDesc
+	
+	def done(self, bResult = True):
+		self.m_oWorker.m_oQueueFast.task_done()
+		self.m_evtDone.set()
+		return
+		
+	def wait(self):
+		self.m_evtDone.wait()
+		return
+
 class LongTask(QueueTask):
 	
 	def __str__(self):
@@ -1195,23 +1215,23 @@ class LongTask(QueueTask):
 		
 	def start(self):
 		bResult = False
-		Globs.dbg("'%s' (schwer) starten: Warten auf Freigabe" % (self))
+		globs.dbg("'%s' (schwer) starten: Warten auf Freigabe" % (self))
 		# >>> Critical Section
 		self.m_oWorker.m_oLock.acquire()
-		Globs.dbg("'%s' (schwer) starten: Freigabe erhalten" % (self))
+		globs.dbg("'%s' (schwer) starten: Freigabe erhalten" % (self))
 		if (self.m_oWorker.m_evtRunning.isSet()):
-			Globs.dbg("'%s' (schwer) starten: In Warteschlange" % (self))
+			globs.dbg("'%s' (schwer) starten: In Warteschlange" % (self))
 			self.m_oWorker.m_oQueueLong.put(self)
 			bResult = True
 		else:
-			Globs.wrn("'%s' (schwer) starten: Bearbeitung verweigert" % (self))
+			globs.wrn("'%s' (schwer) starten: Bearbeitung verweigert" % (self))
 		self.m_oWorker.m_oLock.release()
 		# <<< Critical Section
-		Globs.dbg("'%s' (schwer) starten: Freigabe abgegeben (%r)" % (self, bResult))
+		globs.dbg("'%s' (schwer) starten: Freigabe abgegeben (%r)" % (self, bResult))
 		return bResult
 		
 	def done(self, bResult = True):
-		Globs.dbg("'%s' (schwer): Bearbeitung abgeschlossen (%r)" % (self, bResult))
+		globs.dbg("'%s' (schwer): Bearbeitung abgeschlossen (%r)" % (self, bResult))
 		self.m_oWorker.m_oQueueLong.task_done()
 		return
 
@@ -1247,7 +1267,7 @@ class TaskSound(LongTask):
 		return  strDesc
 	
 	def do(self):
-		for i in range(self.m_nLoops):
+		for _ in range(self.m_nLoops):
 			self.s_oSound.sound(self.m_strSound)
 		return
 
@@ -1258,9 +1278,9 @@ class TaskSaveSettings(FastTask):
 		return  strDesc
 		
 	def do(self):
-		Globs.saveSettings()
+		globs.saveSettings()
 		return
-		
+
 ## 
 #  @brief Weiterleitung von Modulereignissen an alle aktiven Module.
 #  		
@@ -1283,11 +1303,11 @@ class TaskModuleEvt(FastTask):
 		return  strDesc
 	
 	def do(self):
-		for (strName, oInstance) in self.m_oWorker.m_dictModules.items():
+		for oInstance in self.m_oWorker.m_dictModules.values():
 			self.m_oResult = oInstance.moduleExec(self.m_strPath,
 				None, self.m_dictQuery, self.m_dictForm)
 		return
-		
+
 class WebResponse:
 	
 	def __init__(self,
@@ -1321,7 +1341,6 @@ class WebClient:
 			http.client.SEE_OTHER,
 			http.client.TEMPORARY_REDIRECT)
 		oConn = None
-		oResp = None
 		oUrlSplit = urllib.parse.urlsplit(strUrl)
 		
 		if (re.match("[Hh][Tt][Tt][Pp][Ss]", oUrlSplit.scheme)):
@@ -1341,11 +1360,11 @@ class WebClient:
 		elif (oResp.status in lstRedirect
 			and oResp.getheader("Location")
 			and bFollowRedirects):
-			Globs.wrn("Weiterleitung von '%s' nach '%s'" % (
+			globs.wrn("Weiterleitung von '%s' nach '%s'" % (
 				strUrl, oResp.getheader("Location")))
 			oWebResponse = self.GET(oResp.getheader("Location"))
 		else:
-			Globs.wrn("Fehler beim Abrufen von '%s' (Weiterleitung=%s, Location=%s)" % (
+			globs.wrn("Fehler beim Abrufen von '%s' (Weiterleitung=%s, Location=%s)" % (
 				strUrl, bFollowRedirects, oResp.getheader("Location")))
 			oWebResponse = WebResponse(
 				nStatus=oResp.status,
@@ -1358,7 +1377,6 @@ class WebClient:
 		return oWebResponse
 		
 def getShellCmdOutput(strShellCmd):
-	strOutput = ""
 	strOutput = subprocess.check_output(
 		strShellCmd,
 		stderr = subprocess.STDOUT,
@@ -1374,7 +1392,6 @@ def getShellCmdOutput(strShellCmd):
 # Index 4: buffered RAM
 # Index 5: cached RAM
 def getRamInfo():
-	strRamInfo = "n/a"
 	regexSep = r"\s\s*"
 	parts = [[1, 7],]
 	strRamInfo = subprocess.check_output(
@@ -1394,7 +1411,6 @@ def getRamInfo():
 # Index 2: remaining disk space                                                     
 # Index 3: percentage of disk used                                                 
 def getDiskSpace():
-	strDiskSpace = "n/a"
 	regexSep = r"\s\s*"
 	parts = [[1, 5],]
 	strDiskSpace = subprocess.check_output(
@@ -1423,15 +1439,14 @@ def getCpuTemp():
 	temp = partList(re.split(regexSep, strResult), parts)[0]
 	fResult = float(temp)
 
-	if (Globs.getSetting("System", "bTestMode", "True|False", False)
-	 and not Globs.s_oQueueTestCpuTempValues.empty()):
-		fResult = Globs.s_oQueueTestCpuTempValues.get(False)
+	if (globs.getSetting("System", "bTestMode", "True|False", False)
+	 and not globs.s_oQueueTestCpuTempValues.empty()):
+		fResult = globs.s_oQueueTestCpuTempValues.get(False)
 
 	return fResult
 
 # Return current CPU usage in percent as a string value
 def getCpuUse():
-	strResult = "n/a"
 	strResult = subprocess.check_output(
 		"top -b -n1 | awk '/Cpu\(s\):/ {print $2}'",
 		stderr = subprocess.STDOUT,
@@ -1448,25 +1463,22 @@ def getNetworkInfo(strComputerName="google.com"):
 		strIpAddr = oSocket.getsockname()[0]
 		oSocket.close()
 	except:
-		Globs.exc("Ermitteln der IP-Adresse")
+		globs.exc("Ermitteln der IP-Adresse")
 	return strIpAddr
 	
 def setDate(strDate, strFormat):
-	strResult = ""
 	oDate = datetime.strptime(strDate, strFormat).date()
 	oTime = datetime.today().time()
 	oDateTime = datetime.combine(oDate, oTime)
 	return setDateTime(oDateTime)
 
 def setTime(strTime, strFormat):
-	strResult = ""
 	oDate = datetime.today().date()
 	oTime = datetime.strptime(strTime, strFormat).time()
 	oDateTime = datetime.combine(oDate, oTime)
 	return setDateTime(oDateTime)
 
 def setDateTime(oDateTime):
-	strResult = ""
 	strResult = subprocess.check_output(
 		"sudo date -s \"%s\"" % (oDateTime.strftime("%c")),
 		stderr = subprocess.STDOUT,
@@ -1474,10 +1486,281 @@ def setDateTime(oDateTime):
 		universal_newlines = True)
 	return strResult
 
-# Extracts partitions from the given list and returns them as a new list
-def partList(list, indices):
-	output = []
-	for nStart, nStop in indices:
-		output.extend(list[nStart:nStop])
-	return output
+def getAlsaControlValue(
+		strName):
+	strIdent = ""
+	
+	strName = re.escape(strName)
+	
+	strResult = subprocess.check_output(
+		"amixer controls",
+		stderr = subprocess.STDOUT,
+		shell = True,
+		universal_newlines = True)
+	
+	regexSep = r"[\n\r]"
+	lstLines = re.split(regexSep, strResult)
+	for strLine in lstLines:
+		if (re.match(".*name\=\'" + strName + "\'", strLine)):
+			regexSep = r"[\,]"
+			strIdent = re.split(regexSep, strLine)[0]
+			break
 		
+	if not strIdent:
+		return ""
+	
+	strResult = subprocess.check_output(
+		"amixer cget " + strIdent,
+		stderr = subprocess.STDOUT,
+		shell = True,
+		universal_newlines = True)
+	
+	regexSep = r"[\n\r]"
+	lstLines = re.split(regexSep, strResult)
+	strResult = ""
+	for strLine in lstLines:
+		if (re.match("\s+\: values\=", strLine)):
+			regexSep = r"[\=]"
+			strResult = re.split(regexSep, strLine)[1]
+			break
+
+	return strResult
+
+def setAlsaControlValue(
+		strName, strValue):
+	strIdent = ""
+	
+	strName = re.escape(strName)
+	
+	strResult = subprocess.check_output(
+		"amixer controls",
+		stderr = subprocess.STDOUT,
+		shell = True,
+		universal_newlines = True)
+	
+	regexSep = r"[\n\r]"
+	lstLines = re.split(regexSep, strResult)
+	for strLine in lstLines:
+		if (re.match(".*name\=\'" + strName + "\'", strLine)):
+			regexSep = r"[\,]"
+			strIdent = re.split(regexSep, strLine)[0]
+			break
+		
+	if not strIdent:
+		return False
+	
+	strResult = subprocess.check_output(
+		"amixer cset " + strIdent + " " + strValue,
+		stderr = subprocess.STDOUT,
+		shell = True,
+		universal_newlines = True)
+		
+	return True
+
+
+# Extracts partitions from the given list and returns them as a new list
+def partList(lstList, lstIndices):
+	output = []
+	for nStart, nStop in lstIndices:
+		output.extend(lstList[nStart:nStop])
+	return output
+
+##
+# - Return @b all messages:
+# @code
+# "ALL"
+# @endcode
+# - Search for already @b answered emails:
+# @code
+# "ANSWERED"
+# @endcode
+# - Search for messages on a specific @b date:
+# @code
+# "SENTON 05-Mar-2007"
+# @endcode
+# 	- The date string is `DD-Month-YYYY` where Month is: @c Jan, @c Feb,
+#     @c Mar, @c Apr, @c May, @c Jul, @c Aug, @c Sep, @c Oct, @c Nov, @c Dec
+# - Search for messages @b between two @b dates:
+# @code
+#	"SENTSINCE 01-Mar-2007 SENTBEFORE 05-Mar-2007"
+# @endcode
+#	- `SENTBEFORE`: Finds emails @b sent @b before a @b date, and
+#	- `SENTSINCE`: Finds email @b sent @b on or @b after a @b date.
+#	- The `AND` operation is implied by joining criteria, separated by spaces.
+# - Another example of `AND`: Find @b all @b unanswered emails
+# 	@b sent @b after 04-Mar-2007 @b with "Problem" in the subject:
+# 	@code
+#	"UNANSWERED SENTSINCE 04-Mar-2007 Subject \"Problem\""
+#	@endcode
+# - Find messages with a specific @b string in the body:
+#	@code
+#	"BODY \"problem solved\""
+#	@endcode
+# - Using `OR`: The syntax is
+#	@code
+#	OR <criteria1> <criteria2>
+#	@endcode.
+# 	The `OR` comes first, followed by each criteria.
+# 	For example, to match all emails with "Help" or "Question" in the subject.
+# 	You'll notice that literal strings may be quoted or unquoted.
+# 	If a literal contains SPACE characters, quote it:
+# 	@code
+#	"OR SUBJECT Help SUBJECT Question"
+#	@endcode
+# - Find all emails @b sent @b from "yahoo.com" addresses:
+# 	@code
+#	"FROM yahoo.com"
+#	@endcode
+# - Find all emails @b sent @b from anyone @b with "John" in their name:
+# 	@code
+#	"FROM John"
+#	@endcode
+# - Find emails with the @b RECENT flag set:
+#	@code
+#	"RECENT"
+#	@endcode
+# - Find emails that @b don't @b have the @b recent flag set, which is
+#	synonymous with `OLD`:
+#	@code
+#	"NOT RECENT"
+#	"OLD"
+#	@endcode
+# - Find all emails @b marked @b for @b deletion:
+#	@code
+#	"DELETED"
+#	@endcode
+# - Find all emails @b having a specified @b header @b field with a @b value
+# 	containing a substring:
+#	@code
+#	"HEADER DomainKey-Signature paypal.com"
+#	@endcode
+# - Find any emails having a specific @b header @b field present. If the
+# 	2nd argument to the `HEADER` criteria is an empty string,
+# 	any email having the header field is returned regardless
+# 	of the header field's content.
+# 	Find any emails with a `DomainKey-Signature` field:
+# 	@code
+#	"HEADER DomainKey-Signature \"\""
+#	@endcode
+# - Find @b NEW emails: These are emails that have the @b RECENT flag
+# 	set, but not the SEEN flag:
+#	@code
+#	"NEW"
+#	@endcode	
+# - Find emails @b larger than a certain @b number of @b bytes:
+# 	@code
+#	"LARGER 500000"
+#	@endcode
+# - Find emails @b marked as @b seen or @b not already @b seen:
+#	@code
+# 	"SEEN"
+# 	"NOT SEEN"
+#	@endcode
+# - Find emails having a given @b substring in the @b TO header field:
+# 	@code
+#	"TO support@chilkatsoft.com"
+#	"HEADER TO support@chilkatsoft.com"
+#	@endcode
+# - Find emails @b smaller than a size in @b bytes:
+#	@code
+#	"SMALLER 30000"
+#	@endcode
+# - Find emails that have a @b substring @b anywhere in the header
+# 	or body:
+#	@code
+#	"TEXT \"Zip Component\""
+#	@endcode
+#
+# @note
+# Strings are case-insensitive when searching.
+#
+def fetchImapEmail(
+		strMailServer,
+		strUsername,
+		strPassword,
+		strMailbox="INBOX",
+		strSearch="ALL"):
+	strResp = "NO"
+	tupData = []
+	oImapSession = None
+	bMailboxSelected = False
+	try:
+		# Create IMAP-SSL session
+		oImapSession = imaplib.IMAP4_SSL(strMailServer)
+		# Login with username and password
+		strResp, tupData = oImapSession.login(strUsername, strPassword)
+		if (strResp != "OK"):
+			globs.err("IMAP4_SSL login response ("+strResp+"): "+str(tupData))
+			raise
+		globs.log("IMAP4_SSL login response ("+strResp+"): "+str(tupData))
+		# Select a mailbox
+		strResp, tupData = oImapSession.select(strMailbox)
+		if (strResp != "OK"):
+			globs.err("IMAP4_SSL select mailbox response ("+strResp+"): "+str(tupData))
+			raise
+		bMailboxSelected = True
+		globs.dbg("IMAP4_SSL select mailbox response ("+strResp+"): "+str(tupData))
+		strResp, tupData = oImapSession.search(None, strSearch)
+		if (strResp != "OK"):
+			globs.err("IMAP4_SSL search mailbox response ("+strResp+"): "+str(tupData))
+			raise
+		bMailboxSelected = True
+		globs.dbg("IMAP4_SSL search mailbox response ("+strResp+"): "+str(tupData))
+		# Iterate over emails
+		for msgId in tupData[0].split():
+			# Fetch each email
+			strResp, oEmailData = oImapSession.fetch(msgId, "(RFC822)")
+			if (strResp != "OK"):
+				globs.err("IMAP4_SSL fetch response ("+strResp+"): "+str(oEmailData))
+				raise
+			globs.dbg("IMAP4_SSL fetch response ("+strResp+")")
+			try:
+				oRawMail = oEmailData[0][1]
+				strMail = oRawMail.decode("UTF-8")
+				oMail = email.message_from_string(strMail)
+				globs.dbg("Mail object: "+oMail.as_string())
+				for oPart in oMail.walk():
+					globs.dbg("Mail part: "+oPart.as_string())
+					if (oPart.get_content_maintype() == 'multipart'):
+						globs.dbg("Multipart item")
+						continue
+					contentDisposition = oPart.get('Content-Disposition')
+					if (not contentDisposition):
+						globs.dbg("No content disposition")
+						continue
+					dispositions = contentDisposition.strip().split(";")
+					globs.dbg("Item dispositions: "+str(dispositions))
+					if (dispositions[0].lower() != "attachment"):
+						globs.dbg("No attachement: "+str(dispositions))
+						continue
+					#fileName = part.get_filename()
+					# TODO: Get payload
+			except:
+				globs.exc(
+					"Error creating/processing mail object, Fetch response: "+
+					str(oEmailData))
+				raise
+	except:
+		globs.exc("Could not fetch IMAP_SSL e-mail")
+		
+	try:
+		if (oImapSession and bMailboxSelected):
+			strResp, tupData = oImapSession.close()
+			if (strResp != "OK"):
+				globs.err("IMAP4_SSL close mailbox response ("+strResp+"): "+str(tupData))
+			else:
+				globs.log("IMAP_SSL mailbox closed ("+strResp+"): "+str(tupData))
+	except:
+		globs.exc("Could not close IMAP_SSL session")
+		
+	try:
+		if (oImapSession):
+			strResp, tupData = oImapSession.logout()
+			if (strResp != "BYE"):
+				globs.err("IMAP4_SSL session logout response ("+strResp+"): "+str(tupData))
+			else:
+				globs.log("IMAP_SSL session logged out ("+strResp+"): "+str(tupData))
+	except:
+		globs.exc("Could not logout IMAP_SSL session")
+	
+	return

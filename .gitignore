@@ -1,3 +1,15 @@
 berry/www/docs/RasPyWeb.chw
 berry/www/docs/html/
+_vti_cnf/
+_vti_pvt/
+RemoteSystemsTempFiles
+.metadata
 *.suo
+*.json
+*.pickle
+*desktop.ini
+*.pyc
+*.bak
+*.wav
+*.zip
+*.rexpfd

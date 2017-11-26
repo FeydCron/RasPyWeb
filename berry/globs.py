@@ -234,7 +234,7 @@ def stop():
 	return
 
 def getVersion():
-	return float(0.6)
+	return float(0.7)
 
 def getRedirect(strID, strDefault):
 	if ("Redirects" in s_dictSettings

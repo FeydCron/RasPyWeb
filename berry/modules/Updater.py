@@ -571,11 +571,14 @@ class Updater(ModuleBase):
 				# Systemaktualisierung durchführen
 				for (strRelDst, strSrcFile) in dictSysUpdate.items():
 					strDstFile = os.path.join(globs.s_strBasePath, strRelDst)
+					strDstPath, _ = os.path.split(strDstFile)
 					if (os.path.isfile(strDstFile)):
 						strDstFileBak = "%s.bak" % strDstFile
 						os.rename(strDstFile, strDstFileBak)
 						dictBackup.update({strDstFile : strDstFileBak})
 						globs.dbg("Backup von Datei '%s' ('%s') erstellt." % (strDstFile, strDstFileBak))
+					elif (not os.path.isdir(strDstPath)):
+						os.makedirs(strDstPath)
 					foSource = open(strSrcFile, "r+b")
 					self.installFile(foSource, strDstFile)
 					foSource.close()

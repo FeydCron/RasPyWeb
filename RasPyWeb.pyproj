@@ -26,7 +26,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include="berry\readme.txt" />
-    <Content Include="berry\URLs.txt" />
     <Content Include="berry\www\css\custom-grids.css" />
     <Content Include="berry\www\css\flexible-columns.css" />
     <Content Include="berry\www\css\flexible-grids.css" />
@@ -490,13 +489,13 @@
     <Content Include="berry\www\yaml\screen\typography.css" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="berry\Berry.py" />
     <Compile Include="berry\debugtest.py">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="berry\Event.py" />
-    <Compile Include="berry\Globs.py" />
-    <Compile Include="berry\Httpd.py" />
+    <Compile Include="berry\displaytest.py" />
+    <Compile Include="berry\event.py" />
+    <Compile Include="berry\globs.py" />
+    <Compile Include="berry\httpd.py" />
     <Compile Include="berry\modules\AMatisGPIO.py" />
     <Compile Include="berry\modules\Clock.py" />
     <Compile Include="berry\modules\PiFaceIO.py">
@@ -505,11 +504,12 @@
     <Compile Include="berry\modules\Test.py" />
     <Compile Include="berry\modules\Updater.py" />
     <Compile Include="berry\modules\__init__.py" />
-    <Compile Include="berry\SDK.py" />
-    <Compile Include="berry\Sound.py" />
-    <Compile Include="berry\Tasks.py" />
-    <Compile Include="berry\Voice.py" />
-    <Compile Include="berry\Worker.py" />
+    <Compile Include="berry\RasPyWeb.py" />
+    <Compile Include="berry\sdk.py" />
+    <Compile Include="berry\sound.py" />
+    <Compile Include="berry\tasks.py" />
+    <Compile Include="berry\voice.py" />
+    <Compile Include="berry\worker.py" />
     <Compile Include="berry\__init__.py" />
   </ItemGroup>
   <ItemGroup>

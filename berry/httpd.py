@@ -52,6 +52,15 @@ class StartPage(OrderedDict):
 		if self.editTarget(oHtmlPage, secEdt, artEdt, btnEdt):
 			return
 		bIsEmpty = True
+		
+		oHtmlPage.extend([
+			"<div class=\"ym-wrapper\">",
+			"<div class=\"ym-wbox\">",
+			"<main>",
+			"<div class=\"ym-column linearize-level-1\">",
+			"<div class=\"ym-col1\">",
+			"<div class=\"ym-cbox\">"])
+		
 		for (_, oSection) in self.items():
 			oSection.writeToPage(oHtmlPage)
 			bIsEmpty = False
@@ -60,6 +69,14 @@ class StartPage(OrderedDict):
 			oHtmlPage.append(
 				"<p class=\"center\"><a href=\"%s?edit=startpage\">&#x1F527; Die Startseite ist noch leer. Jetzt bearbeiten.</a></p>" % (
 				globs.s_strStartPageUrl))
+			
+		oHtmlPage.extend([
+			"</div>",
+			"</div",
+			"</div",
+			"</main>",
+			"</div>",
+			"</div"])
 		return
 		
 	def editStartPage(self,
@@ -206,17 +223,14 @@ class Section(OrderedDict):
 					strClass = "ym-gr"
 				else:
 					strClass = "ym-gl"
-				oHtmlPage.extend([
-					"<article class=\"ym-g50 %s\">" % (strClass),
-					"<div class=\"ym-gbox\">"])
+				oHtmlPage.append(
+					"<article class=\"ym-g50 %s\">" % (strClass))
+			oHtmlPage.append("<div class=\"ym-gbox\">");
 			oArticle.writeToPage(oHtmlPage)
-			if self.m_bPrimary:
-				oHtmlPage.append("</article>")
-			else:
-				oHtmlPage.extend([
-					"</div>",
-					"</article>"
-				])
+			oHtmlPage.extend([
+				"</div>",
+				"</article>"
+			])
 		oHtmlPage.append("</section>")
 		return
 

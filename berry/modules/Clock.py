@@ -1,5 +1,6 @@
 ﻿import time
 from datetime import datetime
+from datetime import timedelta
 
 import globs
 
@@ -77,6 +78,7 @@ class Clock(ModuleBase):
 		self.m_nSilenceFrom = globs.getSetting("Clock", "nSilenceFrom", "\\d{1,2}", 19)
 		self.m_nSilenceTo = globs.getSetting("Clock", "nSilenceTo", "\\d{1,2}", 6)
 		self.m_nTellTimeInt = globs.getSetting("Clock", "nTellTimeInt", "\\d{1,2}", 30)
+		self.m_oSilenceUntil = None
 		return True
 		
 	def moduleExec(self,
@@ -135,11 +137,41 @@ class Clock(ModuleBase):
 							nMinute = 0
 							nHour += 1
 						TaskSpeak(self.getWorker(), "Der Modultest für die Uhr ist jetzt beendet").start()
+			elif (strCmd == "SilentHours"):
+				for strArg in lstArg:
+					try:
+						strSpeak = "Ich konnte die Ruhezeit wegen einer falschen Angabe leider nicht einstellen."
+						nSilentHours = int(strArg)
+						if (nSilentHours > 0):
+							self.m_oSilenceUntil = (datetime.now() + timedelta(hours=nSilentHours))
+							bResult = True
+							strSpeak = "Ich habe eine Ruhezeit für die"
+							if (nSilentHours == 1):
+								strSpeak += " nächste Stunde"
+							else:
+								strSpeak += " nächsten " + str(nSilentHours) + " Stunden"
+							strSpeak += " eingestellt."
+						elif (nSilentHours == 0):
+							self.m_oSilenceUntil = None
+							bResult = True
+							strSpeak = "Ich habe die Ruhezeit wieder aufgehoben."
+					except:
+						globs.exc("Ausnahmefall während der Einstellung einer Ruhezeit")
+						strSpeak = "Ich konnte die Ruhezeit wegen einem Fehler leider nicht einstellen."
+					TaskSpeak(self.getWorker(), strSpeak).start()
 		# Unbekanntes Kommando
 		return bResult
 
 	# Bereichsprüfung
-	def isAllowed(self):
+	def isAllowed(self):		
+		
+		# Temporäre Abschaltung der Uhrzeitansage für n Stunden
+		if (not self.m_oSilenceUntil == None):
+			if (datetime.now() < self.m_oSilenceUntil):
+				return False
+			self.m_oSilenceUntil = None
+		
+		# Prüfung der eingestellten Ruhezeit
 		if self.m_nSilenceFrom > self.m_nSilenceTo:
 			# Inside-Range
 			return (self.m_nHour24h < self.m_nSilenceFrom and self.m_nHour24h > self.m_nSilenceTo)

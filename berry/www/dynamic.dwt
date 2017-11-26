@@ -23,7 +23,11 @@
 	<![endif]-->
 </head>
 <body>
+	<div class="ym-wrapper">
+	<div class="ym-wbox">
 	<main>
+	<div class="ym-column linearize-level-1">
+	<div class="ym-col1">
 	<!-- #BeginEditable "content" -->
 	<div class="box error">
 		<h3>Fehler</h3>
@@ -31,6 +35,10 @@
 		<a class="ym-reply ym-button ym-primary" href="#">Erneut versuchen</a>
 	</div>
 	<!-- #EndEditable -->
+	</div>
+	</div>
 	</main>
+	</div>
+	</div>
 </body>
 </html>

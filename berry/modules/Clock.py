@@ -8,6 +8,10 @@ from sdk import ModuleBase
 from sdk import TaskSound
 from sdk import TaskSpeak
 
+def createModuleInstance(
+	oWorker):
+	return Clock(oWorker)
+
 class Clock(ModuleBase):
 	
 	def moduleInit(self, dictModCfg={}, dictCfgUsr={}):

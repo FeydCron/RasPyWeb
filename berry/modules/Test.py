@@ -11,6 +11,10 @@ import sdk
 from sdk import ModuleBase
 from sdk import TaskSpeak
 
+def createModuleInstance(
+	oWorker):
+	return Test(oWorker)
+
 class Test(ModuleBase):
 	
 	## 

@@ -25,6 +25,10 @@ from sdk import TaskModuleEvt
 
 from worker import TaskExit
 
+def createModuleInstance(
+	oWorker):
+	return Updater(oWorker)
+
 class Updater(ModuleBase):
 	
 	s_strSystemUrl = "https://github.com/FeydCron/RasPyWeb/archive/latest.zip"
@@ -100,7 +104,7 @@ class Updater(ModuleBase):
 				"description"	: ("Der Aktualisierungszeitpunkt gibt an, zu welcher Zeit "+
 									"täglich nach einer verfügbaren Aktualisierung gesucht "+
 									"und diese gegebenenfalls installiert werden soll."),
-				"default"		: 1,
+				"default"		: 0,
 				"choices"		: {
 					"nachts"		: "0",
 					"früh morgens"	: "3",

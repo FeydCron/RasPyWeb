@@ -11,6 +11,10 @@ from sdk import ModuleBase
 
 VERBOSE = 0
 
+def createModuleInstance(
+	oWorker):
+	return AMatisGPIO(oWorker)
+
 class AMatisGPIO(ModuleBase):
 	
 	def moduleInit(self, dictModCfg={}, dictCfgUsr={}):

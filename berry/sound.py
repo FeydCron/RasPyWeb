@@ -1,71 +1,17 @@
 import os.path
 import re
+import subprocess
 
 import globs
 
+# Try to import from module "mutagen" which might not be installed on the target system
+#
+try:
+	from mutagen.mp3 import MP3
+except:
+	pass
+
 class Sound:
-	# Animal/           
-	# ------------------
-	# Bird, Owl
-	# Cat, Kitten, Meow
-	# Crickets, Cricket
-	# Dog1, Dog2
-	# Duck
-	# Goose
-	# HorseGallop, Horse
-	# Rooster
-	# SeaLion
-	# WolfHowl
-	
-	s_sounds = {
-		'Animal': [
-			'Bird',		'Cat',		'Crickets',
-			'Cricket',	'Dog1',		'Dog2',
-			'Duck',		'Goose',	'HorseGallop',
-			'Horse',	'Kitten', 	'Meow',
-			'Owl',		'Rooster',	'SeaLion',
-			'WolfHowl'],
-		'Effects': [
-			'BalloonScratch',		'BellToll',		'Bubbles',
-			'CarPassing',			'DoorClose',	'DoorCreak',
-			'MotorcyclePassing',	'Plunge',		'Pop',
-			'Rattle',				'Ripples',		'SewingMachine',
-			'Typing',				'WaterDrop',	'WaterRunning'],
-		'Electronic': [
-			'AlienCreak1',		'AlienCreak2',	'ComputerBeeps1',
-			'ComputerBeeps2',	'DirtyWhir',	'Fairydust',
-			'Laser1',			'Laser2',		'Peculiar',
-			'Screech',			'SpaceRipple',	'Spiral',
-			'Whoop',			'Zoop'],
-		'Human': [
-			'BabyCry',			'Cough-female',		'Cough-male',
-			'FingerSnap',		'Footsteps-1',		'Footsteps-2',
-			'Laugh-female',		'Laugh-male1',		'Laugh-male2',
-			'Laugh-male3',		'PartyNoise',		'Scream-female',
-			'Scream-male1',		'Scream-male2',		'Slurp',
-			'Sneeze-female',	'Sneeze-male'],
-		'Instruments': [
-			'AfroString',	'Chord',		'Dijjeridoo',
-			'GuitarStrum',	'SpookyString',	'StringAccent',
-			'StringPluck',	'Suspense',		'Tambura',
-			'Trumpet1',		'Trumpet2'],
-		'Music Loops': [
-			'Cave',				'DripDrop',		'DrumMachine',
-			'Drum',				'DrumSet1',		'DrumSet2',
-			'Eggs',				'Garden',		'GuitarChords1',
-			'GuitarChords2',	'HipHop',		'HumanBeatbox1',
-			'HumanBeatbox2',	'Jungle',		'Medieval1',
-			'Medieval2',		'Techno2',		'Techno',
-			'Triumph',			'Xylo1',		'Xylo2',
-			'Xylo3',			'Xylo4'],
-		'Percussion': [
-			'CymbalCrash',	'DrumBuzz',		'Gong',
-			'HandClap',		'RideCymbal',	'Shaker'],
-		'Vocals': [
-			'BeatBox1',		'BeatBox2',			'Come-and-play',
-			'Doy-doy-doy',	'Got-inspiration',	'Hey-yay-hey',
-			'Join-us',		'Oooo-badada',		'Singer1',
-			'Singer2',		'Sing-me-a-song',	'Ya']}
 	
 	###########################################################################
 	# Konstruktor
@@ -73,12 +19,14 @@ class Sound:
 	def __init__(self):
 		pass
 		return
-	
+
 	# Sound abspielen
 	def sound(self, strSound):
 		strFile = None
+		lstArgs = None
 		strPlay = "aplay"
-		
+		fTimeout = None
+
 		# >>> Critical Section
 		globs.s_oSettingsLock.acquire()
 		try:
@@ -109,9 +57,14 @@ class Sound:
 	
 		if os.path.isfile(strFile):
 			if re.match(".*\\.[Ww][Aa][Vv]", strFile):
-				strPlay = "aplay"
+				#strPlay = "aplay"
+				lstArgs = list(["aplay", strFile])
 			elif re.match(".*\\.[Mm][Pp]3", strFile):
-				strPlay = "omxplayer -o both"
+				#strPlay = "omxplayer -o both"
+				lstArgs = list(["mpg321", strFile])
+				if not globs.isMissingPipPackage("mutagen"):
+					oAudio = MP3(strFile)
+					fTimeout = globs.getWatchDogInterval() + oAudio.info.length
 			else:
 				globs.wrn("Das Format der Sound-Datei wird nicht unterstützt: '%s'" % (strFile))
 				print("\\a")
@@ -121,6 +74,7 @@ class Sound:
 			print("\\a")
 			return
 			
-		print("Now playing: '%s' <%s>" %(strSound, strFile))
-		os.system('%s "%s"' %(strPlay, strFile))
+		print("Now playing: '%r' --> '%s' <%s> with timeout %r" %(lstArgs, strSound, strFile, fTimeout))
+		#os.system('%s "%s"' %(strPlay, strFile))
+		subprocess.call(lstArgs, timeout=fTimeout)
 		return

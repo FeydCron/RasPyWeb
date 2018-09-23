@@ -123,9 +123,9 @@ class TaskSystemWatchDog(FastTask):
 		if "CPU" not in globs.s_dictSystemValues:
 			globs.s_dictSystemValues.update({"CPU" : {}})
 		if "RAM" not in globs.s_dictSystemValues:
-			globs.s_dictSystemValues.update({"Arbeitsspeicher" : {}})
+			globs.s_dictSystemValues.update({"RAM" : {}})
 		if "MEM" not in globs.s_dictSystemValues:
-			globs.s_dictSystemValues.update({"Speicherkapazität" : {}})
+			globs.s_dictSystemValues.update({"MEM" : {}})
 		if "Netzwerk" not in globs.s_dictSystemValues:
 			globs.s_dictSystemValues.update({"Netzwerk" : {}})
 		# Systemwerte eintragen
@@ -227,82 +227,88 @@ class TaskLoadSettings(FastTask):
 	def do(self):
 		globs.loadSettings()
 		self.m_oWorker.m_evtInit.set()
-		for strComponent in globs.s_dictSettings["dictModules"].keys():
+		for strComponent in globs.s_dictSettings["listModules"]:
 			TaskModuleInit(self.m_oWorker, strComponent).start()
 		return
 		
 class TaskModuleInit(FastTask):
 	
-	def __init__(self, oWorker, strComponent):
+	def __init__(self, oWorker, strModule):
 		super(TaskModuleInit, self).__init__(oWorker)
-		self.m_strComponent = strComponent
+		self.m_strModule = strModule
 		return
 		
 	def __str__(self):
-		strDesc = "Verwalten des Moduls %s" % (self.m_strComponent)
+		strDesc = "Verwalten des Moduls %s" % (self.m_strModule)
 		return  strDesc
 	
 	def do(self):
 		# Gegebenenfalls die alte Instanz des Moduls entladen
 		bUnloaded = False
-		if (self.m_strComponent in self.m_oWorker.m_dictModules):
-			oInstance = self.m_oWorker.m_dictModules.pop(self.m_strComponent)
+		
+		if (self.m_strModule in self.m_oWorker.m_dictModules):
+			oInstance = self.m_oWorker.m_dictModules.pop(self.m_strModule)
 			oInstance.moduleExit()
 			del oInstance
 			bUnloaded = True
-		if (self.m_strComponent in globs.s_dictSettings["dictModules"] and
-			self.m_strComponent not in globs.s_dictSettings["listInactiveModules"]):
+		
+		if (self.m_strModule in globs.s_dictSettings["listModules"] and
+			self.m_strModule not in globs.s_dictSettings["listInactiveModules"]):
 			# Klasse des Moduls laden
-			clsModule = globs.importComponent("modules." + self.m_strComponent,
-				globs.s_dictSettings["dictModules"][self.m_strComponent])
-			if not clsModule:
+			oModule = globs.importComponent("modules." + self.m_strModule)
+			if not oModule:
 				strMsg = "Das Modul %s kann nicht geladen werden. Wahrscheinlich sind die Einstellungen falsch." % (
-					self.m_strComponent)
+					self.m_strModule)
 				globs.wrn(strMsg)
 				TaskSpeak(self.m_oWorker, strMsg).start()
 				return
-			# Module instanziieren
-			oInstance = clsModule(self.m_oWorker)
-			del clsModule
+			
 			# >>> Critical Section
 			globs.s_oSettingsLock.acquire()
-			if self.m_strComponent not in globs.s_dictSettings:
-				globs.s_dictSettings.update({self.m_strComponent : {}})
-			dictModCfg = globs.s_dictSettings[self.m_strComponent]
-			globs.s_oSettingsLock.release()
-			# <<< Critical Section
+
+			if self.m_strModule not in globs.s_dictSettings:
+				globs.s_dictSettings.update({self.m_strModule : {}})
+			dictModCfg = globs.s_dictSettings[self.m_strModule]
 			dictCfgUsr = {}
 			try:
-				if not oInstance.moduleInit(dictModCfg=dictModCfg, dictCfgUsr=dictCfgUsr):
-					strMsg = "Das Modul %s konnte nicht initialisiert werden." % (self.m_strComponent)
+				oInstance = oModule.createModuleInstance(self.m_oWorker)
+				if (not oInstance
+					or not oInstance.moduleInit(dictModCfg=dictModCfg, dictCfgUsr=dictCfgUsr)):
+					strMsg = "Das Modul %s konnte nicht initialisiert werden." % (self.m_strModule)
 					globs.wrn(strMsg)
 					TaskSpeak(self.m_oWorker, strMsg).start()
-					return
+					oInstance = None
 			except:
-				globs.exc("Verwalten des Moduls %s" % (self.m_strComponent))
+				globs.exc("Verwalten des Moduls %s" % (self.m_strModule))
 				strMsg = "Das Modul %s konnte nicht initialisiert werden. Wahrscheinlich ist es veraltet und nicht mehr kompatibel." % (
-					self.m_strComponent)
+					self.m_strModule)
 				globs.wrn(strMsg)
 				TaskSpeak(self.m_oWorker, strMsg).start()
-				return
-			# Module registrieren
-			self.m_oWorker.m_dictModules.update({self.m_strComponent : oInstance})
-			globs.s_dictUserSettings.update({self.m_strComponent : dictCfgUsr})
-			return
-		if (self.m_strComponent not in globs.s_dictSettings["dictModules"]):
-			# >>> Critical Section
-			globs.s_oSettingsLock.acquire()
-			if self.m_strComponent in globs.s_dictSettings:
-				globs.s_dictSettings.pop(self.m_strComponent)
-			if self.m_strComponent in globs.s_dictUserSettings:
-				globs.s_dictUserSettings.pop(self.m_strComponent)
+				oInstance = None
+
+			if oInstance:
+				self.m_oWorker.m_dictModules.update({self.m_strModule : oInstance})
+				globs.s_dictUserSettings.update({self.m_strModule : dictCfgUsr})
+
 			globs.s_oSettingsLock.release()
 			# <<< Critical Section
-			strMsg = "Das Modul %s wurde dauerhaft entfernt." % (self.m_strComponent)
+
+			return
+		
+		if (self.m_strModule not in globs.s_dictSettings["listModules"]):
+			# >>> Critical Section
+			globs.s_oSettingsLock.acquire()
+			if self.m_strModule in globs.s_dictSettings:
+				globs.s_dictSettings.pop(self.m_strModule)
+			if self.m_strModule in globs.s_dictUserSettings:
+				globs.s_dictUserSettings.pop(self.m_strModule)
+			globs.s_oSettingsLock.release()
+			# <<< Critical Section
+			strMsg = "Das Modul %s wurde dauerhaft entfernt." % (self.m_strModule)
 			globs.log(strMsg)
 			TaskSpeak(self.m_oWorker, strMsg).start()
 			return
-		strMsg = "Das Modul %s wurde ausgeschaltet" % (self.m_strComponent)
+		strMsg = "Das Modul %s wurde ausgeschaltet" % (self.m_strModule)
 		if (bUnloaded):
 			strMsg += " und entladen"
 		strMsg += "."
@@ -357,7 +363,7 @@ class Worker:
 
 	def runSystemWatchDog(self):
 		self.m_oWatchDogTimer = threading.Timer(
-			10.0, self.onRunSystemWatchDog).start()
+			globs.getWatchDogInterval(), self.onRunSystemWatchDog).start()
 		globs.dbg("Systemüberwachung: Nächste Prüfung eingeplant (%s)" % (
 			self.m_oWatchDogTimer))
 		return

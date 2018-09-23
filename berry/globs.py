@@ -9,6 +9,8 @@ import socket
 import queue
 import datetime
 
+import importlib
+
 from collections import deque
 from collections import OrderedDict
 
@@ -47,8 +49,8 @@ s_strStartPageUrl = "/system/startpage.html"
 
 s_dictSettings = {
 	# Registrierung der installierten Module
-	# {"<Paket/Modul>" : "<Klasse>"}
-	"dictModules" : {},
+	# ["<Paket/Modul>", ...]
+	"listModules" : [],
 	# Auflistung der explizit deaktivierten Module
 	# ["<Paket/Modul>", ...]
 	"listInactiveModules" : [],
@@ -68,6 +70,9 @@ s_dictSettings = {
 		"strUsrSoundLocation"	: s_strSoundPath,
 		"fVersion"			: 0.1,
 	},
+	# Fehlende Python-Pakete, die optional mit Pip installiert werden können
+	# {"<Paketname>" : "<Pip Installationskommando>"}
+	"PIP" : {},
 	# HTTP-Weiterleitungen
 	# {"<ID>" : "<URL>"}
 	"Redirects" : {
@@ -236,6 +241,9 @@ def stop():
 def getVersion():
 	return float(0.8)
 
+def getWatchDogInterval():
+	return float(10.0)
+
 def getRedirect(strID, strDefault):
 	if ("Redirects" in s_dictSettings
 		and strID in s_dictSettings["Redirects"]):
@@ -244,22 +252,21 @@ def getRedirect(strID, strDefault):
 		strID, strDefault))
 	return strDefault
 
-def importComponent(strModuleName, strComponentName):
-	oComponent = None
+def importComponent(
+	strModuleName):
+	oModule = None
 	try:
 		log("Importieren des Moduls '%s'" % (strModuleName))
-		oComponent = __import__(strModuleName)
-		strFullName = strModuleName + "." + strComponentName
-		lstComponents = strFullName.split(".")
-		for strComponent in lstComponents[1:]:
-			log("Laden des Attributes '%s' aus dem Objekt '%r'" % (
-				strComponent, oComponent))
-			oComponent = getattr(oComponent, strComponent)
+		if strModuleName in sys.modules:
+			oModule = importlib.reload(sys.modules[strModuleName])
+		else:
+			oModule = importlib.import_module(strModuleName)
 	except:
-		exc("Importieren der Komponente %s aus dem Modul %s" % (
-			strComponentName, strModuleName))
-		oComponent = None
-	return oComponent
+		exc("Importieren des Moduls '%s'" % (
+			strModuleName))
+		oModule = None
+	log("Modul %r importiert" % (oModule))
+	return oModule
 
 def loadSettings():
 	global s_strBasePath
@@ -292,7 +299,7 @@ def loadSettings():
 		oObj = json.load(foFile)
 		foFile.close()
 		for (strKey, varVal) in oObj.items():
-			if (strKey in ["System", "Redirects"]
+			if (strKey in ["System", "PIP", "Redirects"]
 				and strKey in s_dictSettings):
 				s_dictSettings[strKey].update(oObj[strKey])
 			else:
@@ -359,6 +366,12 @@ def loadSettings():
 	if ("System" in s_dictSettings):
 		if ("strLogLvl" in s_dictSettings["System"]):
 			setLogLvl(s_dictSettings["System"]["strLogLvl"])
+
+	# Modulkonfiguration migrieren
+	if ("dictModules" in s_dictSettings
+		and "listModules"  in s_dictSettings):
+		s_dictSettings["listModules"].extend(s_dictSettings["dictModules"].keys())
+		s_dictSettings.pop("dictModules")
 			
 	dbg("Konfiguration: %r" % (s_dictSettings))
 	dbg("Startseite: %r" % (s_oStartPage))
@@ -504,6 +517,105 @@ def registerSoundFile(strFile, strCategory="Default"):
 	s_oSettingsLock.release()
 	# <<< Critical Section
 	return
+
+def registerMissingPipPackage(
+	strPackage,
+	strTitle,
+	strDescription):
+	if not strPackage or not strTitle or not strDescription:
+		err("Ungültige Parameter '%s', '%s', '%s' für optionale Installation von Python-Packages" % (
+			strPackage, strTitle, strDescription))
+		return
+	# >>> Critical Section
+	s_oSettingsLock.acquire()
+	try:
+		if "PIP" not in s_dictSettings:
+			s_dictSettings.update({"PIP" : {}})
+		if "PIP" not in s_dictUserSettings:
+			s_dictUserSettings.update({"PIP" : {}})
+		s_dictSettings["PIP"].update({strPackage : "install"})
+		s_dictUserSettings["PIP"].update(
+			{strPackage : {
+				"title"			: "%s (%s)" % (strTitle, strPackage),
+				"description"	: strDescription,
+				"default"		: "install",
+				"choices"		: {
+					"Paket hinzufügen"	: "install",
+					"Paket entfernen" 	: "uninstall"
+				}
+			}})
+		log("Optional installierbares Python-Paket erfasst: '%s'" % (strPackage))
+	except:
+		exc("Optional installierbares Python-Paket erfassen: '%s'" % (strPackage))
+	s_oSettingsLock.release()
+	# <<< Critical Section
+	return
+
+def unregisterMissingPipPackage(
+	strPackage):
+	if not strPackage:
+		err("Ungültiger Parameter '%s' für das Verwerfen von Python-Packages" % (
+			strPackage))
+		return
+	# >>> Critical Section
+	s_oSettingsLock.acquire()
+	try:
+		if ("PIP" in s_dictSettings
+			and strPackage in s_dictSettings["PIP"]):
+			s_dictSettings["PIP"].pop(strPackage)
+		if ("PIP" in s_dictUserSettings
+			and strPackage in s_dictUserSettings["PIP"]):
+			s_dictUserSettings["PIP"].pop(strPackage)
+		log("Optional installierbares Python-Paket verworfen: '%s'" % (strPackage))
+	except:
+		exc("Optional installierbares Python-Paket verwerfen: '%s'" % (strPackage))
+	s_oSettingsLock.release()
+	# <<< Critical Section
+	return
+
+def updateModuleUserSetting(
+	strModule,
+	strSettingsName,
+	dictSettingsDesc):
+
+	if not strModule or not strSettingsName or not dictSettingsDesc:
+		err("Ungültiger Parameter '%s', '%s', %r für das Aktualisieren von Benutzereinstellungen" % (
+			strPackage, strSettingsName, dictSettingsDesc))
+		return
+
+	# >>> Critical Section
+	s_oSettingsLock.acquire()
+	try:
+		if (strModule in s_dictUserSettings
+			and strModule in s_dictSettings
+			and strSettingsName in s_dictUserSettings[strModule]
+			and strSettingsName in s_dictSettings[strModule]):
+
+			s_dictUserSettings[strModule].update({strSettingsName : dictSettingsDesc})		
+			log("Benutzereinstellungen aktualisiert: '%s', '%s', %r" % (strModule, strSettingsName, dictSettingsDesc))
+		else:
+			err("Benutzereinstellungen aktualisiert: '%s', '%s', %r" % (strModule, strSettingsName, dictSettingsDesc))
+	except:
+		exc("Benutzereinstellungen aktualisieren: '%s', '%s', %r" % (strModule, strSettingsName, dictSettingsDesc))
+	s_oSettingsLock.release()
+	# <<< Critical Section
+
+	return
+
+def isMissingPipPackage(strPackage):
+	bResult = False
+	# >>> Critical Section
+	s_oSettingsLock.acquire()
+	try:
+		if ("PIP" in s_dictSettings
+			and s_dictSettings["PIP"]
+			and strPackage in s_dictSettings["PIP"]):
+			bResult = True
+	except:
+		exc("Optional installierbares Python-Paket abfragen: '%s'" % (strPackage))
+	s_oSettingsLock.release()
+	# <<< Critical Section
+	return bResult
 	
 def dbg(strText):
 	# >>> Critical Section

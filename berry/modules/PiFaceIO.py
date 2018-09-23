@@ -7,6 +7,10 @@ import globs
 from sdk import ModuleBase
 from sdk import TaskModuleEvt
 
+def createModuleInstance(
+	oWorker):
+	return PiFaceIO(oWorker)
+
 class PiFaceIO(ModuleBase):
 	
 	## 

@@ -8,14 +8,14 @@ import re
 import traceback
 import subprocess
 
-import globs
+from . import globs
 
-from voice import Voice
-from worker import Worker
-from httpd import Httpd
+from .voice import Voice
+from .worker import Worker
+from .httpd import Httpd
 
-import sdk
-from sdk import TaskSpeak
+from . import sdk
+from .sdk import TaskSpeak
 
 # Try to import from module "mutagen" which might not be installed on the target system
 #
@@ -70,16 +70,16 @@ class Berry:
 					# Einmalig versuchen, den belegten Port freizugeben
 					oLines = sdk.getShellCmdOutput("netstat -pant")
 					for strLine in oLines:
-						if re.match("tcp\\s+.*\\s+%s\\:%s\\s+%s\\s+LISTEN\\s+\\d+/dbus-daemon" % (
+						if re.match(r"tcp\s+.*\s+%s\:%s\s+%s\s+LISTEN\s+\d+/dbus-daemon" % (
 							re.escape(globs.s_oHttpd.server_address[0]),
 							globs.s_oHttpd.server_address[1],
-							re.escape("0.0.0.0:*"), strLine)):
-							for strToken in re.split("\\s+", strLine):
-								if (re.match("\\d+/dbus-daemon", strToken)):
-									strPID, strProgram = re.split("/", strToken)
+							re.escape("0.0.0.0:*")), strLine):
+							for strToken in re.split(r"\s+", strLine):
+								if (re.match(r"\d+/dbus-daemon", strToken)):
+									strPID, strProgram = re.split(r"/", strToken)
 									break
 							if (strProgram and strPID):
-								break;
+								break
 					if (strProgram and strPID):
 						TaskSpeak(self.m_oWorker,
 							"Das Program %s mit der Prozesskennung %s belegt den Port %s" % (

@@ -8,22 +8,17 @@ import os
 import re
 import tempfile
 import time
-import zipfile
 import uuid
-
-from datetime import datetime
-from zipfile import ZipFile
-from io import BytesIO
+import zipfile
 from collections import OrderedDict
+from datetime import datetime
+from io import BytesIO
+from zipfile import ZipFile
 
-import globs
+from .. import globs
+from ..sdk import ModuleBase, TaskModuleEvt, TaskSpeak, WebClient
+from ..worker import TaskExit
 
-from sdk import ModuleBase
-from sdk import WebClient
-from sdk import TaskSpeak
-from sdk import TaskModuleEvt
-
-from worker import TaskExit
 
 def createModuleInstance(
 	oWorker):

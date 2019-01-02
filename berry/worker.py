@@ -1,11 +1,9 @@
 import threading
 import queue
 
-import globs
-import sdk
-from sdk import LongTask
-from sdk import FastTask
-from sdk import TaskSpeak
+from . import globs
+from . import sdk
+from .sdk import LongTask, FastTask, TaskSpeak
 
 class TaskInit(LongTask):
 	
@@ -34,8 +32,9 @@ class TaskExit(FastTask):
 	
 	def do(self):
 		globs.s_strExitMode = self.m_strMode
-		for oInstance in self.m_oWorker.m_dictModules.values():
-			oInstance.moduleExit()
+		for (oInstance, _) in self.m_oWorker.m_dictModules.values():
+			if (oInstance):
+				oInstance.moduleExit()
 		self.m_oWorker.m_dictModules.clear()
 		globs.saveSettings()
 		globs.shutdown()
@@ -245,20 +244,31 @@ class TaskModuleInit(FastTask):
 	def do(self):
 		# Gegebenenfalls die alte Instanz des Moduls entladen
 		bUnloaded = False
+
+		# Solange das Modul noch nicht geladen worden ist, ist es u.U. nur
+		# unter einem relativen Namen bekannt. Erst nach dem Laden des Moduls
+		# ist sein absoluter Name bekannt, sodass über diesen Namen ein
+		# Reload des Moduls initiiert werden kann.
+		strKnownModuleName = ".modules." + self.m_strModule
+
+		globs.log("m_dictModules: %r" % (self.m_oWorker.m_dictModules))
 		
-		if (self.m_strModule in self.m_oWorker.m_dictModules):
-			oInstance = self.m_oWorker.m_dictModules.pop(self.m_strModule)
-			oInstance.moduleExit()
-			del oInstance
-			bUnloaded = True
+		if (self.m_strModule in self.m_oWorker.m_dictModules.keys()):
+			(oInstance, strKnownModuleName) = self.m_oWorker.m_dictModules[self.m_strModule]
+			globs.log("KnownModuleName: '%s'" % (strKnownModuleName))
+			if (oInstance):
+				self.m_oWorker.m_dictModules.update({self.m_strModule : (None, strKnownModuleName)})
+				oInstance.moduleExit()
+				del oInstance
+				bUnloaded = True
 		
 		if (self.m_strModule in globs.s_dictSettings["listModules"] and
 			self.m_strModule not in globs.s_dictSettings["listInactiveModules"]):
-			# Klasse des Moduls laden
-			oModule = globs.importComponent("modules." + self.m_strModule)
+			# Modul importieren bzw. neu laden (via Reload)
+			oModule = globs.importComponent(strKnownModuleName)
 			if not oModule:
 				strMsg = "Das Modul %s kann nicht geladen werden. Wahrscheinlich sind die Einstellungen falsch." % (
-					self.m_strModule)
+					strKnownModuleName)
 				globs.wrn(strMsg)
 				TaskSpeak(self.m_oWorker, strMsg).start()
 				return
@@ -287,7 +297,7 @@ class TaskModuleInit(FastTask):
 				oInstance = None
 
 			if oInstance:
-				self.m_oWorker.m_dictModules.update({self.m_strModule : oInstance})
+				self.m_oWorker.m_dictModules.update({self.m_strModule : (oInstance, oModule.__name__)})
 				globs.s_dictUserSettings.update({self.m_strModule : dictCfgUsr})
 
 			globs.s_oSettingsLock.release()
@@ -363,7 +373,9 @@ class Worker:
 
 	def runSystemWatchDog(self):
 		self.m_oWatchDogTimer = threading.Timer(
-			globs.getWatchDogInterval(), self.onRunSystemWatchDog).start()
+			globs.getWatchDogInterval(),
+			self.onRunSystemWatchDog)
+		self.m_oWatchDogTimer.start()
 		globs.dbg("Systemüberwachung: Nächste Prüfung eingeplant (%s)" % (
 			self.m_oWatchDogTimer))
 		return

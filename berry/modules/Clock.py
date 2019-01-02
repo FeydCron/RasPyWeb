@@ -2,11 +2,8 @@
 from datetime import datetime
 from datetime import timedelta
 
-import globs
-
-from sdk import ModuleBase
-from sdk import TaskSound
-from sdk import TaskSpeak
+from .. import globs
+from ..sdk import ModuleBase, TaskSound, TaskSpeak
 
 def createModuleInstance(
 	oWorker):
@@ -181,7 +178,7 @@ class Clock(ModuleBase):
 			return (self.m_nHour24h < self.m_nSilenceFrom and self.m_nHour24h > self.m_nSilenceTo)
 		elif self.m_nSilenceFrom < self.m_nSilenceTo:
 			# Outside-Range
-			return (self.m_nHour24 < self.m_nSilenceFrom or self.m_nHour24h > self.m_nSilenceTo)
+			return (self.m_nHour24h < self.m_nSilenceFrom or self.m_nHour24h > self.m_nSilenceTo)
 
 		# No range
 		return True

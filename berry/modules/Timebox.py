@@ -5,14 +5,14 @@
 #  @brief Plug-In für Divoom Timebox.
 #  
 
-import globs
-
-import sdk
-from sdk import ModuleBase
-from sdk import TaskSpeak
-
 import bluetooth
-from bluetooth import *
+from bluetooth import BluetoothSocket, BluetoothError, RFCOMM
+#from bluetooth import *
+
+from .. import globs
+from .. import sdk
+from ..sdk import ModuleBase, LongTask, TaskSpeak
+
 
 def createModuleInstance(
 	oWorker):
@@ -130,69 +130,117 @@ class Timebox(ModuleBase):
 
 		bResult = False
 		for (strCmd, lstArg) in dictQuery.items():
+
 			if (strCmd == "discover"):
 				for strArg in lstArg:
+					
 					# Suche nach Bluetooth-Geräten
 					if (strArg == "start"):
 						TaskSpeak(self.getWorker(), "Es wird nach Bluhtuhf Geräten gesucht").start()
-						
-						dictChoices = {
-							"title"			: "Adresse der Timebox",
-							"description"	: ("Einstellung der Adresse einer Timebox, zu der eine Verbindung hergestellt werden soll."),
-							"default"		: "",
-							"choices"		: {
-								"Keine Timebox verfügbar"		: ""
-							}
-						}
-
-						dictDiscovery = bluetooth.discover_devices(
-							duration=8,
-							lookup_names=True,
-							flush_cache=True,
-							lookup_class=False)
-
-						if len(dictDiscovery) > 0:
-							dictChoices["choices"].clear()
-
-						print("dictDiscovery %r" % (dictDiscovery))
-
-						for strAddr, strName in dictDiscovery:
-							try:
-								dictChoices["choices"].update({strName : strAddr})
-							except:
-								globs.exc("Fehler beim Auswerten der erreichbaren Bluetooth-Geräte")
-
-						globs.updateModuleUserSetting("Timebox", "strAddress", dictChoices);
-
-						TaskSpeak(self.getWorker(), "Die Suche nach Bluhtuhf Geräten ist abgeschlossen").start()
+						TaskTimebox(self.getWorker(), self.doDiscover).start()
 						continue
+			
 			if (strCmd == "timebox"):
 
-				self.m_strAddress = globs.getSetting("Timebox", "strAddress", "^([0-9a-fA-F]{2}[:]){5}([0-9A-F]{2})$", "")
-				self.m_nPort = globs.getSetting("Timebox", "nPort", "\\d{1,5}", 4)
-				self.m_bAutoConnect = globs.getSetting("Timebox", "bAutoConnect", "(True|False)", False)
+				self.m_strAddress = globs.getSetting("Timebox", "strAddress", r"^([0-9a-fA-F]{2}[:]){5}([0-9A-F]{2})$", "")
+				self.m_nPort = globs.getSetting("Timebox", "nPort", r"\d{1,5}", 4)
+				self.m_bAutoConnect = globs.getSetting("Timebox", "bAutoConnect", r"(True|False)", False)
 
 				for strArg in lstArg:
+
 					# Verbindung herstellen
-					if (strArg == "connect"
-						and not self.m_oTimeboxSocket
-						and self.m_strAddress
-						and self.m_nPort != 0):
-
-						self.m_oTimeboxSocket = BluetoothSocket(RFCOMM)
-						self.m_oTimeboxSocket.connect((
-							self.m_strAddress,
-							self.m_nPort))
-
+					if (strArg == "connect"):
+						TaskTimebox(self.getWorker(), self.doConnect).start()
 						continue
+					
 					# Verbindung abbrechen
-					if (strArg == "disconnect"
-						and self.m_oTimeboxSocket):
-
-						self.m_oTimeboxSocket.close()
-						self.m_oTimeboxSocket = None
-
+					if (strArg == "disconnect"):
+						TaskTimebox(self.getWorker(), self.doDisconnect).start()
 						continue
+
 		# Unbekanntes Kommando
 		return bResult
 
+	##
+	# Suche nach Bluetooth-Geräten
+	#
+	def doDiscover(self):
+
+		dictChoices = {
+			"title"			: "Adresse der Timebox",
+			"description"	: ("Einstellung der Adresse einer Timebox, zu der eine Verbindung hergestellt werden soll."),
+			"default"		: "",
+			"choices"		: {
+				"Keine Timebox verfügbar"		: ""
+			}
+		}
+
+		dictDiscovery = bluetooth.discover_devices(
+			duration=8,
+			lookup_names=True,
+			flush_cache=True,
+			lookup_class=False)
+
+		if len(dictDiscovery) > 0:
+			dictChoices["choices"].clear()
+
+		print("dictDiscovery %r" % (dictDiscovery))
+
+		for strAddr, strName in dictDiscovery:
+			try:
+				dictChoices["choices"].update({strName : strAddr})
+			except:
+				globs.exc("Fehler beim Auswerten der erreichbaren Bluetooth-Geräte")
+
+		globs.updateModuleUserSetting("Timebox", "strAddress", dictChoices)
+
+		TaskSpeak(self.getWorker(), "Die Suche nach Bluhtuhf Geräten ist abgeschlossen").start()
+
+		return
+	
+	##
+	# Verbindung herstellen
+	#
+	def doConnect(self):
+
+		if (not self.m_oTimeboxSocket
+			and self.m_strAddress
+			and self.m_nPort != 0):
+
+			self.m_oTimeboxSocket = BluetoothSocket(RFCOMM)
+			self.m_oTimeboxSocket.connect((
+				self.m_strAddress,
+				self.m_nPort))
+
+			TaskSpeak(self.getWorker(), "Die Verbindung zur Teimbox wurde hergestellt").start()
+
+		return
+	
+	##
+	# Verbindung trennen
+	#
+	def doDisconnect(self):
+
+		if (self.m_oTimeboxSocket):
+
+			self.m_oTimeboxSocket.close()
+			self.m_oTimeboxSocket = None
+
+			TaskSpeak(self.getWorker(), "Die Verbindung zur Teimbox wurde getrennt").start()
+
+		return
+
+class TaskTimebox(LongTask):
+	
+	def __init__(self, oWorker, oFxn):
+		super(TaskTimebox, self).__init__(oWorker)
+		self.m_oFxn = oFxn
+		return
+		
+	def __str__(self):
+		strDesc = "Timebox-Aufgabe ausführen (%r)" % (self.m_oFxn)
+		return  strDesc
+	
+	def do(self):
+		self.m_oFxn()
+		return

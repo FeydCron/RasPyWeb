@@ -449,9 +449,9 @@ import subprocess
 import urllib.parse
 import threading
 
-import globs
-from sound import Sound
-from voice import Voice
+from . import globs
+from .sound import Sound
+from .voice import Voice
 
 ## 
 #  @brief Werkzeug zum Erstellen von einfach strukturieren HTML-Seiten.
@@ -1303,9 +1303,10 @@ class TaskModuleEvt(FastTask):
 		return  strDesc
 	
 	def do(self):
-		for oInstance in self.m_oWorker.m_dictModules.values():
-			self.m_oResult = oInstance.moduleExec(self.m_strPath,
-				None, self.m_dictQuery, self.m_dictForm)
+		for (oInstance, _) in self.m_oWorker.m_dictModules.values():
+			if (oInstance):
+				self.m_oResult = oInstance.moduleExec(self.m_strPath,
+					None, self.m_dictQuery, self.m_dictForm)
 		return
 
 class WebResponse:
@@ -1316,7 +1317,7 @@ class WebResponse:
 		oHeader,
 		oData
 		):
-		self.m_bOK = (nStatus == http.client.OK)
+		self.m_bOK = (nStatus == http.HTTPStatus.OK[0])
 		self.m_nStatus = nStatus
 		self.m_strReason = ("%s" % oReason)
 		self.m_dictHeader = dict(oHeader)
@@ -1336,10 +1337,10 @@ class WebClient:
 		):
 		
 		lstRedirect = (
-			http.client.MOVED_PERMANENTLY,
-			http.client.FOUND,
-			http.client.SEE_OTHER,
-			http.client.TEMPORARY_REDIRECT)
+			http.HTTPStatus.MOVED_PERMANENTLY[0],
+			http.HTTPStatus.FOUND[0],
+			http.HTTPStatus.SEE_OTHER[0],
+			http.HTTPStatus.TEMPORARY_REDIRECT[0])
 		oConn = None
 		oUrlSplit = urllib.parse.urlsplit(strUrl)
 		
@@ -1351,7 +1352,7 @@ class WebClient:
 		oConn.request("GET", strUrl)
 		oResp = oConn.getresponse()
 		
-		if (oResp.status == http.client.OK):
+		if (oResp.status == http.HTTPStatus.OK[0]):
 			oWebResponse = WebResponse(
 				nStatus=oResp.status,
 				oReason=oResp.reason,
@@ -1448,7 +1449,7 @@ def getCpuTemp():
 # Return current CPU usage in percent as a string value
 def getCpuUse():
 	strResult = subprocess.check_output(
-		"top -b -n1 | awk '/Cpu\(s\):/ {print $2}'",
+		"top -b -n1 | awk '/Cpu\\(s\\):/ {print $2}'",
 		stderr = subprocess.STDOUT,
 		shell = True,
 		universal_newlines = True)
@@ -1501,7 +1502,7 @@ def getAlsaControlValue(
 	regexSep = r"[\n\r]"
 	lstLines = re.split(regexSep, strResult)
 	for strLine in lstLines:
-		if (re.match(".*name\=\'" + strName + "\'", strLine)):
+		if (re.match(r".*name\=\'" + strName + r"\'", strLine)):
 			regexSep = r"[\,]"
 			strIdent = re.split(regexSep, strLine)[0]
 			break
@@ -1519,7 +1520,7 @@ def getAlsaControlValue(
 	lstLines = re.split(regexSep, strResult)
 	strResult = ""
 	for strLine in lstLines:
-		if (re.match("\s+\: values\=", strLine)):
+		if (re.match(r"\s+\: values\=", strLine)):
 			regexSep = r"[\=]"
 			strResult = re.split(regexSep, strLine)[1]
 			break
@@ -1541,7 +1542,7 @@ def setAlsaControlValue(
 	regexSep = r"[\n\r]"
 	lstLines = re.split(regexSep, strResult)
 	for strLine in lstLines:
-		if (re.match(".*name\=\'" + strName + "\'", strLine)):
+		if (re.match(r".*name\=\'" + strName + r"\'", strLine)):
 			regexSep = r"[\,]"
 			strIdent = re.split(regexSep, strLine)[0]
 			break
@@ -1691,19 +1692,19 @@ def fetchImapEmail(
 		strResp, tupData = oImapSession.login(strUsername, strPassword)
 		if (strResp != "OK"):
 			globs.err("IMAP4_SSL login response ("+strResp+"): "+str(tupData))
-			raise
+			return
 		globs.log("IMAP4_SSL login response ("+strResp+"): "+str(tupData))
 		# Select a mailbox
 		strResp, tupData = oImapSession.select(strMailbox)
 		if (strResp != "OK"):
 			globs.err("IMAP4_SSL select mailbox response ("+strResp+"): "+str(tupData))
-			raise
+			return
 		bMailboxSelected = True
 		globs.dbg("IMAP4_SSL select mailbox response ("+strResp+"): "+str(tupData))
 		strResp, tupData = oImapSession.search(None, strSearch)
 		if (strResp != "OK"):
 			globs.err("IMAP4_SSL search mailbox response ("+strResp+"): "+str(tupData))
-			raise
+			return
 		bMailboxSelected = True
 		globs.dbg("IMAP4_SSL search mailbox response ("+strResp+"): "+str(tupData))
 		# Iterate over emails
@@ -1712,7 +1713,7 @@ def fetchImapEmail(
 			strResp, oEmailData = oImapSession.fetch(msgId, "(RFC822)")
 			if (strResp != "OK"):
 				globs.err("IMAP4_SSL fetch response ("+strResp+"): "+str(oEmailData))
-				raise
+				return
 			globs.dbg("IMAP4_SSL fetch response ("+strResp+")")
 			try:
 				oRawMail = oEmailData[0][1]

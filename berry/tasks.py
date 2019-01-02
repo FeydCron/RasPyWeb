@@ -1,4 +1,4 @@
-from sdk import LongTask
+from .sdk import LongTask
 
 class TaskCheckForUpdates(LongTask):
 	

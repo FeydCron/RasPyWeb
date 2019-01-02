@@ -16,13 +16,15 @@ import time
 #	'Play'		- <sound> Abspielen des angegebenen Sounds
 #	'Talk'		- <Text> Sprechen des angegebenen Textes
 schedule = {
-	'Test': {
-		'Weekday':	range(22, 23),
-		'Hour': 	range(0, 23),
-		'Minute':	range(0, 59),
-		'Time': 	True,
-		'Play':		"Horse",
-		'Talk':		"Dies ist nur ein Test"}}
+	"Test": {
+		"Weekday"	:	range(22, 23),
+		"Hour"		: 	range(0, 23),
+		"Minute"	:	range(0, 59),
+		"Time"		: 	True,
+		"Play"		:	"Horse",
+		"Talk"		:	"Dies ist nur ein Test"
+	}
+}
 
 # Globale Variablen
 sMonName = ""	# Monatsname (%B)
@@ -50,16 +52,13 @@ def watchScheduledEvents():
 	global nMonYear
 	
 	isTrigger = False
-	scheduled = False
 	
-	for name, param in schedule:
+	for (_, param) in schedule.items():
 		isTrigger = True
-		if param['Year'] and isTrigger:
+		if param["Year"] and isTrigger:
 			isTrigger = nYear4xY in param['Year']
-			scheduled = True
 		if param['Month'] and isTrigger:
 			isTrigger = nMonYear in param['Month']
-			scheduled = True
 		if param['Day'] and isTrigger:
 			#isTrigger = nDay
 			pass
@@ -186,20 +185,20 @@ def sound(strSound):
 		print('Now playing: "%s" <%s>' %(strSound, strFile))
 		os.system('%s "%s"' %(strPlay, strFile))
 	else:
-		print("*** Error: File <%s> not found!" %strFile);
+		print("*** Error: File <%s> not found!" %strFile)
 
 # Testroutine für sound abspielen
 def testSound():
 	global sounds
 
-	for strKey, listSounds in sounds.items():
+	for _, listSounds in sounds.items():
 		for strSound in listSounds:
 			sound(strSound)
 
 # Glockenschlag
 def gong(nCount):
-	for i in range(nCount):
-		os.system("aplay /usr/share/scratch/Media/Sounds/Effects/BellToll.wav");
+	for _ in range(nCount):
+		os.system("aplay /usr/share/scratch/Media/Sounds/Effects/BellToll.wav")
 
 # Akustische Zeitanzeige
 def signalTime():

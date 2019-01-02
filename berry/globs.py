@@ -1,22 +1,19 @@
-import os
-import sys
-import json
-import re
-import traceback
-import pickle
-import threading
-import socket
-import queue
 import datetime
-
 import importlib
+import json
+import os
+import pickle
+import queue
+import re
+import socket
+import sys
+import threading
+import traceback
+from collections import OrderedDict, deque
 
-from collections import deque
-from collections import OrderedDict
+from . import httpd
+from .httpd import StartPage
 
-from httpd import StartPage
-
-	
 # Defines test values for CPU temperatures for being used with
 # a module test
 s_oQueueTestCpuTempValues = queue.Queue()
@@ -256,16 +253,17 @@ def importComponent(
 	strModuleName):
 	oModule = None
 	try:
-		log("Importieren des Moduls '%s'" % (strModuleName))
 		if strModuleName in sys.modules:
+			log("Importieren des Moduls '%s' via Reload" % (strModuleName))
 			oModule = importlib.reload(sys.modules[strModuleName])
 		else:
-			oModule = importlib.import_module(strModuleName)
+			log("Importieren des Moduls '%s' via Import" % (strModuleName))
+			oModule = importlib.import_module(strModuleName, __package__)
 	except:
 		exc("Importieren des Moduls '%s'" % (
 			strModuleName))
 		oModule = None
-	log("Modul %r importiert" % (oModule))
+	log("Modul %r (%s) importiert" % (oModule, oModule.__name__))
 	return oModule
 
 def loadSettings():
@@ -319,10 +317,10 @@ def loadSettings():
 		log("Fehlerspeicher nicht vorhanden: '%s'" % (
 			s_strLogMemFile))
 	while bRetry and os.path.isfile(s_strLogMemFile):
+		bRetry = False
 		try:
 			with open(s_strLogMemFile, "rb") as f:
 				oLogMem = pickle.load(f)
-			bRetry = False
 		except:
 			exc("Laden des Fehlerspeichers von '%s'" % (
 				s_strLogMemFile))
@@ -347,11 +345,10 @@ def loadSettings():
 		log("Startseite nicht vorhanden: '%s'" % (
 			s_strLogMemFile))
 	while bRetry and os.path.isfile(s_strStartPageFile):
-		# Startseite lesen
+		bRetry = False
 		try:
 			with open(s_strStartPageFile, "rb") as f:
 				s_oStartPage = pickle.load(f)
-			bRetry = False
 		except:
 			exc("Laden der Startseite von '%s'" % (
 				s_strStartPageFile))
@@ -387,7 +384,7 @@ def migrateFile(strFilename):
 	try:
 		with open(strFilename, "rb") as f:
 			oData = f.read()
-		if oData.find(bOld):
+		if bOld in oData:
 			with open(strFilename, "wb") as f:
 				f.write(oData.replace(bOld, bNew))
 			log("Migration der Datei '%s' erfolgreich" % (
@@ -580,7 +577,7 @@ def updateModuleUserSetting(
 
 	if not strModule or not strSettingsName or not dictSettingsDesc:
 		err("Ungültiger Parameter '%s', '%s', %r für das Aktualisieren von Benutzereinstellungen" % (
-			strPackage, strSettingsName, dictSettingsDesc))
+			strModule, strSettingsName, dictSettingsDesc))
 		return
 
 	# >>> Critical Section

@@ -2,7 +2,7 @@ import os.path
 import re
 import subprocess
 
-import globs
+from . import globs
 
 # Try to import from module "mutagen" which might not be installed on the target system
 #
@@ -24,7 +24,7 @@ class Sound:
 	def sound(self, strSound):
 		strFile = None
 		lstArgs = None
-		strPlay = "aplay"
+		#strPlay = "aplay"
 		fTimeout = None
 
 		# >>> Critical Section

@@ -15,19 +15,12 @@ from collections import OrderedDict
 from zipfile import ZipFile
 from io import BytesIO
 
-import globs
+from . import globs
 
-from worker import TaskModuleInit
-from worker import TaskExit
+from .worker import TaskModuleInit, TaskExit
 
-import sdk
-from sdk import TaskSpeak
-from sdk import TaskSound
-from sdk import FastTask
-from sdk import FutureTask
-from sdk import HtmlPage
-from sdk import TaskModuleEvt
-from sdk import TaskSaveSettings
+from . import sdk
+from .sdk import TaskSpeak, TaskSound, FastTask, FutureTask, HtmlPage, TaskModuleEvt, TaskSaveSettings
 
 g_oHttpdWorker = None
 	
@@ -210,7 +203,7 @@ class Section(OrderedDict):
 					strClass = "ym-gl"
 				oHtmlPage.append(
 					"<article class=\"ym-g50 %s\">" % (strClass))
-			oHtmlPage.append("<div class=\"ym-gbox\">");
+			oHtmlPage.append("<div class=\"ym-gbox\">")
 			oArticle.writeToPage(oHtmlPage)
 			oHtmlPage.extend([
 				"</div>",
@@ -396,8 +389,8 @@ class TaskModuleCmd(FutureTask):
 		return  strDesc
 	
 	def do(self):
-		for (strName, oInstance) in self.m_oWorker.m_dictModules.items():
-			if (re.match("/modules/%s\\..+" % (strName), self.m_strPath)):
+		for (strName, (oInstance, _)) in self.m_oWorker.m_dictModules.items():
+			if (oInstance and re.match("/modules/%s\\..+" % (strName), self.m_strPath)):
 				self.m_oResult = oInstance.moduleExec(self.m_strPath,
 					self.m_oHtmlPage, self.m_dictQuery, self.m_dictForm)
 				return
@@ -417,7 +410,7 @@ class TaskInstallModule(FastTask):
 	
 	def do(self):
 		if not self.m_strModule in globs.s_dictSettings["listModules"]:
-			globs.globs.s_dictSettings["listModules"].append(self.m_strModule)
+			globs.s_dictSettings["listModules"].append(self.m_strModule)
 		return
 		
 class TaskRemoveModule(FastTask):
@@ -493,20 +486,20 @@ class TaskDisplayModules(FutureTask):
 			["Modul", "Status"],
 			strChk = "Auswahl")
 		for strModule in sorted(globs.s_dictSettings["listModules"]):
-			strStatus = "primary"
+			strStatus = "info"
 			strContent = "N/A"
 			if strModule in globs.s_dictSettings["listInactiveModules"]:
-				strStatus = "warning ym-forbid"
+				strStatus = "warning"
 				strContent = "Ausgeschaltet"
-			elif strModule not in self.m_oWorker.m_dictModules:
-				strStatus = "danger ym-noentry"
+			elif strModule not in self.m_oWorker.m_dictModules.keys():
+				strStatus = "error"
 				strContent = "Fehlerhaft"
 			else:
-				strStatus = "success ym-play"
+				strStatus = "success"
 				strContent = "Eingeschaltet"
 			self.m_oHtmlPage.appendTableForm(
 				strModule,
-				["%s" % (strModule), strContent],
+				["%s" % (strModule), "<div class=\"%s\">%s</div>" % (strStatus, strContent)],
 				bChk = False, bEscape=False)
 		self.m_oHtmlPage.closeTableForm(
 			dictAct = {
@@ -554,7 +547,7 @@ class TaskDisplaySystem(FutureTask):
 				if strVal in self.m_dictQuery:
 					self.m_strFxn = "%s" % (strVal)
 					self.m_strArg = self.m_dictQuery[self.m_strFxn][0]
-					break;		
+					break
 			if (self.m_strFxn
 				and self.m_strFxn == "edit"
 				and self.m_strArg):

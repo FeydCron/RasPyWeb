@@ -569,7 +569,7 @@ class HtmlPage(list):
 			"<html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\">" +
 			"<head>" +
 			"<meta charset=\"utf-8\"/>" +
-			"<title>%s</title>" % (html.escape(self.m_strTitle)) +
+			"<title>%s</title>" % (html.escape("%s" % self.m_strTitle)) +
 			"%s" % (self.m_strAutoRefresh) +
 			"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">" +
 			"<link href=\"../css/flexible-columns.css\" rel=\"stylesheet\" type=\"text/css\"/>" +
@@ -643,16 +643,16 @@ class HtmlPage(list):
 				"ym-form ym-full", "post", "multipart/form-data", self.m_strPath),
 			"<div class=\"ym-fbox\">",
 			"<table%s>" % (strClass),
-			"<caption>%s</caption>" % (html.escape(strCaption)),
+			"<caption>%s</caption>" % (html.escape("%s" % strCaption)),
 			"<thead>",
 			"<tr>",
 		])
 		if self.m_bChk:
-			self.append("<th>%s</th>" % (html.escape(strChk)))
+			self.append("<th>%s</th>" % (html.escape("%s" % strChk)))
 		for strHead in lstHeader:
-			self.append("<th>%s</th>" % (html.escape(strHead)))
+			self.append("<th>%s</th>" % (html.escape("%s" % strHead)))
 		if self.m_bAct:
-			self.append("<th>%s</th>" % (html.escape(strAct)))
+			self.append("<th>%s</th>" % (html.escape("%s" % strAct)))
 		self.extend([
 			"</tr>",
 			"</thead>",
@@ -730,7 +730,7 @@ class HtmlPage(list):
 			self.append("</td>")
 		for strData in lstData:
 			if bEscape:
-				strData = html.escape(strData)
+				strData = html.escape("%s" % strData)
 			self.append("<td>%s</td>" % (strData))
 		if self.m_bAct:
 			self.append("<td style=\"white-space:nowrap\">")
@@ -745,7 +745,7 @@ class HtmlPage(list):
 					elif strParam == "content":
 						strContent = strValue
 						if bEscape:
-							strContent = html.escape(strContent)
+							strContent = html.escape("%s" % strContent)
 					elif strParam == "query":
 						strHRef += "?" + strValue
 					else:
@@ -788,7 +788,7 @@ class HtmlPage(list):
 						strAttr += " %s=\"%s\"" % (strParam, strValue)
 				self.append(
 					"<button class=\"%s\" name=\"submit\" value=\"%s\" type=\"submit\" style=\"margin-top:10px;\" %s>%s</button>"  % (
-					strType, strName, strAttr, html.escape(strContent)))
+					strType, strName, strAttr, html.escape("%s" % strContent)))
 			if bReset:
 				self.append(
 					"<button type=\"reset\" class=\"reset ym-delete ym-warning\" style=\"margin-top:10px;\">Zurücksetzen</button>")
@@ -814,12 +814,12 @@ class HtmlPage(list):
 			strClass = ""
 		self.extend([
 			"<table%s>" % (strClass),
-			"<caption>%s</caption>" % (html.escape(strCaption)),
+			"<caption>%s</caption>" % (html.escape("%s" % strCaption)),
 			"<thead>",
 			"<tr>",
 		])
 		for strHead in lstHeader:
-			self.append("<th>%s</th>" % (html.escape(strHead)))
+			self.append("<th>%s</th>" % (html.escape("%s" % strHead)))
 		self.extend([
 			"</tr>",
 			"</thead>",
@@ -833,7 +833,7 @@ class HtmlPage(list):
 		])
 		for strData in lstData:
 			if bEscape:
-				strData = html.escape(strData)
+				strData = html.escape("%s" % strData)
 			if bFirstIsHead:
 				bFirstIsHead = False
 				self.append("<th>%s</th>" % (strData))
@@ -849,7 +849,7 @@ class HtmlPage(list):
 		])
 		for strData in lstData:
 			if bEscape:
-				strData = html.escape(strData)
+				strData = html.escape("%s" % strData)
 			self.append("<th>%s</th>" % (strData))
 		self.extend([
 			"</tr></thead>",
@@ -903,8 +903,9 @@ class HtmlPage(list):
 			for (strName, lstProps) in dictButtons.items():
 				self.append(
 					"<button name=\"%s\" value=\"%s\" type=\"submit\" class=\"%s\">%s</button>" % (
-						strName, lstProps[0], lstProps[2], html.escape(lstProps[1])))
+						strName, lstProps[0], lstProps[2], html.escape("%s" % lstProps[1])))
 			self.append("</div>")
+		self.append("</form>")
 		return
 		
 	def appendForm(self, strName, strInput="", strTitle="", bSelected=False,
@@ -914,9 +915,9 @@ class HtmlPage(list):
 		strSelected = ""
 		if bEscape:
 			if strTitle:
-				strTitle = html.escape(strTitle)
+				strTitle = html.escape("%s" % strTitle)
 			if strTip:
-				strTip = html.escape(strTip)
+				strTip = html.escape("%s" % strTip)
 		if dictChoice:
 			if bCheck or bRadio:
 				strType = "checkbox"
@@ -937,7 +938,7 @@ class HtmlPage(list):
 						self.append("<p>%s</p>" % (oName))
 						for oItem in sorted(oValue):
 							self.m_nId += 1
-							if (bSelected or strInput == oItem):
+							if (bSelected or strInput == "%s" % oItem):
 								strSelected = "checked"
 							else:
 								strSelected = ""
@@ -946,12 +947,12 @@ class HtmlPage(list):
 								"<input type=\"%s\" name=\"%s\" value=\"%s\" id=\"%s\" %s/>" % (
 									strType, strName, oItem, self.m_nId, strSelected),
 								"<label for=\"%s\">%s</label>" % (
-									self.m_nId, html.escape(oItem)),
+									self.m_nId, html.escape("%s" % oItem)),
 								"</div>"
 							])
 					else:
 						self.m_nId += 1
-						if (bSelected or strInput == oValue):
+						if (bSelected or strInput == "%s" % oValue):
 							strSelected = "checked"
 						else:
 							strSelected = ""
@@ -982,34 +983,34 @@ class HtmlPage(list):
 						strName, nSize, self.m_nId))
 				for (oName, oValue) in sorted(dictChoice.items()):
 					if bEscape:
-						oName = html.escape(oName)
+						oName = html.escape("%s" % oName)
 					self.m_nId += 1
 					if (isinstance(oValue, dict)):
 						self.append("<optgroup label=\"%s\">" % (oName))
 						for (oName, oItem) in sorted(oValue.items()):
-							if ((bUseKeyAsValue and strInput == oName) or
-								(not bUseKeyAsValue and strInput == oItem)):
+							if ((bUseKeyAsValue and strInput == "%s" % oName) or
+								(not bUseKeyAsValue and strInput == "%s" % oItem)):
 								strSelected = "selected=\"selected\""
 							else:
 								strSelected = ""
 							if bUseKeyAsValue:
 								oItem = oName
 							if bEscape:
-								oItem = html.escape(oItem)
+								oItem = html.escape("%s" % oItem)
 							self.append(
 								"<option value=\"%s\" %s>%s</option>" % (
 									oItem, strSelected, oName))
 						self.append("</optgroup>")
 					else:
-						if ((bUseKeyAsValue and strInput == oName) or
-							(not bUseKeyAsValue and strInput == oValue)):
+						if ((bUseKeyAsValue and strInput == "%s" % oName) or
+							((not bUseKeyAsValue) and strInput == "%s" % oValue)):
 							strSelected = "selected=\"selected\""
 						else:
 							strSelected = ""
 						if bUseKeyAsValue:
 							oValue = oName
 						if bEscape:
-							oValue = html.escape(oValue)
+							oValue = html.escape("%s" % (oValue))
 						self.append(
 							"<option value=\"%s\" %s>%s</option>" % (
 								oValue, strSelected, oName))
@@ -1024,7 +1025,7 @@ class HtmlPage(list):
 					self.m_nId, strTitle))
 			self.append(
 				"<textarea id=\"%s\" rows=\"%s\" name=\"%s\">%s</textarea>" % (
-				self.m_nId, nLines, strName, html.escape(strInput)))
+				self.m_nId, nLines, strName, html.escape("%s" % strInput)))
 			self.append("</div>")
 		elif bCheck:
 			# Einzelne Check-Box
@@ -1036,7 +1037,7 @@ class HtmlPage(list):
 			if not strTitle:
 				strTitle = strInput
 				if strTitle and bEscape:
-					strTitle = html.escape(strTitle)
+					strTitle = html.escape("%s" % strTitle)
 			self.m_nId += 1
 			self.extend([
 				"<input type=\"checkbox\" name=\"%s\" value=\"%s\" id=\"%s\" %s/>" % (
@@ -1060,14 +1061,14 @@ class HtmlPage(list):
 				"<label for=\"%s\">%s</label>" % (
 					self.m_nId, strTitle),
 				"<input type=\"%s\" name=\"%s\" value=\"%s\" id=\"%s\" %s placeholder=\"%s\"/>" % (
-					strTextType, strName, strInput, self.m_nId, strTypePattern, html.escape(strInput)),
+					strTextType, strName, strInput, self.m_nId, strTypePattern, html.escape("%s" % strInput)),
 				"</div>"
 			])
 		return
 		
 	def createText(self, strText):
 		self.extend([
-			"<p>%s</p>" % (html.escape(strText))
+			"<p>%s</p>" % (html.escape("%s" % strText))
 		])
 		return
 	
@@ -1079,8 +1080,8 @@ class HtmlPage(list):
 		
 		self.extend([
 			"<div class=\"box %s\">" % (strType),
-			"<h3>%s</h3>" % (html.escape(strTitle)),
-			"<p>%s</p>" % (html.escape(strMsg)),
+			"<h3>%s</h3>" % (html.escape("%s" % strTitle)),
+			"<p>%s</p>" % (html.escape("%s" % strMsg)),
 		])
 		if bClose:
 			self.append(
@@ -1093,7 +1094,7 @@ class HtmlPage(list):
 		if not strHRef:
 			strHRef = self.m_strPath
 		self.append("<a class=\"ym-button %s\" style=\"margin-top:10px;\" href=\"%s\">%s</a>" % (
-			strClass, strHRef, html.escape(strTitle)))
+			strClass, strHRef, html.escape("%s" % strTitle)))
 		return
 		
 	def closeBox(self):
@@ -1317,7 +1318,7 @@ class WebResponse:
 		oHeader,
 		oData
 		):
-		self.m_bOK = (nStatus == http.HTTPStatus.OK[0])
+		self.m_bOK = (nStatus == http.HTTPStatus.OK)
 		self.m_nStatus = nStatus
 		self.m_strReason = ("%s" % oReason)
 		self.m_dictHeader = dict(oHeader)
@@ -1337,10 +1338,10 @@ class WebClient:
 		):
 		
 		lstRedirect = (
-			http.HTTPStatus.MOVED_PERMANENTLY[0],
-			http.HTTPStatus.FOUND[0],
-			http.HTTPStatus.SEE_OTHER[0],
-			http.HTTPStatus.TEMPORARY_REDIRECT[0])
+			http.HTTPStatus.MOVED_PERMANENTLY,
+			http.HTTPStatus.FOUND,
+			http.HTTPStatus.SEE_OTHER,
+			http.HTTPStatus.TEMPORARY_REDIRECT)
 		oConn = None
 		oUrlSplit = urllib.parse.urlsplit(strUrl)
 		
@@ -1352,7 +1353,7 @@ class WebClient:
 		oConn.request("GET", strUrl)
 		oResp = oConn.getresponse()
 		
-		if (oResp.status == http.HTTPStatus.OK[0]):
+		if (oResp.status == http.HTTPStatus.OK):
 			oWebResponse = WebResponse(
 				nStatus=oResp.status,
 				oReason=oResp.reason,

@@ -563,6 +563,11 @@ class TaskDisplaySystem(FutureTask):
 		if (self.m_strFxn and self.m_strArg):
 			if not self.updateValue():
 				return
+			TaskModuleEvt(g_oHttpdWorker, "/int/evt.src",
+				dictQuery={
+					"system" : [self.m_strFxn]
+				}
+			).start()
 				
 		self.displayValues()
 		return
@@ -633,39 +638,39 @@ class TaskDisplaySystem(FutureTask):
 		
 	def updateValue(self):
 		strResult = ""
+
 		if (self.m_strFxn == "date"):
 			try:
 				strResult = sdk.setDate(self.m_strArg, "%d.%m.%Y")
-				self.m_oHtmlPage.createBox("Datum",
-					"Das Datum \"%s\" wurde übernommen und mit folgendem Ergebnis angewendet: %s" % (
-						self.m_strArg, strResult))
-				return False
+				globs.log("Datum einstellen: %s" % (strResult))
 			except Exception as ex:
 				strResult = " %s" % (ex)
 				globs.wrn("Datum einstellen: %s" % (strResult))
+			else:
+				return True
 			try:
 				strResult = sdk.setDate(self.m_strArg, "%Y-%m-%d")
-				self.m_oHtmlPage.createBox("Datum",
-					"Das Datum \"%s\" wurde übernommen und mit folgendem Ergebnis angewendet: %s" % (
-						self.m_strArg, strResult))
-				return False
+				globs.log("Datum einstellen: %s" % (strResult))
 			except Exception as ex:
 				globs.exc("Datum einstellen")
 				strResult = " %s" % (ex)
+			else:
+				return True
 		elif (self.m_strFxn == "time"):
 			try:
 				strResult = sdk.setTime(self.m_strArg, "%H:%M:%S")
-				self.m_oHtmlPage.createBox("Uhrzeit",
-					"Die Uhrzeit \"%s\" wurde übernommen und mit folgendem Ergebnis angewendet: %s" % (
-						self.m_strArg, strResult))
-				return False
+				globs.log("Uhrzeit einstellen: %s" % (strResult))
 			except Exception as ex:
 				globs.exc("Uhrzeit einstellen")
 				strResult = " %s" % (ex)
+			else:
+				return True
+
 		self.m_oHtmlPage.createBox(self.m_strFxn,
 			"Die Einstellung \"%s\" konnte nicht auf den Wert \"%s\" geändert werden.%s" % (
 			self.m_strFxn, self.m_strArg, strResult),
 			strType="warning")
+
 		return False
 		
 class TaskDisplaySettings(FutureTask):
@@ -776,6 +781,8 @@ class TaskDisplaySettings(FutureTask):
 		strTitle = self.m_strVal
 		strDesc = ""
 		strDefault = ""
+		strType = ""
+		strPattern = ""
 		varVal = None
 		bUseKeyAsValue = False
 		# >>> Critical Section
@@ -802,6 +809,10 @@ class TaskDisplaySettings(FutureTask):
 					dictChoices = dictProperties["choices"]
 				if "keyIsValue" in dictProperties:
 					bUseKeyAsValue = dictProperties["keyIsValue"]
+				if "type" in dictProperties:
+					strType = dictProperties["type"]
+				if "pattern" in dictProperties:
+					strPattern = dictProperties["pattern"]
 		except:
 			globs.exc("Ändern der Konfiguration")
 			varVal = None
@@ -819,17 +830,29 @@ class TaskDisplaySettings(FutureTask):
 			"key" 		: self.m_strKey
 		})
 		if isinstance(varVal, bool):
-			self.m_oHtmlPage.appendForm(self.m_strVal,
-				strInput="%s" % (varVal),
-				strTitle=strTitle,
-				dictChoice = {
+			bCheck = True if strType == "check" else False
+			bRadio = True if strType == "radio" else False
+			if (bRadio or not bCheck) and not dictChoices:
+				dictChoices = {
 					"Ein"	: "True",
 					"Aus"	: "False"
-				})
-		else:
+				}
 			self.m_oHtmlPage.appendForm(self.m_strVal,
 				strInput="%s" % (varVal),
 				strTitle=strTitle,
+				bCheck=bCheck,
+				bRadio=bRadio,
+				dictChoice = dictChoices)
+		else:
+			bCheck = True if strType == "check" else False
+			bButton = True if strType == "button" else False
+			self.m_oHtmlPage.appendForm(self.m_strVal,
+				strInput="%s" % (varVal),
+				strTitle=strTitle,
+				bCheck=bCheck,
+				bButton=bButton,
+				strTextType=strType,
+				strTypePattern=strPattern,
 				dictChoice=dictChoices,
 				bUseKeyAsValue=bUseKeyAsValue)	
 		self.m_oHtmlPage.closeForm()
@@ -856,6 +879,14 @@ class TaskDisplaySettings(FutureTask):
 			return False
 		elif globs.setSetting(self.m_strKey, self.m_strFxn, self.m_strVal):
 			globs.saveSettings()
+			TaskModuleEvt(g_oHttpdWorker, "/int/evt.src",
+				dictQuery={
+					"settings" : [self.m_strKey]
+				},
+				dictForm={
+					self.m_strFxn : [self.m_strVal]
+				}
+			).start()
 			return True
 		self.m_oHtmlPage.createBox(self.m_strFxn,
 			"Die Einstellung \"%s\" konnte nicht auf den Wert \"%s\" geändert werden." % (
@@ -932,10 +963,10 @@ class TaskDisplayLogMem(FutureTask):
 				self.m_oHtmlPage.append("<ul>")
 				for (filename, line, function, text) in oLogEntry.m_lstTB:
 					self.m_oHtmlPage.append("<li>File \"%s\", line %s, in %s %s</li>" % (
-						html.escape(filename),
+						html.escape("%s" % filename),
 						line,
-						html.escape(function),
-						html.escape(text)))
+						html.escape("%s" % function),
+						html.escape("%s" % text)))
 				self.m_oHtmlPage.append("</ul>")
 			self.m_oHtmlPage.createButton("OK")
 			self.m_oHtmlPage.closeBox()
@@ -967,9 +998,9 @@ class TaskDisplayLogMem(FutureTask):
 				"<div class=\"center\"><a class=\"%s %s\" href=\"%s?mode=%s\">%s</a></div>" % (
 					"ym-button ym-xsmall", strType,
 					self.m_oHtmlPage.m_strPath, nIndex,
-					html.escape(oLogEntry.m_strType)),
-				"%s" % (html.escape(oLogEntry.m_strDate)),
-				"%s" % (html.escape(oLogEntry.m_strText))],
+					html.escape("%s" % oLogEntry.m_strType)),
+				"%s" % (html.escape("%s" % oLogEntry.m_strDate)),
+				"%s" % (html.escape("%s" % oLogEntry.m_strText))],
 				bFirstIsHead=True, bEscape=False)
 			nIndex += 1
 		# Tabelle schließen

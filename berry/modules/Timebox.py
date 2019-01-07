@@ -12,6 +12,7 @@ from time import sleep
 
 import socket
 import re
+import struct
 
 import bluetooth
 from bluetooth import BluetoothSocket, BluetoothError, RFCOMM
@@ -44,6 +45,8 @@ class Timebox(ModuleBase):
 			"strTempColor"		: "#FFFFFF",
 			"nBrightness"		: 100,
 			"strAmbientColor"	: "#FFFFFF",
+			"strPrimaryColor"	: "#00FF00",
+			"strSecondaryColor"	: "#FF0000",
 			# "fFmFrequency"	: 90.7,
 		}
 		# Vorbelegung der Moduleigenschaften mit Default-Werten, sofern noch nicht verfügbar
@@ -126,6 +129,20 @@ class Timebox(ModuleBase):
 				"type"			: "color",
 				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
 			},
+			"strPrimaryColor" : {
+				"title"			: "Primärfarbe",
+				"description"	: ("Einstellung einer Primärfarbe für verschiedene Anwendung, z.B. die Darstellung von Wellenformen."),
+				"default"		: "#00FF00",
+				"type"			: "color",
+				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
+			},
+			"strSecondaryColor" : {
+				"title"			: "Sekundärfarbe",
+				"description"	: ("Einstellung einer Sekundärfarbe für verschiedene Anwendung, z.B. die Darstellung von Wellenformen."),
+				"default"		: "#FF0000",
+				"type"			: "color",
+				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
+			},
 			# "fFmFrequency" : {
 			# 	"title"			: "FM Radio Frequenz",
 			# 	"description"	: ("Frequenz (MHz) eines Senders für das FM Radio einstellen, z.B. 88.1 oder 100.3."),
@@ -141,6 +158,9 @@ class Timebox(ModuleBase):
 
 		self.m_nScoreLower = 0
 		self.m_nScoreUpper = 0
+
+		self.m_nWeatherCond = 0x00
+		self.m_nWeatherTemp = 0
 
 		# TODO
 		# - Nach verfügbaren Bluetooth Geräten suchen (zyklisch, solange keine Timebox-Geräte gefunden wurden)
@@ -274,21 +294,8 @@ class Timebox(ModuleBase):
 				if ("weather" in lstArg):
 					self.m_oTimeboxProtocol.send(self.displayWeather())
 					continue
-				if ("equalizer" in lstArg):
-					self.m_oTimeboxProtocol.send([
-						0x45,	# Display
-						0x04,	# Equalizer
-						0x06,	# Index [0..6]
-						0xFF,	# RGB -> R
-						0x00,	# RGB -> G
-						0x00,	# RGB -> B
-						0xFF,	# RGB -> R
-						0xFF,	# RGB -> G
-						0xFF	# RGB -> B
-					])
-					continue
 				if ("image" in lstArg):
-					self.m_oTimeboxProtocol.send([0x45, 0x05])
+					self.m_oTimeboxProtocol.send([0x45, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00])
 					continue
 				if ("stopwatch" in lstArg):
 					self.m_oTimeboxProtocol.send(self.displayStopwatch())
@@ -309,6 +316,23 @@ class Timebox(ModuleBase):
 					self.m_oTimeboxProtocol.send(self.displayBuiltInAnimation(strType=strArg))
 					break
 				continue
+			# Built-In Waveform-Kommandos
+			if (strCmd == "waveform" and lstArg and self.m_oTimeboxProtocol):
+				for strArg in lstArg:
+					self.m_oTimeboxProtocol.send(self.displayBuiltInWaveforms(strType=strArg))
+					break
+				continue
+			# Vorgabe Temperatur/Wetterbedingungen
+			if (strCmd == "temperature" and lstArg and self.m_oTimeboxProtocol):
+				for strArg in lstArg:
+					self.m_oTimeboxProtocol.send(self.changeTemperature(strTemp=strArg))
+					break
+				continue
+			if (strCmd == "weather" and lstArg and self.m_oTimeboxProtocol):
+				for strArg in lstArg:
+					self.m_oTimeboxProtocol.send(self.changeWeatherCondition(strType=strArg))
+					break
+				continue
 
 			# Radio-Kommandos
 			# if (strCmd == "radio" and lstArg and self.m_oTimeboxProtocol):
@@ -324,6 +348,84 @@ class Timebox(ModuleBase):
 		# Unbekanntes Kommando
 		return bResult
 
+	def changeTemperature(self, strTemp=None):
+		lyData = [0x5F]
+
+		try:
+			self.m_nWeatherTemp = min(max(int(strTemp), -99), +127)
+		except:
+			pass
+
+		lyData.append(int.from_bytes(struct.pack('b', self.m_nWeatherTemp), byteorder='big', signed=False))
+		lyData.append(self.m_nWeatherCond)
+		return bytearray(lyData)
+
+	def changeWeatherCondition(self, strType=None):
+		lyData = [0x5F]
+		lstConditions = [
+			"sunny",					# 0x01 - sonnig				(sunny)
+			"cheerful",					# 0x02 - heiter				(cheerful)
+			"cloudy",					# 0x03 - bewölkt			(cloudy)
+			"covered",					# 0x04 - bedeckt			(covered)
+			"rainy",					# 0x05 - regnerisch			(rainy)
+			"changeable",				# 0x06 - wechselhaft		(changeable)
+			"thunderstorm",				# 0x07 - gewittrig			(thunderstorm)
+			"snowy",					# 0x08 - schneeig			(snowy)
+			"foggy",					# 0x09 - neblig				(foggy)
+			"clear-at-night",			# 0x10 - nachts klar		(clear-at-night)
+			"cloudy-at-night",			# 0x11 - nachts wolkig		(cloudy-at-night)
+			"covered-at-night",			# 0x12 - nachts bedeckt		(covered-at-night)
+			"rainy-at-night",			# 0x13 - nachts regnerisch	(rainy-at-night)
+			"changeable-at-night",		# 0x14 - nachts wechselhaft	(changeable-at-night)
+			"thunderstorm-at-night",	# 0x15 - nachts gewittrig	(thunderstorm-at-night)
+			"snowy-at-night",			# 0x16 - nachts schneeig	(snowy-at-night)
+			"foggy-at-night",			# 0x17 - nachts neblig		(foggy-at-night)
+			# "clock-change",			# 0x18 - Zeitumstellung		(clock-change)
+		]	
+
+		try:
+			if strType.isdigit():
+				self.m_nWeatherCond = min(max(int(strType), 1), 17)
+			elif strType in lstConditions:
+				self.m_nWeatherCond = lstConditions.index(strType) + 1
+		except:
+			pass
+
+		lyData.append(int.from_bytes(struct.pack('b', self.m_nWeatherTemp), byteorder='big', signed=False))
+		lyData.append(self.m_nWeatherCond)
+		return bytearray(lyData)
+
+	def displayBuiltInWaveforms(self, strType="0"):
+		lyData = [0x45, 0x04]
+		nType = 0
+		lstAnimations = [
+			"common",
+			"stickman",
+			"vertical",
+			"horizontal",
+			"seewaves",
+			"campfire",
+			"face"]
+
+		try:
+			if strType.isdigit():
+				nType = min(max(int(strType), 0), 6)
+			elif strType in lstAnimations:
+				nType = lstAnimations.index(strType)
+			else:
+				nType = 0
+		except:
+			nType = 0
+
+		lyData.append(nType)
+		# Spitzen - Sekundärfarbe RGB
+		strRGB = globs.getSetting("Timebox", "strSecondaryColor", r"^#([A-Fa-f0-9]{6})$", "#FF0000")
+		lyData.extend(bytes.fromhex(str(strRGB[1:])))
+		# Balken - Primärfarbe RGB
+		strRGB = globs.getSetting("Timebox", "strPrimaryColor", r"^#([A-Fa-f0-9]{6})$", "#00FF00")
+		lyData.extend(bytes.fromhex(str(strRGB[1:])))
+		return bytearray(lyData)
+
 	def displayBuiltInAnimation(self, strType="0"):
 		lyData = [0x45, 0x03]
 		nType = 0
@@ -335,7 +437,8 @@ class Timebox(ModuleBase):
 			"arrows",
 			"countdown",
 			"spinning",
-			"colors"]
+			"colors"
+			]
 
 		try:
 			if strType.isdigit():

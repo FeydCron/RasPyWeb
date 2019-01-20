@@ -592,13 +592,16 @@ class TaskDisplaySystem(FutureTask):
 				dt.strftime("%H:%M:%S"))],
 				bFirstIsHead=True, bEscape=False)
 		# Alle Sektionen durchgehen
-		for (strHeader, dictSection) in sorted(globs.s_dictSystemValues.items()):
+		for strSection in sorted(globs.s_dictSystemValues.keys()):
 			# Tabelle mit dem nächsten Tabellenkopf fortsetzen
-			self.m_oHtmlPage.appendHeader([strHeader, ""])
+			self.m_oHtmlPage.appendHeader([strSection, ""])
 			# Alle Werte durchgehen
-			for (strName, strValue) in sorted(dictSection.items()):
+			for strProperty in sorted(globs.s_dictSystemValues[strSection].keys()):
 				self.m_oHtmlPage.appendTable(
-					[strName, strValue],
+					[
+						strProperty,
+						globs.s_dictSystemValues[strSection][strProperty]
+					],
 					bFirstIsHead=True)
 		# Tabelle schließen
 		self.m_oHtmlPage.closeTable()
@@ -724,32 +727,34 @@ class TaskDisplaySettings(FutureTask):
 		globs.s_oSettingsLock.acquire()
 		try:
 			bOpened = False
-			for (strKey, dictValues) in globs.s_dictUserSettings.items():
+			for strSubsystem in sorted(globs.s_dictUserSettings.keys()):
 	
-				if (strKey not in globs.s_dictSettings
-					or not globs.s_dictSettings[strKey]
-					or not globs.s_dictUserSettings[strKey]):
+				if (strSubsystem not in globs.s_dictSettings
+					or not globs.s_dictSettings[strSubsystem]
+					or not globs.s_dictUserSettings[strSubsystem]):
 					continue
-				if (strKey not in ("System", "PIP") and strKey not in globs.s_dictSettings["listModules"]):
+				if (strSubsystem not in ("System", "PIP") and strSubsystem not in globs.s_dictSettings["listModules"]):
 					continue
-				if (strKey in globs.s_dictSettings["listInactiveModules"]):
+				if (strSubsystem in globs.s_dictSettings["listInactiveModules"]):
 					continue
 				
 				if bOpened:
-					self.m_oHtmlPage.appendHeader([strKey, ""])
+					self.m_oHtmlPage.appendHeader([strSubsystem, ""])
 				else:
 					bOpened = True
 					self.m_oHtmlPage.openTable("Konfigurationseinstellungen",
-						[strKey, ""], True, True)
-				for (strValueName, dictProperties) in sorted(dictValues.items()):
-					if strValueName in globs.s_dictSettings[strKey]:
-						strTitle = strValueName
+						[strSubsystem, ""], True, True)
+
+				for strProperty in sorted(globs.s_dictUserSettings[strSubsystem].keys()):
+					if strProperty in globs.s_dictSettings[strSubsystem]:
+						strTitle = strProperty
+						dictProperties = globs.s_dictUserSettings[strSubsystem][strProperty]
 						if ("title" in dictProperties):
 							strTitle = dictProperties["title"]
 						if ("readonly" in dictProperties and dictProperties["readonly"]):
 							self.m_oHtmlPage.appendTable([
 								strTitle,
-								"%s" % (globs.s_dictSettings[strKey][strValueName])
+								"%s" % (globs.s_dictSettings[strSubsystem][strProperty])
 								], bFirstIsHead=True, bEscape=False)
 						elif ("showlink" in dictProperties and dictProperties["showlink"]
 							and "description" in dictProperties
@@ -757,15 +762,15 @@ class TaskDisplaySettings(FutureTask):
 							self.m_oHtmlPage.appendTable([
 								strTitle,
 								"<a href=\"%s\">&#x027A5; %s</a>" % (
-									globs.s_dictSettings[strKey][strValueName],
+									globs.s_dictSettings[strSubsystem][strProperty],
 									dictProperties["description"])
 								], bFirstIsHead=True, bEscape=False)
 						else:
 							self.m_oHtmlPage.appendTable([
 								strTitle,
 								"<a href=\"%s?edit=%s&key=%s\">&#x0270E; %s</a>" % (
-									"/system/settings.html", strValueName, strKey,
-									globs.s_dictSettings[strKey][strValueName])
+									"/system/settings.html", strProperty, strSubsystem,
+									globs.s_dictSettings[strSubsystem][strProperty])
 								], bFirstIsHead=True, bEscape=False)
 			if bOpened:
 				self.m_oHtmlPage.closeTable()

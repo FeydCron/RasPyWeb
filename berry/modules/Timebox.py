@@ -36,18 +36,24 @@ class Timebox(ModuleBase):
 		
 		# Verfügbare Einstellungen mit Default-Werten festlegen
 		dictSettings = {
-			"strAddress" 		: "",
-			"nPort" 			: 4,
-			"bAutoConnect" 		: False,
-			"bTime24Hours"		: True,
-			"strTimeColor"		: "#FFFFFF",
-			"bTempCelsius"		: True,
-			"strTempColor"		: "#FFFFFF",
-			"nBrightness"		: 100,
-			"strAmbientColor"	: "#FFFFFF",
-			"strPrimaryColor"	: "#00FF00",
-			"strSecondaryColor"	: "#FF0000",
-			# "fFmFrequency"	: 90.7,
+			"bAutoConnect" 			: False,
+			"bTime24Hours"			: True,
+			"bUnitCelsius"			: True,
+			"bMute"					: False,
+			"bPowerSafe"			: False,
+			"bOnOffByClap"			: False,
+			"nPort" 				: 4,
+			"nBrightness"			: 100,
+			"nVolume"				: 7,
+			"nAutoOffDelay"			: 0,
+			"strAddress" 			: "",
+			"strColorTime"			: "#FFFFFF",
+			"strColorTemp"			: "#FFFFFF",
+			"strColorAmbient"		: "#FFFFFF",
+			"strColorPrimary"		: "#00FF00",
+			"strColorSecondary"		: "#FF0000",
+			"strTestCommand"		: "",
+			# "fFmFrequency"		: 90.7,
 		}
 		# Vorbelegung der Moduleigenschaften mit Default-Werten, sofern noch nicht verfügbar
 		if (not dictModCfg):
@@ -59,19 +65,6 @@ class Timebox(ModuleBase):
 
 		# Beschreibung der Konfigurationseinstellungen
 		dictCfgUsr.update({
-			"strAddress" : {
-				"title"			: "Adresse der Timebox",
-				"description"	: ("Einstellung der Adresse einer Timebox, zu der eine Verbindung hergestellt werden soll."),
-				"default"		: "",
-				"choices"		: {
-					"Keine Timebox verfügbar"		: ""
-				}
-			},
-			"nPort" : {
-				"title"			: "Portnummer für RFCOMM",
-				"description"	: ("Einstellung der Portnummer für RFCOMM mit einer Timebox."),
-				"default"		: 4
-			},
 			"bAutoConnect" : {
 				"title"			: "Automatischer Verbindungsaufbau",
 				"description"	: ("Automatischen oder manuellen Verbindungsaufbau aktivieren."),
@@ -91,14 +84,7 @@ class Timebox(ModuleBase):
 					"12-Stundenanzeige"		: False
 				}
 			},
-			"strTimeColor" : {
-				"title"			: "Uhrzeitfarbe",
-				"description"	: ("Farbeinstellung der Uhrzeitanzeige."),
-				"default"		: "#FFFFFF",
-				"type"			: "color",
-				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
-			},
-			"bTempCelsius" : {
+			"bUnitCelsius" : {
 				"title"			: "Temperaturdarstellung",
 				"description"	: ("Darstellung der Temperatur in °C (Celsius) oder °F (Fahrenheit) einstellen."),
 				"default"		: True,
@@ -108,12 +94,28 @@ class Timebox(ModuleBase):
 					"°F (Fahrenheit)"		: False
 				}
 			},
-			"strTempColor" : {
-				"title"			: "Temperaturfarbe",
-				"description"	: ("Farbeinstellung der Temperaturanzeige."),
-				"default"		: "#FFFFFF",
-				"type"			: "color",
-				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
+			"bMute" : {
+				"title"			: "Stummschaltung",
+				"description"	: ("Stummschaltung ein- oder ausschalten."),
+				"default"		: False,
+				"type"			: "radio"
+			},
+			"bPowerSafe" : {
+				"title"			: "Energiesparmodus",
+				"description"	: ("Schaltet das Gerät nach 5 Minuten in Standby."),
+				"default"		: False,
+				"type"			: "radio"
+			},
+			"bOnOffByClap" : {
+				"title"			: "Klatsch-Befehl",
+				"description"	: ("Schaltet das Display beim Klatschen ein oder aus."),
+				"default"		: False,
+				"type"			: "radio"
+			},
+			"nPort" : {
+				"title"			: "Portnummer für RFCOMM",
+				"description"	: ("Einstellung der Portnummer für RFCOMM mit einer Timebox."),
+				"default"		: 4
 			},
 			"nBrightness" : {
 				"title"			: "Helligkeit",
@@ -122,26 +124,76 @@ class Timebox(ModuleBase):
 				"type"			: "range",
 				"pattern"		: "min=\"0\" max=\"100\" step=\"10\""
 			},
-			"strAmbientColor" : {
+			"nVolume" : {
+				"title"			: "Lautstärke",
+				"description"	: ("Lautstärke einstellen."),
+				"default"		: "7",
+				"type"			: "range",
+				"pattern"		: "min=\"0\" max=\"15\" step=\"1\""
+			},
+			"nAutoOffDelay" : {
+				"title"			: "Automatische Abschaltung",
+				"description"	: ("Schaltet das Gerät nach der eingestellten Verzögerung aus, wenn das Gerät nicht verwendet wird."),
+				"default"		: "0",
+				"type"			: "radio",
+				"choices"		: {
+					"Niemals"			: 0,
+					"30 Minuten"		: 30,
+					"1 Stunde"			: 60,
+					"3 Stunden"			: 180,
+					"6 Stunden"			: 360,
+					"12 Stunden"		: 720
+				}
+			},
+			"strAddress" : {
+				"title"			: "Adresse der Timebox",
+				"description"	: ("Einstellung der Adresse einer Timebox, zu der eine Verbindung hergestellt werden soll."),
+				"default"		: "",
+				"choices"		: {
+					"Keine Timebox verfügbar"		: ""
+				}
+			},
+			"strColorTime" : {
+				"title"			: "Uhrzeitfarbe",
+				"description"	: ("Farbeinstellung der Uhrzeitanzeige."),
+				"default"		: "#FFFFFF",
+				"type"			: "color",
+				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
+			},
+			"strColorTemp" : {
+				"title"			: "Temperaturfarbe",
+				"description"	: ("Farbeinstellung der Temperaturanzeige."),
+				"default"		: "#FFFFFF",
+				"type"			: "color",
+				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
+			},
+			"strColorAmbient" : {
 				"title"			: "Umgebungslicht",
 				"description"	: ("Farbeinstellung für das Umgebungslicht."),
 				"default"		: "#FFFFFF",
 				"type"			: "color",
 				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
 			},
-			"strPrimaryColor" : {
+			"strColorPrimary" : {
 				"title"			: "Primärfarbe",
 				"description"	: ("Einstellung einer Primärfarbe für verschiedene Anwendung, z.B. die Darstellung von Wellenformen."),
 				"default"		: "#00FF00",
 				"type"			: "color",
 				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
 			},
-			"strSecondaryColor" : {
+			"strColorSecondary" : {
 				"title"			: "Sekundärfarbe",
 				"description"	: ("Einstellung einer Sekundärfarbe für verschiedene Anwendung, z.B. die Darstellung von Wellenformen."),
 				"default"		: "#FF0000",
 				"type"			: "color",
 				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
+			},
+			"strTestCommand" : {
+				"title"			: "Test-Kommando",
+				"description"	: ("Vorgabe einer Byte-Sequenz für Testzwecke."),
+				"default"		: "",
+				"type"			: "text",
+				"pattern"		: r"^([A-Fa-f0-9]{2}\s?){1,}$"
 			},
 			# "fFmFrequency" : {
 			# 	"title"			: "FM Radio Frequenz",
@@ -161,6 +213,11 @@ class Timebox(ModuleBase):
 
 		self.m_nWeatherCond = 0x00
 		self.m_nWeatherTemp = 0
+
+		self.m_nSelectedDisplay = 0
+		self.m_nSelectedAnimation = 0
+		self.m_nSelectedWaveForm = 0
+		self.m_nSelectedAmbientPattern = 0
 
 		# TODO
 		# - Nach verfügbaren Bluetooth Geräten suchen (zyklisch, solange keine Timebox-Geräte gefunden wurden)
@@ -219,32 +276,47 @@ class Timebox(ModuleBase):
 		bResult = False
 		for (strCmd, lstArg) in dictQuery.items():
 			# Moduleinstellungen wurden geändert
-			if (strCmd == "settings" and lstArg and self.m_oTimeboxProtocol
-				and "Timebox" in lstArg):
+			if (strCmd == "settings" and lstArg	and "Timebox" in lstArg):
 				for (strCmd, _) in dictForm.items():
-					if (strCmd in ["bTime24Hours", "strTimeColor"]):
-						self.m_oTimeboxProtocol.send(self.displayClock())
+					if (strCmd in ["bTime24Hours", "strColorTime"]):
+						self.displayClock()
 						continue
-					if (strCmd in ["bTempCelsius", "strTempColor"]):
-						self.m_oTimeboxProtocol.send(self.displayWeather())
+					if (strCmd in ["bUnitCelsius", "strColorTemp"]):
+						self.displayWeather()
 						continue
 					if (strCmd in ["nBrightness"]):
-						self.m_oTimeboxProtocol.send(self.changeDisplayBrightness())
+						self.changeDisplayBrightness()
+						continue
+					if (strCmd in ["nVolume"]):
+						self.synchronizeVolume()
+						continue
+					if (strCmd in ["bMute"]):
+						self.synchronizeMute()
+						continue
+					if (strCmd in ["bOnOffByClap", "bPowerSafe", "nAutoOffDelay"]):
+						self.synchronizeBasicSettings(
+							bOnOffByClap=True if strCmd == "bOnOffByClap" else False,
+							bPowerSafe=True if strCmd == "bPowerSafe" else False,
+							bAutoOffDelay=True if strCmd == "nAutoOffDelay" else False
+						)
+						continue
+					if (strCmd in ["strTestCommand"]):
+						self.sendGenericCommand()
 						continue
 					# if (strCmd in ["fFmFrequency"]):
-					# 	self.m_oTimeboxProtocol.send(self.getFmFrequency())
+					# 	self.getFmFrequency()
 					# 	continue
 				continue
 			# Systemeinstellungen wurden geändert
 			if (strCmd == "system" and lstArg and self.m_oTimeboxProtocol):
 				if ("date" in lstArg or "time" in lstArg):
-					self.m_oTimeboxProtocol.send(self.changeDateAndTime())
+					self.changeDateAndTime()
 					continue
 				continue
 			# Timer-Ereignisse
 			if (strCmd == "timer" and lstArg and self.m_oTimeboxProtocol):
 				if ("cron" in lstArg):
-					self.m_oTimeboxProtocol.send(self.changeDateAndTime())
+					self.changeDateAndTime()
 					continue
 				continue
 			# Gerätekommandos
@@ -264,104 +336,429 @@ class Timebox(ModuleBase):
 					continue
 				continue
 			# Stopwatch-Kommandos
-			if (strCmd == "stopwatch" and lstArg and self.m_oTimeboxProtocol):
+			if (strCmd == "stopwatch" and lstArg):
 				if ("stop" in lstArg):
-					self.m_oTimeboxProtocol.send(self.displayStopwatch(bStop=True))
+					self.displayStopwatch(bStop=True)
 					continue
 				if ("reset" in lstArg):
-					self.m_oTimeboxProtocol.send(self.displayStopwatch(bReset=True))
+					self.displayStopwatch(bReset=True)
 					continue
-				self.m_oTimeboxProtocol.send(self.displayStopwatch())
+				self.displayStopwatch()
 				continue
 			# Scoreboard-Kommandos
-			if (strCmd == "scoreboard" and lstArg and self.m_oTimeboxProtocol):
+			if (strCmd == "scoreboard" and lstArg):
 				if ("upper" in lstArg):
-					self.m_oTimeboxProtocol.send(self.displayScoreboard(bIncUpper=True))
+					self.displayScoreboard(bIncUpper=True)
 					continue
 				if ("lower" in lstArg):
-					self.m_oTimeboxProtocol.send(self.displayScoreboard(bIncLower=True))
+					self.displayScoreboard(bIncLower=True)
 					continue
 				if ("reset" in lstArg):
-					self.m_oTimeboxProtocol.send(self.displayScoreboard(bReset=True))
+					self.displayScoreboard(bReset=True)
 					continue
-				self.m_oTimeboxProtocol.send(self.displayScoreboard())
+				self.displayScoreboard()
 				continue
 			# Display-Kommandos
-			if (strCmd == "display" and lstArg and self.m_oTimeboxProtocol):
+			if (strCmd == "display" and lstArg):
 				if ("clock" in lstArg):
-					self.m_oTimeboxProtocol.send(self.displayClock())
+					self.displayClock()
 					continue
 				if ("weather" in lstArg):
-					self.m_oTimeboxProtocol.send(self.displayWeather())
+					self.displayWeather()
 					continue
 				if ("image" in lstArg):
 					self.m_oTimeboxProtocol.send([0x45, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00])
 					continue
 				if ("stopwatch" in lstArg):
-					self.m_oTimeboxProtocol.send(self.displayStopwatch())
+					self.displayStopwatch()
 					continue
 				if ("scoreboard" in lstArg):
-					self.m_oTimeboxProtocol.send(self.displayScoreboard())
+					self.displayScoreboard()
 					continue
 				continue
 			# Ambient-Kommandos
-			if (strCmd == "ambient" and lstArg and self.m_oTimeboxProtocol):
+			if (strCmd == "ambient" and lstArg):
 				for strArg in lstArg:
-					self.m_oTimeboxProtocol.send(self.displayAmbientLight(strColor=strArg))
+					self.displayAmbientLight(strColor=strArg)
 					break
 				continue
 			# Built-In Animation-Kommandos
-			if (strCmd == "animation" and lstArg and self.m_oTimeboxProtocol):
+			if (strCmd == "animation" and lstArg):
 				for strArg in lstArg:
-					self.m_oTimeboxProtocol.send(self.displayBuiltInAnimation(strType=strArg))
+					self.displayBuiltInAnimation(strType=strArg)
 					break
 				continue
 			# Built-In Waveform-Kommandos
-			if (strCmd == "waveform" and lstArg and self.m_oTimeboxProtocol):
+			if (strCmd == "waveform" and lstArg):
 				for strArg in lstArg:
-					self.m_oTimeboxProtocol.send(self.displayBuiltInWaveforms(strType=strArg))
+					self.displayBuiltInWaveforms(strType=strArg)
 					break
 				continue
 			# Vorgabe Temperatur/Wetterbedingungen
-			if (strCmd == "temperature" and lstArg and self.m_oTimeboxProtocol):
+			if (strCmd == "temperature" and lstArg):
 				for strArg in lstArg:
-					self.m_oTimeboxProtocol.send(self.changeTemperature(strTemp=strArg))
+					self.changeTemperature(strTemp=strArg)
 					break
 				continue
-			if (strCmd == "weather" and lstArg and self.m_oTimeboxProtocol):
+			if (strCmd == "weather" and lstArg):
 				for strArg in lstArg:
-					self.m_oTimeboxProtocol.send(self.changeWeatherCondition(strType=strArg))
+					self.changeWeatherCondition(strType=strArg)
 					break
 				continue
-
-			# Radio-Kommandos
-			# if (strCmd == "radio" and lstArg and self.m_oTimeboxProtocol):
-			# 	if ("frequency" in lstArg):
-			# 		self.m_oTimeboxProtocol.send([0x60])
-			#		continue
-			# 	elif ("on" in lstArg):
-			# 		self.m_oTimeboxProtocol.send([0x05, 0x01])
-			#		continue
-			# 	self.m_oTimeboxProtocol.send([0x05, 0x00])
-			# 	continue
+			# Vorgabe/Auslesen Lautstärke und Stummschaltung
+			if (strCmd == "volume" and lstArg):
+				try:
+					if ("on" in lstArg):
+						globs.setSetting("Timebox", "bMute", True)
+						self.synchronizeMute()
+						continue
+					if ("off" in lstArg):
+						globs.setSetting("Timebox", "bMute", False)
+						self.synchronizeMute()
+						continue
+					if ("min" in lstArg):
+						globs.setSetting("Timebox", "nVolume", 0)
+						self.synchronizeVolume()
+						continue
+					if ("low" in lstArg):
+						globs.setSetting("Timebox", "nVolume", 3)
+						self.synchronizeVolume()
+						continue
+					if ("med" in lstArg):
+						globs.setSetting("Timebox", "nVolume", 7)
+						self.synchronizeVolume()
+						continue
+					if ("high" in lstArg):
+						globs.setSetting("Timebox", "nVolume", 11)
+						self.synchronizeVolume()
+						continue
+					if ("max" in lstArg):
+						globs.setSetting("Timebox", "nVolume", 15)
+						self.synchronizeVolume()
+						continue
+					for strArg in lstArg:
+						globs.setSetting("Timebox", "nVolume", int(strArg))
+						self.synchronizeVolume()
+						globs.setSetting("Timebox", "bMute", False)
+						self.synchronizeMute()
+						break
+				except:
+					globs.exc("Vorgabe Lautstärke oder Stummschaltung")
+				continue
+			# Spiel auswählen
+			if (strCmd == "game" and lstArg):
+				try:
+					if ("off" in lstArg):
+						self.displayBuiltInGame(bState=False)
+						continue
+					if ("start" in lstArg):
+						self.displayBuiltInGame(bStart=True)
+						continue
+					for strArg in lstArg:
+						self.displayBuiltInGame(bState=True, strType=strArg)
+						break
+				except:
+					globs.exc("Vorgabe Lautstärke oder Stummschaltung")
+				continue
 
 		# Unbekanntes Kommando
 		return bResult
 
-	def changeTemperature(self, strTemp=None):
-		lyData = [0x5F]
+	def sendGenericCommand(self, strCommand=None):
+		try:
+			if not self.m_oTimeboxProtocol:
+				return None
+			
+			if not strCommand:
+				strCommand = globs.getSetting("Timebox", "strTestCommand", r"^([A-Fa-f0-9]{2}\s?){1,}$", "")
+			
+			print("Test-Kommando: %r" % (strCommand))
+
+			if not strCommand:
+				return None
+
+			lyData = bytearray.fromhex(strCommand)
+
+			self.m_oTimeboxProtocol.send(lyData)
+			return lyData[0:1]
+		except:
+			globs.exc("Test-Kommando absetzen")
+		return None
+
+	def displayBuiltInGame(self, bState=False, bStart=False, strType=None):
+		lstGames = [
+			"one-armed-bandit",
+			"roll-the-dice",
+			"yes-or-no",
+			"car-racing"]
 
 		try:
-			self.m_nWeatherTemp = min(max(int(strTemp), -99), +127)
-		except:
-			pass
+			if not self.m_oTimeboxProtocol:
+				return None
+			nType = 0
+			try:
+				if strType.isdigit():
+					nType = min(max(int(strType), 0), 256)
+				elif strType in lstGames:
+					nType = lstGames.index(strType)
+				else:
+					nType = 0
+					bState = False
+			except:
+				nType = 0
+				bState = False
 
-		lyData.append(int.from_bytes(struct.pack('b', self.m_nWeatherTemp), byteorder='big', signed=False))
-		lyData.append(self.m_nWeatherCond)
-		return bytearray(lyData)
+			if bStart:
+				# Spiel starten
+				lyData = [0x88]	
+			else:
+				# Spiel auswählen
+				lyData = [0xA0,
+					0x01 if bState else 0x00,
+					nType]
+			
+			self.m_oTimeboxProtocol.send(lyData)
+			return lyData[0:1]
+		except:
+			globs.exc("Spiel auswählen")
+		return None
+	
+	def fetchDisplaySettings(self):
+		try:
+			if not self.m_oTimeboxProtocol:
+				return None
+			
+			# Display-Einstellungen abrufen
+			lyData = [0x46]
+			
+			self.m_oTimeboxProtocol.send(lyData)
+			return lyData[0:1]
+		except:
+			globs.exc("Display-Einstellungen abrufen")
+		return None
+	
+	def notifyDisplaySettings(self, command, data):
+		if (command == 0x46 and len(data) >= 26):
+			# Ausgewählte Anzeige (0...7)
+			self.m_nSelectedDisplay = min(max(int.from_bytes(data[3:4], byteorder='big', signed=False), 0), 7)
+			# Ausgewählte Temperatureinheit (0/1)
+			nUnitCelsius = min(max(int.from_bytes(data[4:5], byteorder='big', signed=False), 0), 1)
+			globs.setSetting("Timebox", "bUnitCelsius", True if nUnitCelsius == 0x01 else False)
+			# Ausgewählte Animation (0...7)
+			self.m_nSelectedAnimation = min(max(int.from_bytes(data[5:6], byteorder='big', signed=False), 0), 7)
+			# Ausgewählte Umgebungslichtfarbe (RGB)
+			strColorAmbient = "#{:02X}{:02X}{:02X}".format(
+				min(max(int.from_bytes(data[6:7], byteorder='big', signed=False), 0), 255),
+				min(max(int.from_bytes(data[7:8], byteorder='big', signed=False), 0), 255),
+				min(max(int.from_bytes(data[8:9], byteorder='big', signed=False), 0), 255)
+			)
+			globs.setSetting("Timebox", "strColorAmbient", strColorAmbient)
+			# Ausgewählte Umgebungslichthelligkeit (0...100)
+			nBrightness = min(max(int.from_bytes(data[9:10], byteorder='big', signed=False), 0), 100)
+			globs.setSetting("Timebox", "nBrightness", nBrightness)
+			# Ausgewählte Wellenform (0...6)
+			self.m_nSelectedWaveForm = min(max(int.from_bytes(data[10:11], byteorder='big', signed=False), 0), 6)
+			# 2. Ausgewählte Helligkeit ignorieren
+			# Ausgewähltes Uhrzeitformat
+			nTime24Hours = min(max(int.from_bytes(data[12:13], byteorder='big', signed=False), 0), 1)
+			globs.setSetting("Timebox", "bTime24Hours", True if nTime24Hours == 0x01 else False)
+			# Ausgewählte Uhrzeitfarbe (RGB)
+			strColorTime = "#{:02X}{:02X}{:02X}".format(
+				min(max(int.from_bytes(data[13:14], byteorder='big', signed=False), 0), 255),
+				min(max(int.from_bytes(data[14:15], byteorder='big', signed=False), 0), 255),
+				min(max(int.from_bytes(data[14:16], byteorder='big', signed=False), 0), 255)
+			)
+			globs.setSetting("Timebox", "strColorTime", strColorTime)
+			# Ausgewählte Temperaturfarbe (RGB)
+			strColorTemp = "#{:02X}{:02X}{:02X}".format(
+				min(max(int.from_bytes(data[16:17], byteorder='big', signed=False), 0), 255),
+				min(max(int.from_bytes(data[17:18], byteorder='big', signed=False), 0), 255),
+				min(max(int.from_bytes(data[18:19], byteorder='big', signed=False), 0), 255)
+			)
+			globs.setSetting("Timebox", "strColorTemp", strColorTemp)
+			# Ausgewählte Sekundärfarbe (RGB)
+			strColorSecondary = "#{:02X}{:02X}{:02X}".format(
+				min(max(int.from_bytes(data[19:20], byteorder='big', signed=False), 0), 255),
+				min(max(int.from_bytes(data[20:21], byteorder='big', signed=False), 0), 255),
+				min(max(int.from_bytes(data[21:22], byteorder='big', signed=False), 0), 255)
+			)
+			globs.setSetting("Timebox", "strColorSecondary", strColorSecondary)
+			# Ausgewählte Primärfarbe (RGB)
+			strColorPrimary = "#{:02X}{:02X}{:02X}".format(
+				min(max(int.from_bytes(data[22:23], byteorder='big', signed=False), 0), 255),
+				min(max(int.from_bytes(data[23:24], byteorder='big', signed=False), 0), 255),
+				min(max(int.from_bytes(data[24:25], byteorder='big', signed=False), 0), 255)
+			)
+			globs.setSetting("Timebox", "strColorPrimary", strColorPrimary)
+			# Ausgewähltes Umgebungslichtmuster (0...4)
+			self.m_nSelectedAmbientPattern = min(max(int.from_bytes(data[25:26], byteorder='big', signed=False), 0), 4)
+
+		return
+
+	def fetchAudioSource(self):
+		try:
+			if not self.m_oTimeboxProtocol:
+				return None
+			
+			# Audio-Quelle abrufen
+			lyData = [0x13]
+			
+			self.m_oTimeboxProtocol.send(lyData)
+			return lyData[0:1]
+		except:
+			globs.exc("Audio-Quelle abrufen")
+		return None
+
+	def notifyAudioSource(self, command, data):
+		if (command == 0x13 and len(data) >= 4):
+			nAudioSource = int.from_bytes(data[3:4], byteorder='big', signed=False)
+			globs.log("Audio-Quelle abgerufen: %r" % (nAudioSource))
+		return
+
+	def synchronizeVolume(self, bReadback=False):
+		try:
+			if not self.m_oTimeboxProtocol:
+				return None
+			
+			if bReadback:
+				# Lautstärke abrufen
+				lyData = [0x09]
+			else:
+				# Lautstärke einstellen
+				lyData = [0x08,
+					min(max(globs.getSetting("Timebox", "nVolume", r"\d{1,2}", 7), 0), 15)]
+			
+			self.m_oTimeboxProtocol.send(lyData)
+			return lyData[0:1]
+		except:
+			globs.exc("Lautstärke %s" % ("abrufen" if bReadback else "einstellen"))
+		return None
+
+	def notifyVolume(self, command, data):
+		if (command == 0x08 and len(data) >= 4):
+			nVolume = int.from_bytes(data[3:4], byteorder='big', signed=False)
+			globs.log("Lautstärke eingestellt: %r" % (nVolume))
+			globs.setSetting("Timebox", "nVolume", nVolume)
+		elif (command == 0x09 and len(data) >= 4):
+			nVolume = int.from_bytes(data[3:4], byteorder='big', signed=False)
+			globs.log("Lautstärke abgerufen: %r" % (nVolume))
+			globs.setSetting("Timebox", "nVolume", nVolume)
+		elif (command != 0x09):
+			self.synchronizeVolume(bReadback=True)
+		return
+
+	def synchronizeMute(self, bReadback=False):
+		try:
+			if not self.m_oTimeboxProtocol:
+				return None
+			
+			if bReadback:
+				# Stummschaltung abrufen
+				lyData = [0x0B]
+			else:
+				# Stummschaltung einstellen
+				lyData = [0x0A,
+					0x00 if globs.getSetting("Timebox", "bMute", r"(True|False)", False) else 0x01]
+
+			self.m_oTimeboxProtocol.send(lyData)
+			return lyData[0:1]
+		except:
+			globs.exc("Stummschaltung %s" % ("abrufen" if bReadback else "einstellen"))
+		return None
+
+	def notifyMute(self, command, data):
+		if (command == 0x0A):
+			self.synchronizeMute(bReadback=True)
+		elif (command == 0x0B and len(data) >= 4):
+			bMute = True if data[3] == 0x00 else False
+			globs.log("Stummschaltung abgerufen: %r" % (bMute))
+			globs.setSetting("Timebox", "bMute", bMute)
+		return
+
+	def synchronizeBasicSettings(self, bReadback=False,
+		bAll = False,
+		bOnOffByClap = False,
+		bPowerSafe = False,
+		bAutoOffDelay = False):
+		try:
+			if not self.m_oTimeboxProtocol:
+				return None
+			
+			lyData = []
+			if bReadback:
+				if bOnOffByClap or bAll:
+					lyData.append(0xA8)
+					self.m_oTimeboxProtocol.send(lyData[-1:])
+				if bPowerSafe or bAll:
+					lyData.append(0xB3)
+					self.m_oTimeboxProtocol.send(lyData[-1:])
+				if bAutoOffDelay or bAll:
+					lyData.append(0xAC)
+					self.m_oTimeboxProtocol.send(lyData[-1:])
+			else:
+				if bOnOffByClap:
+					lyData.append(0xA7)
+					self.m_oTimeboxProtocol.send([
+						lyData[-1],
+						0x01 if globs.getSetting("Timebox", "bOnOffByClap", r"(True|False)", False) else 0x00
+					])
+				if bPowerSafe:
+					lyData.append(0xB2)
+					self.m_oTimeboxProtocol.send([
+						lyData[-1],
+						0x01 if globs.getSetting("Timebox", "bPowerSafe", r"(True|False)", False) else 0x00
+					])
+				if bAutoOffDelay:
+					# Keine Quittung für dieses Kommando
+					nAutoOffDelay = globs.getSetting("Timebox", "nAutoOffDelay", r"\d+", 0)
+					self.m_oTimeboxProtocol.send([
+						0xAB,
+						nAutoOffDelay & 0xFF,
+						(nAutoOffDelay >> 8) & 0xFF
+					])
+					# Eingestellten Wert explizit abrufen
+					self.synchronizeBasicSettings(bReadback=True, bAutoOffDelay=True)
+			return lyData
+		except:
+			globs.exc("Stummschaltung %s" % ("abrufen" if bReadback else "einstellen"))
+		return None
+
+	def notifyBasicSettings(self, command, data):
+		if (command == 0xA8 and len(data) >= 4):
+			bOnOffByClap = True if data[3] == 0x01 else False
+			globs.log("Klatsch-Befehl abgerufen: %r" % (bOnOffByClap))
+			globs.setSetting("Timebox", "bOnOffByClap", bOnOffByClap)
+		elif (command == 0xB3 and len(data) >= 4):
+			bPowerSafe = True if data[3] == 0x01 else False
+			globs.log("Energiesparmodus abgerufen: %r" % (bPowerSafe))
+			globs.setSetting("Timebox", "bPowerSafe", bPowerSafe)
+		elif (command == 0xAC and len(data) >= 5):
+			nAutoOffDelay = int.from_bytes(data[3:5], byteorder='little', signed=False)
+			globs.log("Automatische Abschaltung abgerufen: %r" % (nAutoOffDelay))
+			globs.setSetting("Timebox", "nAutoOffDelay", nAutoOffDelay)
+		elif (command == 0xA7):
+			self.synchronizeBasicSettings(bReadback=True, bOnOffByClap=True)
+		elif (command == 0xB2):
+			self.synchronizeBasicSettings(bReadback=True, bPowerSafe=True)
+		return
+
+	def changeTemperature(self, strTemp=None):
+		try:
+			if not self.m_oTimeboxProtocol:
+				return None
+			
+			self.m_nWeatherTemp = min(max(int(strTemp), -99), +127)
+			lyData = [0x5F,
+				int.from_bytes(struct.pack('b', self.m_nWeatherTemp), byteorder='big', signed=False),
+				self.m_nWeatherCond]
+
+			self.m_oTimeboxProtocol.send(lyData)
+			return lyData[0:1]
+		except:
+			globs.exc("Temperatur einstellen: %s" % (strTemp))
+		return None
 
 	def changeWeatherCondition(self, strType=None):
-		lyData = [0x5F]
 		lstConditions = [
 			"sunny",					# 0x01 - sonnig				(sunny)
 			"cheerful",					# 0x02 - heiter				(cheerful)
@@ -384,20 +781,24 @@ class Timebox(ModuleBase):
 		]	
 
 		try:
+			if not self.m_oTimeboxProtocol:
+				return None
 			if strType.isdigit():
 				self.m_nWeatherCond = min(max(int(strType), 1), 17)
 			elif strType in lstConditions:
 				self.m_nWeatherCond = lstConditions.index(strType) + 1
-		except:
-			pass
+			
+			lyData = [0x5F,
+				int.from_bytes(struct.pack('b', self.m_nWeatherTemp), byteorder='big', signed=False),
+				self.m_nWeatherCond]
 
-		lyData.append(int.from_bytes(struct.pack('b', self.m_nWeatherTemp), byteorder='big', signed=False))
-		lyData.append(self.m_nWeatherCond)
-		return bytearray(lyData)
+			self.m_oTimeboxProtocol.send(lyData)
+			return lyData[0:1]
+		except:
+			globs.exc("Wetterbedingungen einstellen: %s" % (strType))
+		return None
 
 	def displayBuiltInWaveforms(self, strType="0"):
-		lyData = [0x45, 0x04]
-		nType = 0
 		lstAnimations = [
 			"common",
 			"stickman",
@@ -408,27 +809,34 @@ class Timebox(ModuleBase):
 			"face"]
 
 		try:
-			if strType.isdigit():
-				nType = min(max(int(strType), 0), 6)
-			elif strType in lstAnimations:
-				nType = lstAnimations.index(strType)
-			else:
-				nType = 0
-		except:
+			if not self.m_oTimeboxProtocol:
+				return None
 			nType = 0
-
-		lyData.append(nType)
-		# Spitzen - Sekundärfarbe RGB
-		strRGB = globs.getSetting("Timebox", "strSecondaryColor", r"^#([A-Fa-f0-9]{6})$", "#FF0000")
-		lyData.extend(bytes.fromhex(str(strRGB[1:])))
-		# Balken - Primärfarbe RGB
-		strRGB = globs.getSetting("Timebox", "strPrimaryColor", r"^#([A-Fa-f0-9]{6})$", "#00FF00")
-		lyData.extend(bytes.fromhex(str(strRGB[1:])))
-		return bytearray(lyData)
+			try:
+				if strType.isdigit():
+					nType = min(max(int(strType), 0), 6)
+				elif strType in lstAnimations:
+					nType = lstAnimations.index(strType)
+				else:
+					nType = 0
+			except:
+				nType = 0
+			
+			lyData = [0x45, 0x04, nType]
+			# Spitzen - Sekundärfarbe RGB
+			strRGB = globs.getSetting("Timebox", "strColorSecondary", r"^#([A-Fa-f0-9]{6})$", "#FF0000")
+			lyData.extend(bytes.fromhex(str(strRGB[1:])))
+			# Balken - Primärfarbe RGB
+			strRGB = globs.getSetting("Timebox", "strColorPrimary", r"^#([A-Fa-f0-9]{6})$", "#00FF00")
+			lyData.extend(bytes.fromhex(str(strRGB[1:])))
+			
+			self.m_oTimeboxProtocol.send(lyData)
+			return lyData[0:1]
+		except:
+			globs.exc("Audio-Wellenform anzeigen: %s" % (strType))
+		return None
 
 	def displayBuiltInAnimation(self, strType="0"):
-		lyData = [0x45, 0x03]
-		nType = 0
 		lstAnimations = [
 			"diagonal",
 			"expanding",
@@ -441,107 +849,187 @@ class Timebox(ModuleBase):
 			]
 
 		try:
-			if strType.isdigit():
-				nType = min(max(int(strType), 0), 7)
-			elif strType in lstAnimations:
-				nType = lstAnimations.index(strType)
-			else:
-				nType = 0
-		except:
+			if not self.m_oTimeboxProtocol:
+				return None
 			nType = 0
-
-		lyData.append(nType)
-		return bytearray(lyData)
+			try:
+				if strType.isdigit():
+					nType = min(max(int(strType), 0), 7)
+				elif strType in lstAnimations:
+					nType = lstAnimations.index(strType)
+				else:
+					nType = 0
+			except:
+				nType = 0
+			
+			lyData = [0x45, 0x03, nType]
+			# Spitzen - Sekundärfarbe RGB
+			strRGB = globs.getSetting("Timebox", "strColorSecondary", r"^#([A-Fa-f0-9]{6})$", "#FF0000")
+			lyData.extend(bytes.fromhex(str(strRGB[1:])))
+			# Balken - Primärfarbe RGB
+			strRGB = globs.getSetting("Timebox", "strColorPrimary", r"^#([A-Fa-f0-9]{6})$", "#00FF00")
+			lyData.extend(bytes.fromhex(str(strRGB[1:])))
+			
+			self.m_oTimeboxProtocol.send(lyData)
+			return lyData[0:1]
+		except:
+			globs.exc("Built-In-Animation anzeigen: %s" % (strType))
+		return None
 
 	def displayAmbientLight(self, strColor=None):
-		lyData = [0x45, 0x02]
-		if re.match(r"^([A-Fa-f0-9]{6})$", strColor):
-			lyData.extend(bytes.fromhex(strColor))
-		else:
-			strRGB = globs.getSetting("Timebox", "strAmbientColor", r"^#([A-Fa-f0-9]{6})$", "#FFFFFF")
-			lyData.extend(bytes.fromhex(str(strRGB[1:])))
-		nAlpha = globs.getSetting("Timebox", "nBrightness", r"\d{1,3}", 0xFF)
-		nAlpha %= 0x100
-		lyData.extend(bytes.fromhex("{:02X}".format(nAlpha)))
-		lyData.append(0x03 if strColor and strColor == "flower" else 0x00)
-		return bytearray(lyData)
+		try:
+			if not self.m_oTimeboxProtocol:
+				return None
+			
+			lyData = [0x45, 0x02]
+			if re.match(r"^([A-Fa-f0-9]{6})$", strColor):
+				lyData.extend(bytes.fromhex(strColor))
+			else:
+				strRGB = globs.getSetting("Timebox", "strColorAmbient", r"^#([A-Fa-f0-9]{6})$", "#FFFFFF")
+				lyData.extend(bytes.fromhex(str(strRGB[1:])))
+			nAlpha = globs.getSetting("Timebox", "nBrightness", r"\d{1,3}", 0xFF)
+			nAlpha %= 0x100
+			lyData.extend(bytes.fromhex("{:02X}".format(nAlpha)))
+			lyData.append(0x03 if strColor and strColor == "flower" else 0x00)
+			
+			self.m_oTimeboxProtocol.send(lyData)
+			return lyData[0:1]
+		except:
+			globs.exc("Stimmungslicht anzeigen: %s" % (strColor))
+		return None
 	
 	def displayClock(self):
-		lyData = [0x45, 0x00]
-		# 12/24 (0x00/0x01)
-		lyData.append(
-			0x01 if globs.getSetting("Timebox", "bTime24Hours", r"(True|False)", True) else
-			0x00)
-		# Farbe RGB
-		strRGB = globs.getSetting("Timebox", "strTimeColor", r"^#([A-Fa-f0-9]{6})$", "#FFFFFF")
-		lyData.extend(bytes.fromhex(str(strRGB[1:])))
-		# Farbe Alpha
-		nAlpha = globs.getSetting("Timebox", "nBrightness", r"\d{1,3}", 0xFF)
-		nAlpha %= 0x100
-		lyData.extend(bytes.fromhex("{:02X}".format(nAlpha)))
-		return bytearray(lyData)
+		try:
+			if not self.m_oTimeboxProtocol:
+				return None
+			
+			lyData = [0x45, 0x00]
+			# 12/24 (0x00/0x01)
+			lyData.append(
+				0x01 if globs.getSetting("Timebox", "bTime24Hours", r"(True|False)", True) else
+				0x00)
+			# Farbe RGB
+			strRGB = globs.getSetting("Timebox", "strColorTime", r"^#([A-Fa-f0-9]{6})$", "#FFFFFF")
+			lyData.extend(bytes.fromhex(str(strRGB[1:])))
+			# Farbe Alpha
+			nAlpha = globs.getSetting("Timebox", "nBrightness", r"\d{1,3}", 0xFF)
+			nAlpha %= 0x100
+			lyData.extend(bytes.fromhex("{:02X}".format(nAlpha)))
+			
+			self.m_oTimeboxProtocol.send(lyData)
+			return lyData[0:1]
+		except:
+			globs.exc("Uhrzeit anzeigen")
+		return None
 
 	def displayWeather(self):
-		lyData = [0x45, 0x01]
-		# °F/°C (0x00/0x01)
-		lyData.append(
-			0x00 if globs.getSetting("Timebox", "bTempCelsius", r"(True|False)", True) else
-			0x01)
-		# Farbe RGB
-		strRGB = globs.getSetting("Timebox", "strTempColor", r"^#([A-Fa-f0-9]{6})$", "#FFFFFF")
-		lyData.extend(bytes.fromhex(str(strRGB[1:])))
-		# Farbe Alpha
-		nAlpha = globs.getSetting("Timebox", "nBrightness", r"\d{1,3}", 0xFF)
-		nAlpha %= 0x100
-		lyData.extend(bytes.fromhex("{:02X}".format(nAlpha)))
-		return bytearray(lyData)
+		try:
+			if not self.m_oTimeboxProtocol:
+				return None
+			
+			lyData = [0x45, 0x01]
+			# °F/°C (0x00/0x01)
+			lyData.append(
+				0x00 if globs.getSetting("Timebox", "bUnitCelsius", r"(True|False)", True) else
+				0x01)
+			# Farbe RGB
+			strRGB = globs.getSetting("Timebox", "strColorTemp", r"^#([A-Fa-f0-9]{6})$", "#FFFFFF")
+			lyData.extend(bytes.fromhex(str(strRGB[1:])))
+			# Farbe Alpha
+			nAlpha = globs.getSetting("Timebox", "nBrightness", r"\d{1,3}", 0xFF)
+			nAlpha %= 0x100
+			lyData.extend(bytes.fromhex("{:02X}".format(nAlpha)))
+			
+			self.m_oTimeboxProtocol.send(lyData)
+			return lyData[0:1]
+		except:
+			globs.exc("Wetter anzeigen")
+		return None
 
 	def displayStopwatch(self, bStop=False, bReset=False):
-		lyData = [0x45, 0x06]
-		if (bReset):
-			lyData.append(0x02)
-		elif (bStop):
-			lyData.append(0x00)
-		else:
-			lyData.append(0x01)
-		return bytearray(lyData)
+		try:
+			if not self.m_oTimeboxProtocol:
+				return None
+			
+			lyData = [0x45, 0x06]
+			if (bReset):
+				lyData.append(0x02)
+			elif (bStop):
+				lyData.append(0x00)
+			else:
+				lyData.append(0x01)
+			
+			self.m_oTimeboxProtocol.send(lyData)
+			return lyData[0:1]
+		except:
+			globs.exc("Stoppuhr %s" % ("stoppen" if bStop else "zurücksetzen" if bReset else "anzeigen/starten"))
+		return None
 
 	def displayScoreboard(self, bIncLower=False, bIncUpper=False, bReset=False):
-		lyData = [0x45, 0x07, 0x01]
-		if (bReset):
-			self.m_nScoreLower = 0
-			self.m_nScoreUpper = 0
-		if (bIncLower):
-			self.m_nScoreLower += 1
-		if (bIncUpper):
-			self.m_nScoreUpper += 1
-		lyData.append(self.m_nScoreLower & 0x00FF)
-		lyData.append((self.m_nScoreLower >> 8) & 0x00FF)
-		lyData.append(self.m_nScoreUpper & 0x00FF)
-		lyData.append((self.m_nScoreUpper >> 8) & 0x00FF)
-		return bytearray(lyData)
+		try:
+			if (bReset):
+				self.m_nScoreLower = 0
+				self.m_nScoreUpper = 0
+			if (bIncLower):
+				self.m_nScoreLower += 1
+			if (bIncUpper):
+				self.m_nScoreUpper += 1
+			if not self.m_oTimeboxProtocol:
+				return None
+			globs.setSetting("Timebox", "nScoreLower", self.m_nScoreLower)
+			globs.setSetting("Timebox", "nScoreUpper", self.m_nScoreUpper)
+			
+			lyData = [0x45, 0x07, 0x01]
+			lyData.append(self.m_nScoreLower & 0x00FF)
+			lyData.append((self.m_nScoreLower >> 8) & 0x00FF)
+			lyData.append(self.m_nScoreUpper & 0x00FF)
+			lyData.append((self.m_nScoreUpper >> 8) & 0x00FF)
+			
+			self.m_oTimeboxProtocol.send(lyData)
+			return lyData[0:1]
+		except:
+			globs.exc("Punktzahl setzen, Oben=%d, Unten=%d" % (self.m_nScoreUpper, self.m_nScoreLower))
+		return None
 
 	def changeDisplayBrightness(self):
-		lyData = [0x74]
-		# Farbe Alpha
-		nAlpha = globs.getSetting("Timebox", "nBrightness", r"\d{1,3}", 0xFF)
-		nAlpha %= 0x100
-		lyData.extend(bytes.fromhex("{:02X}".format(nAlpha)))
-		return bytearray(lyData)
+		try:
+			if not self.m_oTimeboxProtocol:
+				return None
+
+			lyData = [0x74]
+			# Farbe Alpha
+			nAlpha = globs.getSetting("Timebox", "nBrightness", r"\d{1,3}", 0xFF)
+			nAlpha %= 0x100
+			lyData.extend(bytes.fromhex("{:02X}".format(nAlpha)))
+			
+			self.m_oTimeboxProtocol.send(lyData)
+			return lyData[0:1]
+		except:
+			globs.exc("Helligkeit einstellen")
+		return None
 
 	def changeDateAndTime(self):
-		lyData = [0x18]
-		dt = datetime.today()		
-		lyData.extend([
-			int(dt.strftime("%Y")) % 100,
-			int(int(dt.strftime("%Y")) / 100),
-			int(dt.strftime("%m")),
-			int(dt.strftime("%d")),
-			int(dt.strftime("%H")),
-			int(dt.strftime("%M")),
-			int(dt.strftime("%S"))
-		])
-		return bytearray(lyData)
+		try:
+			if not self.m_oTimeboxProtocol:
+				return None
+		
+			lyData = [0x18]
+			dt = datetime.today()		
+			lyData.extend([
+				int(dt.strftime("%Y")) % 100,
+				int(int(dt.strftime("%Y")) / 100),
+				int(dt.strftime("%m")),
+				int(dt.strftime("%d")),
+				int(dt.strftime("%H")),
+				int(dt.strftime("%M")),
+				int(dt.strftime("%S"))
+			])
+			
+			self.m_oTimeboxProtocol.send(lyData)
+			return lyData[0:1]
+		except:
+			globs.exc("Datum und Uhrzeit einstellen")
+		return None
 
 	# def getFmRadio(self, bOn):
 	# 	lyData = [0x05, 0x01 if bOn else 0x00]
@@ -558,6 +1046,66 @@ class Timebox(ModuleBase):
 	# 	# 	lyData.append(int(nFreq % 100))
 	# 	# 	lyData.append(int(nFreq / 100))
 	# 	return bytearray(lyData)
+
+	def onConnect(self, protocol):
+		if (not self.m_oTimeboxProtocol and protocol):
+			self.m_oTimeboxProtocol = protocol
+			self.m_bProtocolPending = False
+			
+			TaskSpeak(self.getWorker(), "Verbindung zur Teimbox hergestellt").start()
+
+			self.fetchAudioSource()
+			self.fetchDisplaySettings()
+			self.synchronizeBasicSettings(bReadback=True, bAll=True)
+			self.synchronizeMute(bReadback=True)
+			self.synchronizeVolume()
+
+		return
+
+	def onData(self, data):
+		globs.log("Verarbeite Daten [%s], %d Bytes, %r" % (
+			"".join("{:02X} ".format(a) for a in data),
+			len(data),
+			data
+		))
+		try:
+			if (self.m_oTimeboxProtocol and len(data) >= 3
+				and data[0] == 0x04 and data[2] == 0x55):	# Quittungen mit Ausführungsergebnis OK
+				
+				if (data[1] in [0x08, 0x09]):
+					# Lautstärke eingestellt bzw. abgerufen
+					self.notifyVolume(data[1], data)
+				elif (data[1] in [0x0A, 0x0B]):
+					# Stummschaltung eingestellt bzw. abgerufen
+					self.notifyMute(data[1], data)
+				elif (data[1] == 0x13):
+					# Audio-Quelle abgerufen
+					self.notifyAudioSource(data[1], data)
+				elif (data[1] in [0xA7, 0xA8, 0xB2, 0xB3, 0xAB, 0xAC]):
+					# Grundeinstellungen abgerufen
+					self.notifyBasicSettings(data[1], data)
+				elif (data[1] == 0x46):
+					# Anzeigeeinstellungen abgerufen
+					self.notifyDisplaySettings(data[1], data)
+
+		except:
+			globs.exc("Daten verarbeiten [%s], %d Bytes" % (
+				"".join("{:02X} ".format(a) for a in data),
+				len(data),
+			))
+			TaskSound(self.getWorker(), "AlienCreak2").start()
+		else:
+			TaskSound(self.getWorker(), "Pop").start()
+
+		return
+
+	def onDisconnect(self, protocol):
+		if (self.m_oTimeboxProtocol is protocol
+			or not self.m_oTimeboxProtocol):
+			self.m_oTimeboxProtocol = None
+			self.m_bProtocolPending = False
+			TaskSpeak(self.getWorker(), "Verbindung zur Teimbox getrennt").start()
+		return
 
 	##
 	# Suche nach Bluetooth-Geräten
@@ -644,70 +1192,6 @@ class Timebox(ModuleBase):
 	def cbData(self, obj):
 		# Ereignis in die Verarbeitungsqueue einhängen
 		TaskTimeboxFast(self.getWorker(), self.onData, obj).start()
-		return
-
-	def onConnect(self, protocol):
-		if (not self.m_oTimeboxProtocol and protocol):
-			self.m_oTimeboxProtocol = protocol
-			self.m_bProtocolPending = False
-			TaskSpeak(self.getWorker(), "Verbindung zur Teimbox hergestellt").start()
-
-			# for i in range(0x00, 0xFF, 1):
-			# 	self.m_oTimeboxProtocol.send([
-			# 		i+1
-			# 	])
-
-			# self.m_oTimeboxProtocol.send([
-			# 	0x59
-			# ])
-			# self.m_oTimeboxProtocol.send([
-			# 	0x15
-			# ])
-			# self.m_oTimeboxProtocol.send([
-			# 	0x13
-			# ])
-			# self.m_oTimeboxProtocol.send([
-			# 	0x18,
-			# 	0x13,
-			# 	0x14,
-			# 	0x01,
-			# 	0x05,
-			# 	0x00,
-			# 	0x00,
-			# 	0x00,
-			# 	0x00
-			# ])
-			# self.m_oTimeboxProtocol.send([
-			# 	0xb0
-			# ])
-			# self.m_oTimeboxProtocol.send([
-			# 	0x42
-			# ])
-			# self.m_oTimeboxProtocol.send([
-			# 	0xa2
-			# ])
-			# self.m_oTimeboxProtocol.send([
-			# 	0x57, 0x00
-			# ])
-			# self.m_oTimeboxProtocol.send([
-			# 	0x46
-			# ])
-		return
-
-	def onDisconnect(self, protocol):
-		if (self.m_oTimeboxProtocol is protocol
-			or not self.m_oTimeboxProtocol):
-			self.m_oTimeboxProtocol = None
-			self.m_bProtocolPending = False
-			TaskSpeak(self.getWorker(), "Verbindung zur Teimbox getrennt").start()
-		return
-
-	def onData(self, data):
-		globs.log("Verarbeiten Daten [%s], %d Bytes" % (
-			"".join("{:02X} ".format(a) for a in data),
-			len(data),
-		))
-		TaskSound(self.getWorker(), "Pop").start()
 		return
 
 class TaskTimeboxLong(LongTask):
@@ -866,7 +1350,7 @@ class TimeboxClientProtocol:
 			# Telegramm-Frame verarbeiten
 			lyFrame = self.m_lyRcvBuffer[nSliceStart : nSliceEnd]
 			lyPayload = self.unwrap(lyFrame)
-			globs.log("Empfang Daten [%s], %d Bytes aus Frame {%s}, %d Bytes" % (
+			globs.dbg("Empfang Daten [%s], %d Bytes aus Frame {%s}, %d Bytes" % (
 				"".join("{:02X} ".format(a) for a in lyPayload),
 				len(lyPayload),
 				"".join("{:02X} ".format(a) for a in lyFrame),
@@ -924,6 +1408,7 @@ class TimeboxClientProtocol:
 	# Liefert ein bytearry der Telegrammdaten in Anwenderdarstellung zurück.
 	#
 	def unwrap(self, telegram):
+		lyTelegram = list(telegram) 
 		lyRawData = list(telegram)
 		lyPayload = []
 		nLen = 0
@@ -934,7 +1419,11 @@ class TimeboxClientProtocol:
 				or lyRawData.pop(0) != 0x05
 				or lyRawData.pop(len(lyRawData) - 1) != 0x00):
 				# Fehler: Unerwartete Anfangs-/Endekennungen
-				globs.err("Unerwartete Anfangs-/Endkennungen in Timebox-Handshake (%r)" % (telegram))
+				globs.err("Unerwartete Anfangs-/Endkennungen in Timebox-Handshake (%r) - [%s], %d Bytes" % (
+					telegram,
+					"".join("{:02X} ".format(a) for a in lyTelegram),
+					len(lyTelegram)
+				))
 				return lyPayload
 			# Handshake nach Verbindungsaufbau abgeschlossen
 			globs.log("Handshake abgeschlossen")
@@ -944,7 +1433,11 @@ class TimeboxClientProtocol:
 			or lyRawData.pop(0) != 0x01
 			or lyRawData.pop(len(lyRawData) - 1) != 0x02):
 			# Fehler: Telegramm zu kurz oder ungültige Anfangs-/Endekennungen
-			globs.err("Unerwartete oder fehlende Anfangs-/Endkennungen in Timebox-Telegramm (%r)" % (telegram))
+			globs.err("Unerwartete oder fehlende Anfangs-/Endkennungen in Timebox-Telegramm (%r) - [%s], %d Bytes" % (
+				telegram,
+				"".join("{:02X} ".format(a) for a in lyTelegram),
+				len(lyTelegram)
+			))
 			return lyPayload
 		# Längeninformation, Payload und Checksumme demaskieren
 		while (len(lyRawData) > 0):
@@ -952,7 +1445,11 @@ class TimeboxClientProtocol:
 			if (yByte == 0x03):
 				if (len(lyRawData) == 0):
 					# Error: Unexpected end of telegram
-					globs.err("Unerwartetes Ende von Timebox-Telegramm (%r)" % (telegram))
+					globs.err("Unerwartetes Ende von Timebox-Telegramm (%r) - [%s], %d Bytes" % (
+						telegram,
+						"".join("{:02X} ".format(a) for a in lyTelegram),
+						len(lyTelegram)
+					))
 					return []
 				yByte = lyRawData.pop(0) - 0x03
 			lyPayload.append(yByte)
@@ -962,7 +1459,11 @@ class TimeboxClientProtocol:
 			or lyPayload.pop() != ((nChecksum >> 8) & 0x00FF)	# Checksum High Value
 			or lyPayload.pop() != (nChecksum & 0x00FF)):	# Checksum Low Value
 			# Error: Ungültige Checksumme
-			globs.err("Ungültige oder fehlende Checksumme in Timebox-Telegramm (%r)" % (telegram))
+			globs.err("Ungültige oder fehlende Checksumme in Timebox-Telegramm (%r) - [%s], %d Bytes" % (
+				telegram,
+				"".join("{:02X} ".format(a) for a in lyTelegram),
+				len(lyTelegram)
+			))
 			return []
 		# Längeninformation prüfen
 		nLen = len(lyPayload)
@@ -970,6 +1471,10 @@ class TimeboxClientProtocol:
 			or lyPayload.pop(0) != (nLen & 0x00FF)
 			or lyPayload.pop(0) != ((nLen >> 8) & 0x00FF)):
 			# Fehler: Inkonsistente Telegrammlänge
-			globs.err("Inkonsistente oder fehlende Längeninformation in Timebox-Telegramm (%r)" % (telegram))
+			globs.err("Inkonsistente oder fehlende Längeninformation in Timebox-Telegramm (%r) - [%s], %d Bytes" % (
+				telegram,
+				"".join("{:02X} ".format(a) for a in lyTelegram),
+				len(lyTelegram)
+			))
 			return []
 		return lyPayload

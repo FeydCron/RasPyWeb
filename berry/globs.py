@@ -38,6 +38,7 @@ s_nLogLvl = 4
 
 s_strBasePath = "/home/pi/berry"
 s_strSoundPath = "/home/pi/berry/sounds"
+s_strImagePath = "/home/pi/berry/images"
 s_strModulePath = "/home/pi/berry/modules"
 s_strConfigFile = "/home/pi/berry/config.json"
 s_strLogMemFile = "/home/pi/berry/logmem.pickle"
@@ -65,6 +66,8 @@ s_dictSettings = {
 		"fCpuTempH" 		: 1.0,  # Hysterese Temperaturgrenze
 		"strSysSoundLocation"	: "/usr/share/scratch/Media/Sounds",
 		"strUsrSoundLocation"	: s_strSoundPath,
+		"strSysImageLocation"	: "/usr/share/icons/Adwaita/32x32",
+		"strUsrImageLocation"	: s_strImagePath,
 		"fVersion"			: 0.1,
 	},
 	# Fehlende Python-Pakete, die optional mit Pip installiert werden können
@@ -158,17 +161,31 @@ s_dictUserSettings = OrderedDict({
 			"title"			: "Ablageort Systemklänge",
 			"description"	: ("Legt den Ablageort von Klangdateien fest, die auf dem System " + 
 								"standardmäßig zur Verfügung stehen. Dieser Ort wird bei der " + 
-								"Installation oder Verwaltung von Klangdateienwerden nicht " + 
-								"verändert."),
+								"Installation oder Verwaltung von Klangdateien nicht verändert."),
 			"default"		: "/usr/share/scratch/Media/Sounds"
 		},
 		"strUsrSoundLocation" : {
-			"title"			: "sound-Datei Ablageort",
+			"title"			: "Ablageort Klangdateien",
 			"description"	: ("Legt den Ablageort von Klangdateien fest, die für das System " + 
-								"zur Verfügung stehen sollen. Bei der Installieren neuer Klänge " + 
-								"werden diese dort abgelegt, gegebenenfalls auch in Unterordnern " + 
-								"kategorisiert."),
+								"zur Verfügung stehen sollen. Bei der Installation neuer Klänge " + 
+								"werden diese dort abgelegt, gegebenenfalls auch kategorisiert in " + 
+								"Unterordnern."),
 			"default"		: s_strSoundPath
+		},
+		"strSysImageLocation" : {
+			"title"			: "Ablageort System-Bilddateien",
+			"description"	: ("Legt den Ablageort von Bilddateien fest, die auf dem System " + 
+								"standardmäßig zur Verfügung stehen. Dieser Ort wird bei der " + 
+								"Installation oder Verwaltung von Bilddateien nicht verändert."),
+			"default"		: "/usr/share/icons/Adwaita/32x32"
+		},
+		"strUsrImageLocation" : {
+			"title"			: "Ablageort Bilddateien",
+			"description"	: ("Legt den Ablageort von Bilddateien fest, die für das System " + 
+								"zur Verfügung stehen sollen. Bei der Installation neuer Bilder " + 
+								"werden diese dort abgelegt, gegebenenfalls auch kategorisiert in " + 
+								"Unterordnern."),
+			"default"		: s_strImagePath
 		}
 	},
 })
@@ -357,6 +374,10 @@ def loadSettings():
 	dbg("Klangdateien erfassen")
 	# Sounds einmalig scannen
 	scanSoundFiles()
+
+	dbg("Bilddateien erfassen")
+	# Bilder einmalig scannen
+	scanImageFiles()
 	
 	dbg("Konfigurationsparameter synchronisieren")
 	# Konfigurationsparameter synchronisieren
@@ -514,6 +535,100 @@ def registerSoundFile(strFile, strCategory="Default"):
 	s_oSettingsLock.release()
 	# <<< Critical Section
 	return
+
+def scanImageFiles(bRescan=False, bClear=False):
+	# >>> Critical Section
+	s_oSettingsLock.acquire()
+	try:
+		if "Images" not in s_dictSettings:
+			bRescan = True
+		elif bClear:
+			s_dictSettings["Images"].clear()
+			bRescan = True
+	except:
+		exc("Erfassen von Bilddateien")
+	s_oSettingsLock.release()
+	# <<< Critical Section
+	if not bRescan:
+		return
+	
+	lstDir = (
+		getSetting("System", "strSysImageLocation",
+			varDefault="/usr/share/icons/Adwaita/32x32"),
+		getSetting("System", "strUsrImageLocation",
+			varDefault=s_strImagePath))
+		
+	for strDir in lstDir:
+		# Verzeichnisstruktur scannen (Kategorie, Datei)
+		try:
+			for strCategory in os.listdir(strDir):
+				strFile = None
+				strPath = os.path.join(strDir, strCategory)
+				if os.path.isdir(strPath):
+					for strEntry in os.listdir(strPath):
+						strFile = os.path.join(strPath, strEntry)
+						if os.path.isfile(strFile):
+							registerImageFile(strFile, strCategory)
+				elif os.path.isfile(strPath):
+					strFile = strPath
+					registerImageFile(strFile)
+		except:
+			exc("Erfassen von Bilddateien aus: '%s'" % (strDir))
+	return
+	
+def registerImageFile(strFile, strCategory="Default"):
+	_, strTail = os.path.split(strFile)
+	if not strTail:
+		return
+	strName, strExt = os.path.splitext(strTail)
+	if not strExt or not strName:
+		return
+	# if not re.match("\\.([Ww][Aa][Vv]|[Mm][Pp]3)", strExt):
+	# 	return
+	# >>> Critical Section
+	s_oSettingsLock.acquire()
+	try:
+		if "Images" not in s_dictSettings:
+			s_dictSettings.update({"Images" : {}})
+		if not strCategory in s_dictSettings["Images"]:
+			s_dictSettings["Images"].update({strCategory : {}})
+		s_dictSettings["Images"][strCategory].update({strName : strFile})
+	except:
+		exc("Bilddatei erfassen: '%s'" % (strFile))
+	s_oSettingsLock.release()
+	# <<< Critical Section
+	return
+
+def findMatchingImageFile(strImage):
+	# >>> Critical Section
+	s_oSettingsLock.acquire()
+	try:
+		if "Images" in s_dictSettings:
+			# Direkte Übereinstimmung finden
+			strFile = None
+			for (strCategory, dictSounds) in s_dictSettings["Images"].items():
+				if strImage in dictSounds:
+					strFile = s_dictSettings["Images"][strCategory][strImage]
+					break
+			if not strFile:
+				# Partiellen Treffer finden
+				for (strCategory, dictSounds) in sorted(s_dictSettings["Images"].items()):
+					for (strName, strPath) in dictSounds.items():
+						if re.match(strImage + ".*", strName):
+							log("Bild '%s' für angefordertes Bild '%s' verwendet." % (
+								strName, strImage))
+							strFile = strPath
+							break
+						if re.match(".*" + strImage + ".*", strName):
+							log("Bild '%s' für angefordertes Bild '%s' verwendet." % (
+								strName, strImage))
+							strFile = strPath
+							break
+	except:
+		exc("Bilddatei '%s' finden" % (strImage))
+	s_oSettingsLock.release()
+	# <<< Critical Section
+	return strFile
 
 def registerMissingPipPackage(
 	strPackage,

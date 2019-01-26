@@ -9,6 +9,8 @@ import threading
 from threading import Thread
 from datetime import datetime
 from time import sleep
+from PIL import Image
+from PIL import ImageSequence
 
 import socket
 import re
@@ -75,7 +77,7 @@ class Timebox(ModuleBase):
 				}
 			},
 			"bTime24Hours" : {
-				"title"			: "Uhrzeitdarstellung",
+				"title"			: "Uhrzeitformat (24h)",
 				"description"	: ("Darstellung der Uhrzeit in 12/24-Stunden einstellen."),
 				"default"		: True,
 				"type"			: "radio",
@@ -85,7 +87,7 @@ class Timebox(ModuleBase):
 				}
 			},
 			"bUnitCelsius" : {
-				"title"			: "Temperaturdarstellung",
+				"title"			: "Temperatureinheit (°C)",
 				"description"	: ("Darstellung der Temperatur in °C (Celsius) oder °F (Fahrenheit) einstellen."),
 				"default"		: True,
 				"type"			: "radio",
@@ -108,7 +110,7 @@ class Timebox(ModuleBase):
 			},
 			"bOnOffByClap" : {
 				"title"			: "Klatsch-Befehl",
-				"description"	: ("Schaltet das Display beim Klatschen ein oder aus."),
+				"description"	: ("Aktiviert oder Deaktiviert das Ein- und Ausschalten des Displays durch Klatschen."),
 				"default"		: False,
 				"type"			: "radio"
 			},
@@ -313,6 +315,11 @@ class Timebox(ModuleBase):
 					self.changeDateAndTime()
 					continue
 				continue
+			if (strCmd == "picture" and lstArg and self.m_oTimeboxProtocol):
+				for strArg in lstArg:
+					self.displayImage(strArg)
+					break
+				continue
 			# Timer-Ereignisse
 			if (strCmd == "timer" and lstArg and self.m_oTimeboxProtocol):
 				if ("cron" in lstArg):
@@ -460,6 +467,15 @@ class Timebox(ModuleBase):
 				except:
 					globs.exc("Vorgabe Lautstärke oder Stummschaltung")
 				continue
+			# Bild auswählen
+			if (strCmd == "picture" and lstArg):
+				try:
+					for strArg in lstArg:
+						self.displayImage(strArg)
+						break
+				except:
+					globs.exc("Bild einstellen")
+				continue
 
 		# Unbekanntes Kommando
 		return bResult
@@ -483,6 +499,80 @@ class Timebox(ModuleBase):
 			return lyData[0:1]
 		except:
 			globs.exc("Test-Kommando absetzen")
+		return None
+
+	def convertImageToTimeboxRGB(self, oImage):
+		return
+
+	def convertImageToTimeboxFormat(self, strFile, strFormat):
+		return
+
+	def displayImage(self, strName):
+		try:
+			if not self.m_oTimeboxProtocol:
+				return None
+
+			strFile = globs.findMatchingImageFile(strName)
+			if not strFile:
+				return None
+			
+			with Image.open(strFile) as oImage:
+				lstData = []
+				
+				for oImg in ImageSequence.Iterator(oImage):
+					
+					if (oImg.width != 11 or oImg.height != 11):
+						if (oImg.width != oImg.height):
+							nMinSize = min(oImg.width, oImg.height)
+							nMaxSize = max(oImg.width, oImg.height)
+							nOffset = round((nMaxSize - nMinSize) / 2)
+
+							if (nMaxSize == oImg.width):
+								oBox = (nOffset, 0, oImg.width - nOffset, oImg.height)
+								oImg = oImg.crop(oBox)
+							else:
+								oBox = (0, nOffset, oImg.width, oImg.height - nOffset)
+								oImg = oImg.crop(oBox)
+						oImg = oImg.resize(size=(11, 11), resample=Image.BICUBIC)
+					oImg = oImg.convert(mode="RGB")
+					
+					lyData = [0xB1, 0x00, 0x00, 0x05]
+					lstR = list(oImg.getdata(band=0))
+					lstG = list(oImg.getdata(band=1))
+					lstB = list(oImg.getdata(band=2))
+					bContinue = False
+					nByte = 0
+					for i in range(11*11):
+						if not bContinue:
+							#nByte = (lstR[i] & 0x0F) 			# (round(lstR[i] / 16) & 0x0F)
+							#nByte |= ((lstG[i] << 4) & 0xF0) 	# ((round(lstG[i] / 16) << 4) & 0xF0)
+							nByte = (int(lstR[i] / 16) & 0x0F)
+							nByte |= ((int(lstG[i] / 16) << 4) & 0xF0)
+							lyData.append(nByte)
+							#nByte = (lstB[i] & 0x0F)			# (round(lstB[i] / 16) & 0x0F)
+							nByte = (int(lstB[i] / 16) & 0x0F)
+							bContinue = True
+						else:
+							#nByte |= ((lstR[i] << 4) & 0xF0)	# ((round(lstR[i] / 16) << 4) & 0xF0)
+							nByte |= ((int(lstR[i] / 16) << 4) & 0xF0)
+							lyData.append(nByte)
+							#nByte = (lstG[i] & 0x0F)			# (round(lstG[i] / 16) & 0x0F)
+							#nByte |= ((lstB[i] << 4) & 0xF0)	# ((round(lstB[i] / 16) << 4) & 0xF0)
+							nByte = (int(lstG[i] / 16) & 0x0F)
+							nByte |= ((int(lstB[i] / 16) << 4) & 0xF0)
+							lyData.append(nByte)
+							bContinue = False
+					if bContinue:
+						lyData.append(nByte)
+					lstData.append(lyData)
+
+				for lyData in lstData:
+					lyData[1] = len(lstData)
+					self.m_oTimeboxProtocol.send(lyData)
+
+			return None
+		except:
+			globs.exc("Bild darstellen")
 		return None
 
 	def displayBuiltInGame(self, bState=False, bStart=False, strType=None):
@@ -541,57 +631,68 @@ class Timebox(ModuleBase):
 		if (command == 0x46 and len(data) >= 26):
 			# Ausgewählte Anzeige (0...7)
 			self.m_nSelectedDisplay = min(max(int.from_bytes(data[3:4], byteorder='big', signed=False), 0), 7)
+			globs.log("Eingestellte Anzeige abgerufen: %r" % (self.m_nSelectedDisplay))
 			# Ausgewählte Temperatureinheit (0/1)
 			nUnitCelsius = min(max(int.from_bytes(data[4:5], byteorder='big', signed=False), 0), 1)
 			globs.setSetting("Timebox", "bUnitCelsius", True if nUnitCelsius == 0x01 else False)
+			globs.log("Temperatureinheit abgerufen (°C): %r (%r)" % (True if nUnitCelsius == 0x01 else False, nUnitCelsius))
 			# Ausgewählte Animation (0...7)
 			self.m_nSelectedAnimation = min(max(int.from_bytes(data[5:6], byteorder='big', signed=False), 0), 7)
 			# Ausgewählte Umgebungslichtfarbe (RGB)
-			strColorAmbient = "#{:02X}{:02X}{:02X}".format(
+			strColor = "#{:02X}{:02X}{:02X}".format(
 				min(max(int.from_bytes(data[6:7], byteorder='big', signed=False), 0), 255),
 				min(max(int.from_bytes(data[7:8], byteorder='big', signed=False), 0), 255),
 				min(max(int.from_bytes(data[8:9], byteorder='big', signed=False), 0), 255)
 			)
-			globs.setSetting("Timebox", "strColorAmbient", strColorAmbient)
+			globs.setSetting("Timebox", "strColorAmbient", strColor)
+			globs.log("Umgebungslichtfarbe abgerufen: %r" % (strColor))
 			# Ausgewählte Umgebungslichthelligkeit (0...100)
 			nBrightness = min(max(int.from_bytes(data[9:10], byteorder='big', signed=False), 0), 100)
 			globs.setSetting("Timebox", "nBrightness", nBrightness)
+			globs.log("Umgebungslichthelligkeit abgerufen: %r" % (nBrightness))
 			# Ausgewählte Wellenform (0...6)
 			self.m_nSelectedWaveForm = min(max(int.from_bytes(data[10:11], byteorder='big', signed=False), 0), 6)
+			globs.log("Eingestellte Wellenform abgerufen: %r" % (self.m_nSelectedWaveForm))
 			# 2. Ausgewählte Helligkeit ignorieren
 			# Ausgewähltes Uhrzeitformat
 			nTime24Hours = min(max(int.from_bytes(data[12:13], byteorder='big', signed=False), 0), 1)
 			globs.setSetting("Timebox", "bTime24Hours", True if nTime24Hours == 0x01 else False)
+			globs.log("Uhrzeitformat abgerufen (24h): %r (%r)" % (True if nTime24Hours == 0x01 else False, nTime24Hours))
 			# Ausgewählte Uhrzeitfarbe (RGB)
-			strColorTime = "#{:02X}{:02X}{:02X}".format(
+			strColor = "#{:02X}{:02X}{:02X}".format(
 				min(max(int.from_bytes(data[13:14], byteorder='big', signed=False), 0), 255),
 				min(max(int.from_bytes(data[14:15], byteorder='big', signed=False), 0), 255),
 				min(max(int.from_bytes(data[14:16], byteorder='big', signed=False), 0), 255)
 			)
-			globs.setSetting("Timebox", "strColorTime", strColorTime)
+			globs.setSetting("Timebox", "strColorTime", strColor)
+			globs.log("Uhrzeitfarbe abgerufen: %r" % (strColor))
 			# Ausgewählte Temperaturfarbe (RGB)
-			strColorTemp = "#{:02X}{:02X}{:02X}".format(
+			strColor = "#{:02X}{:02X}{:02X}".format(
 				min(max(int.from_bytes(data[16:17], byteorder='big', signed=False), 0), 255),
 				min(max(int.from_bytes(data[17:18], byteorder='big', signed=False), 0), 255),
 				min(max(int.from_bytes(data[18:19], byteorder='big', signed=False), 0), 255)
 			)
-			globs.setSetting("Timebox", "strColorTemp", strColorTemp)
+			globs.setSetting("Timebox", "strColorTemp", strColor)
+			globs.log("Temperaturfarbe abgerufen: %r" % (strColor))
 			# Ausgewählte Sekundärfarbe (RGB)
-			strColorSecondary = "#{:02X}{:02X}{:02X}".format(
+			strColor = "#{:02X}{:02X}{:02X}".format(
 				min(max(int.from_bytes(data[19:20], byteorder='big', signed=False), 0), 255),
 				min(max(int.from_bytes(data[20:21], byteorder='big', signed=False), 0), 255),
 				min(max(int.from_bytes(data[21:22], byteorder='big', signed=False), 0), 255)
 			)
-			globs.setSetting("Timebox", "strColorSecondary", strColorSecondary)
+			globs.setSetting("Timebox", "strColorSecondary", strColor)
+			globs.log("Sekundärfarbe abgerufen: %r" % (strColor))
 			# Ausgewählte Primärfarbe (RGB)
-			strColorPrimary = "#{:02X}{:02X}{:02X}".format(
+			strColor = "#{:02X}{:02X}{:02X}".format(
 				min(max(int.from_bytes(data[22:23], byteorder='big', signed=False), 0), 255),
 				min(max(int.from_bytes(data[23:24], byteorder='big', signed=False), 0), 255),
 				min(max(int.from_bytes(data[24:25], byteorder='big', signed=False), 0), 255)
 			)
-			globs.setSetting("Timebox", "strColorPrimary", strColorPrimary)
+			globs.setSetting("Timebox", "strColorPrimary", strColor)
+			globs.log("Primärfarbe abgerufen: %r" % (strColor))
 			# Ausgewähltes Umgebungslichtmuster (0...4)
 			self.m_nSelectedAmbientPattern = min(max(int.from_bytes(data[25:26], byteorder='big', signed=False), 0), 4)
+			globs.log("Eingestelltes Umgebungslichtmuster abgerufen: %r" % (self.m_nSelectedAmbientPattern))
 
 		return
 

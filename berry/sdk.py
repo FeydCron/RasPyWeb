@@ -448,15 +448,56 @@ import socket
 import subprocess
 import urllib.parse
 import threading
+import os
 
 from . import globs
 from .sound import Sound
 from .voice import Voice
 
+class HttpContent(list):
+	def __init__(self, strPath):
+		list.__init__([])
+
+		self.m_strPath = strPath
+		return
+	
+	## 
+	#  @brief Liefert den Inhalt eines HTTP-Content Objekts als Bytes in Standardkodierung zurück.
+	#  
+	#  @param [in] self
+	#  Instanzverweis
+	#  
+	#  @return
+	#  Liefert den Inhalt des HTTP-Content Objekts als Bytes in Standardkodierung zurück.
+	#  
+	def getContent(self):
+		return []
+
+class ImageObject(HttpContent):
+	def __init__(self, strPath):
+		super().__init__(strPath)
+		self.append(strPath)
+		return
+
+	def getContent(self):
+		_, strFilename = os.path.split(self.m_strPath)
+		if not strFilename:
+			return []
+		strName, _ = os.path.splitext(strFilename)
+		if not strName:
+			return []
+		strFile = globs.findMatchingImageFile(strName)
+		if not strFile:
+			return []
+		foFile = open(strFile, "rb")
+		oData = foFile.read()
+		foFile.close()
+		return oData
+
 ## 
 #  @brief Werkzeug zum Erstellen von einfach strukturieren HTML-Seiten.
 #  
-class HtmlPage(list):
+class HtmlPage(HttpContent):
 
 	## 
 	#  @brief Erzeugt eine Instanz zum Erstellen einer HTML-Seite.
@@ -483,12 +524,11 @@ class HtmlPage(list):
 	#  @details Details
 	#  
 	def __init__(self, strPath, strTitle=None, nAutoRefresh=0):
-		list.__init__([])
+		super().__init__(strPath)
 		
 		if (not strTitle):
 			strTitle = ""
 		
-		self.m_strPath = strPath
 		self.m_strTitle = strTitle
 		self.m_bPageEnded = False
 		self.m_bChk = False

@@ -4,6 +4,7 @@ import re
 import uuid
 import html
 import zipfile
+import imghdr
 
 from http.server import SimpleHTTPRequestHandler
 from http.server import HTTPServer
@@ -20,7 +21,7 @@ from . import globs
 from .worker import TaskModuleInit, TaskExit
 
 from . import sdk
-from .sdk import TaskSpeak, TaskSound, FastTask, FutureTask, HtmlPage, TaskModuleEvt, TaskSaveSettings
+from .sdk import TaskSpeak, TaskSound, FastTask, FutureTask, ImageObject, HtmlPage, TaskModuleEvt, TaskSaveSettings
 
 g_oHttpdWorker = None
 	
@@ -1058,7 +1059,7 @@ class TaskDisplaySounds(FutureTask):
 			# Standardklänge darstellen
 			if "Default" in dictSounds:
 				strAnchor = uuid.uuid1().hex
-				self.m_oHtmlPage.append("<li id=\"Default\"><span>Standard</span>")
+				self.m_oHtmlPage.append("<li><span>Standard</span>")
 				self.m_oHtmlPage.append("<ul>")
 				for (strName, strFile) in sorted(dictSounds["Default"].items()):
 					if strName == strSound:
@@ -1070,8 +1071,8 @@ class TaskDisplaySounds(FutureTask):
 					_, strExt = os.path.splitext(strTail)
 					
 					self.m_oHtmlPage.append(
-						"<li><a href=\"%s?sound=%s&token=%s#%s\">%s %s [%s]</a></li>" % (
-							"/sound/values.html", strName, strAnchor, "Default",
+						"<li id=\"%s\"><a href=\"%s?sound=%s&token=%s#%s\">%s %s [%s]</a></li>" % (
+							strName, "/sound/values.html", strName, strAnchor, strName,
 							strActive, strName, strExt.strip(".").upper()))
 				self.m_oHtmlPage.append("</ul>")
 				self.m_oHtmlPage.append("</li>")
@@ -1080,7 +1081,7 @@ class TaskDisplaySounds(FutureTask):
 				if strCategory == "Default":
 					continue
 				strAnchor = uuid.uuid1().hex
-				self.m_oHtmlPage.append("<li id=\"%s\"><span>%s</span>" % (strCategory, strCategory))
+				self.m_oHtmlPage.append("<li><span>%s</span>" % (strCategory))
 				self.m_oHtmlPage.append("<ul>")
 				for (strName, strFile) in sorted(dictSounds.items()):
 					if strName == strSound:
@@ -1092,8 +1093,112 @@ class TaskDisplaySounds(FutureTask):
 					_, strExt = os.path.splitext(strTail)
 
 					self.m_oHtmlPage.append(
-						"<li><a href=\"%s?sound=%s&token=%s#%s\">%s %s [%s]</a></li>" % (
-							"/sound/values.html", strName, strAnchor, strCategory,
+						"<li id=\"%s\"><a href=\"%s?sound=%s&token=%s#%s\">%s %s [%s]</a></li>" % (
+							strName, "/sound/values.html", strName, strAnchor, strName,
+							strActive, strName, strExt.strip(".").upper()))
+				self.m_oHtmlPage.append("</ul>")
+				self.m_oHtmlPage.append("</li>")
+		self.m_oHtmlPage.extend([
+			"</ul>",
+			"</nav>",
+			"</div>"
+		])
+		return
+
+class TaskDisplayImages(FutureTask):
+	
+	def __init__(self,
+		oWorker,
+		oHtmlPage,
+		dictForm=None,
+		dictQuery=None
+		):
+		super(TaskDisplayImages, self).__init__(oWorker)
+		self.m_oHtmlPage = oHtmlPage
+		self.m_dictForm = dictForm
+		self.m_dictQuery = dictQuery
+		return
+		
+	def __str__(self):
+		strDesc = "Darstellen der installierten Bilder"
+		return  strDesc
+		
+	def do(self):
+		self.displayImages()
+		return
+		
+	def displayImages(self):
+		self.m_oHtmlPage.setTitle("Bilder")
+		self.m_oHtmlPage.extend([
+			"<div class=\"nav-wrapper\">",
+			"<nav class=\"ym-vlist\">",
+			"<h6 class=\"ym-vtitle\">Installierte Bilder</h6>"
+		])
+		
+		strImage = ""
+		
+		if self.m_dictQuery and "cache" in self.m_dictQuery:
+			if self.m_dictQuery["cache"][0] == "clear":
+				globs.scanImageFiles(bClear=True)
+			if self.m_dictQuery["cache"][0] == "rescan":
+				globs.scanImageFiles(bRescan=True)
+		if self.m_dictQuery and "image" in self.m_dictQuery:
+			strImage = self.m_dictQuery["image"][0]
+		
+		self.m_oHtmlPage.append("<ul>")
+		if "Images" in globs.s_dictSettings:
+			dictImages = globs.s_dictSettings["Images"]
+			# Standard-Bilder darstellen
+			if "Default" in dictImages:
+				strAnchor = uuid.uuid1().hex
+				self.m_oHtmlPage.append("<li><span>Standard</span>")
+				self.m_oHtmlPage.append("<ul>")
+				for (strName, strFile) in sorted(dictImages["Default"].items()):
+
+					_, strTail = os.path.split(strFile)
+					_, strExt = os.path.splitext(strTail)
+
+					if strName == strImage:
+						strActive = "<div><img src=\"/image/%s\" alt=\"%s\"/></div>" % (strTail, strFile)
+						TaskModuleEvt(g_oHttpdWorker, "/int/evt.src",
+							dictQuery={
+								"picture" : [strImage]
+							}
+						).start()
+					else:
+						strActive = "&#x1F441;"
+					
+					self.m_oHtmlPage.append(
+						"<li id=\"%s\"><a href=\"%s?image=%s&token=%s#%s\">%s %s [%s]</a></li>" % (
+							strName, "/image/values.html", strName, strAnchor, strName,
+							strActive, strName, strExt.strip(".").upper()))
+				self.m_oHtmlPage.append("</ul>")
+				self.m_oHtmlPage.append("</li>")
+			# Alle übrigen Bilder darstellen
+			for (strCategory, dictImages) in sorted(globs.s_dictSettings["Images"].items()):
+				if strCategory == "Default":
+					continue
+				strAnchor = uuid.uuid1().hex
+				self.m_oHtmlPage.append("<li><span>%s</span>" % (strCategory))
+				self.m_oHtmlPage.append("<ul>")
+				for (strName, strFile) in sorted(dictImages.items()):
+					
+					_, strTail = os.path.split(strFile)
+					_, strExt = os.path.splitext(strTail)
+
+					if strName == strImage:
+						strActive = "<div><img src=\"/image/%s\" alt=\"%s\"/></div>" % (strTail, strFile)
+						TaskModuleEvt(g_oHttpdWorker, "/int/evt.src",
+							dictQuery={
+								"picture" : [strImage]
+							}
+						).start()
+					else:
+						strActive = "&#x1F441;"
+
+					self.m_oHtmlPage.append(
+						"<li id=\"%s\"><a href=\"%s?image=%s&token=%s#%s\">%s %s [%s]</a></li>" % (
+							strName, "/image/values.html", strName, strAnchor, strName,
 							strActive, strName, strExt.strip(".").upper()))
 				self.m_oHtmlPage.append("</ul>")
 				self.m_oHtmlPage.append("</li>")
@@ -1524,6 +1629,49 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		if oTask.start():
 			oTask.wait()
 		return oHtmlPage
+	
+	def installImage(self, strPath, dictForm):
+		if ("ImageFile" not in dictForm):
+			oHtmlPage = HtmlPage(strPath, strTitle = "Bildinstallation")
+			oHtmlPage.createBox(
+				"Unvollständige Eingabe",
+				"Es muss mindestens eine Bild- oder Zip-Datei angegeben werden.",
+				strType="warning")
+			return oHtmlPage
+		oHtmlPage = HtmlPage("/image/values.html", strTitle = "Installierte Bilder")
+		
+		try:
+			for oImageFile in dictForm["ImageFile"]:
+				if (not oImageFile.filename or
+					not oImageFile.file):
+					oHtmlPage = HtmlPage(strPath, strTitle = "Bildinstallation")
+					oHtmlPage.createBox(
+						"Unvollständige Eingabe",
+						"Es konnte keine gültige Bild- oder Zip-Datei empfangen werden.",
+						strType="warning")
+					return oHtmlPage
+				if not self.processImageFile(oImageFile):
+					oHtmlPage = HtmlPage(strPath, strTitle = "Bildinstallation")
+					oHtmlPage.createBox(
+						"Unzulässige Eingabe",
+						"Bitte verwenden Sie nur zulässige Bilddateien (*.gif, *.jpeg, *.bmp, *.png).",
+						strType="warning")
+					return oHtmlPage
+		except Exception as ex:
+			globs.exc("Verarbeiten der Bilddatei %s" % (
+				oImageFile.filename))
+			oHtmlPage.createBox(
+				"Fehler",
+				"Die empfangene Datei '%s' " % (oImageFile.filename) +
+				"konnte nicht verarbeitet werden (%s)." % (ex),
+				strType="error")
+			return oHtmlPage
+		# Tasks ausführen
+		globs.scanImageFiles(bRescan=True)
+		oTask = TaskDisplayImages(g_oHttpdWorker, oHtmlPage)
+		if oTask.start():
+			oTask.wait()
+		return oHtmlPage
 
 	def configSound(self, strPath, dictForm):
 		oHtmlPage = HtmlPage(strPath, strTitle = "Klangeinstellungen")
@@ -1594,7 +1742,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				for oZipInfo in (oZipFile.infolist()):
 					foFile = oZipFile.open(oZipInfo)
 					_, strFilename = os.path.split(oZipInfo.filename)
-					if re.match("\\.[Ww][Aa][Vv]|\\.[Mm][Pp]3", strFilename):
+					if not re.match("\\.[Ww][Aa][Vv]|\\.[Mm][Pp]3", strExt):
 						continue
 					self.installSoundFile(foFile, os.path.join(strDirname, strFilename))
 					bResult = True
@@ -1612,6 +1760,50 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		foFile = open(strFilename, "wb")
 		oData = foSource.read()
 		globs.log("Inhalt Klangdatei: %r, Original: %r" % (oData, foSource))
+		foFile.write(oData)
+		foFile.close()
+		del oData
+		return
+	
+	def processImageFile(self, oImageFile):
+		strImagePath = globs.getSetting("System", "strUsrImageLocation",
+			varDefault=globs.s_strImagePath)
+		strFilename = oImageFile.filename
+		strFilename = strFilename.replace("\\", "/")
+		_, strFilename = os.path.split(strFilename)
+		strName, strExt = os.path.splitext(strFilename)
+		bResult = False
+		oData = oImageFile.file.read()
+		globs.log("Data: %r" % (oData))
+		if (zipfile.is_zipfile(BytesIO(oData))):
+			strDirname = os.path.join(strImagePath, strName)
+			if not (os.path.isdir(strDirname) or os.path.islink(strDirname)):
+				os.mkdir(strDirname)
+			with ZipFile(BytesIO(oData), "r") as oZipFile:
+				for oZipInfo in (oZipFile.infolist()):
+					foFile = oZipFile.open(oZipInfo)
+					_, strFilename = os.path.split(oZipInfo.filename)
+					if (not re.match(r"\.([Gg][Ii][Ff]|[Jj][Pp][Ee][Gg]|[Bb][Mm][Pp]|[Pp][Nn][Gg])", strExt)
+						or not re.match("gif|jpeg|bmp|png", imghdr.what(foFile))):
+						continue
+					foFile = oZipFile.open(oZipInfo)
+					self.installImageFile(foFile, os.path.join(strDirname, strFilename))
+					bResult = True
+		elif (not re.match(r"\.([Gg][Ii][Ff]|[Jj][Pp][Ee][Gg]|[Bb][Mm][Pp]|[Pp][Nn][Gg])", strExt)
+			or not re.match("gif|jpeg|bmp|png", imghdr.what(BytesIO(oData)))):
+			del oData
+			return False
+		else:
+			self.installImageFile(BytesIO(oData), os.path.join(strImagePath, strFilename))
+			bResult = True
+		del oData
+		return bResult
+		
+	def installImageFile(self, foSource, strFilename):
+		globs.log("Bilddatei installieren %r, %r" % (foSource, strFilename))
+		foFile = open(strFilename, "wb")
+		oData = foSource.read()
+		globs.log("Inhalt Bilddatei: %r, Original: %r" % (oData, foSource))
 		foFile.write(oData)
 		foFile.close()
 		del oData
@@ -1730,6 +1922,16 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 					oHtmlPage = HtmlPage(strPath)
 					oFutureTask = TaskConfigSound(g_oHttpdWorker,
 						oHtmlPage)
+				elif strPath == "/image/values.html":
+					oHtmlPage = HtmlPage(strPath)
+					oFutureTask = TaskDisplayImages(g_oHttpdWorker,
+						oHtmlPage,
+						dictQuery=dictQuery,
+						dictForm=dictForm)
+				elif re.match(r"^/image/.*\.([Gg][Ii][Ff]|[Jj][Pp][Ee][Gg]|[Bb][Mm][Pp]|[Pp][Nn][Gg])$", strPath):
+					oHtmlPage = ImageObject(strPath)
+					print("ImageObject: %r" % (oHtmlPage))
+					pass
 						
 			if oFutureTask:
 				if oFutureTask.start():
@@ -1770,6 +1972,8 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				oHtmlPage = self.installSound(strPath, dictForm)
 			elif strPath == "/sound/config.html":
 				oHtmlPage = self.configSound(strPath, dictForm)
+			elif strPath == "/image/install.html":
+				oHtmlPage = self.installImage(strPath, dictForm)
 			elif strPath == "/system/modules.html":
 				oHtmlPage = self.changeModules(strPath, dictForm)
 			

@@ -26,14 +26,13 @@ try:
 except:
 	globs.exc("Modul <mutagen> scheint nicht verfügbar zu sein")
 	globs.registerMissingPipPackage(
-		"mutagen",
-		"Python Multimedia Tagging Library",
-		"Das Paket wird verwendet, um die maximale Abspieldauer von MP3-Dateien zu ermitteln. " +
-		"Anhand der Abspieldauer wird die Laufzeit des MP3-Players begrenzt, sodass dieser nicht " +
-		"mehr Zeit als notwendig in Anspruch nehmen kann. Damit kann ein Problem mit dem omxplayer " +
-		"behoben werden, welcher sich gelegentlich nicht beendet und damit das Abspielen weiterer " +
-		"Klänge blockiert. Solange keine Probleme mit dem omxplayer beobachtet werden, besteht keine " +
-		"Notwendigkeit, das Paket zu installieren.")
+		"mutagen", "Python Multimedia Tagging Library",
+		"""Das Paket wird verwendet, um die maximale Abspieldauer von MP3-Dateien zu ermitteln.
+		Anhand der Abspieldauer wird die Laufzeit des MP3-Players begrenzt, sodass dieser nicht
+		mehr Zeit als notwendig in Anspruch nehmen kann. Damit kann ein Problem mit dem omxplayer
+		behoben werden, welcher sich gelegentlich nicht beendet und damit das Abspielen weiterer
+		Klänge blockiert. Solange keine Probleme mit dem omxplayer beobachtet werden, besteht keine
+		Notwendigkeit, das Paket zu installieren.""")
 
 class Berry:
 	

@@ -37,7 +37,7 @@ class Updater(ModuleBase):
 		dictSettings = {
 			"strSystemUrl" : Updater.s_strSystemUrl,
 			"strChkUpdUrl" : Updater.s_strChkUpdUrl,
-			"lnkManUpdate" : "/modules/Updater.html",
+			"lnkManUpdate" : "",
 			"bAutoUpdate" : False,
 			"bAutoReboot" : False,
 			"nUpdateHour" : 0,
@@ -119,8 +119,8 @@ class Updater(ModuleBase):
 			},
 			"lnkManUpdate" : {
 				"title"			: "Manuelle Aktualisierung",
-				"description"	: ("Anzeigen"),
-				"default"		: None,
+				"description"	: ("Anzeigen..."),
+				"default"		: "/modules/Updater.html",
 				"showlink"		: True
 			},
 		})
@@ -170,7 +170,7 @@ class Updater(ModuleBase):
 		print("%r::moduleExec(strPath=%s, oHtmlPage=%s, dictQuery=%s, dictForm=%s) [%s]" % (
 			self, strPath, oHtmlPage, dictQueryKeys, dictFormKeys, datetime.today().strftime("%X")))
 		
-		if (re.match("/modules/Updater\\.html", strPath)
+		if (re.match(r"/modules/Updater\.html", strPath)
 			and not oHtmlPage == None):
 			return self.serveHtmlPage(oHtmlPage, dictQuery, dictForm)
 			

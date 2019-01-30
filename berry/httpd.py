@@ -763,7 +763,7 @@ class TaskDisplaySettings(FutureTask):
 							self.m_oHtmlPage.appendTable([
 								strTitle,
 								"<a href=\"%s\">&#x027A5; %s</a>" % (
-									globs.s_dictSettings[strSubsystem][strProperty],
+									dictProperties["default"],
 									dictProperties["description"])
 								], bFirstIsHead=True, bEscape=False)
 						else:
@@ -1159,6 +1159,7 @@ class TaskDisplayImages(FutureTask):
 					_, strExt = os.path.splitext(strTail)
 
 					if strName == strImage:
+						#strActive = "&#x1F440;"
 						strActive = "<div><img src=\"/image/%s\" alt=\"%s\"/></div>" % (strTail, strFile)
 						TaskModuleEvt(g_oHttpdWorker, "/int/evt.src",
 							dictQuery={
@@ -1187,6 +1188,7 @@ class TaskDisplayImages(FutureTask):
 					_, strExt = os.path.splitext(strTail)
 
 					if strName == strImage:
+						#strActive = "&#x1F440;"
 						strActive = "<div><img src=\"/image/%s\" alt=\"%s\"/></div>" % (strTail, strFile)
 						TaskModuleEvt(g_oHttpdWorker, "/int/evt.src",
 							dictQuery={

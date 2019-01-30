@@ -1130,11 +1130,13 @@ class HtmlPage(HttpContent):
 			self.append("</div>")
 		return
 		
-	def createButton(self, strTitle, strHRef="", strClass=""):
+	def createButton(self, strTitle, strHRef="", strClass="", bExternal=False):
 		if not strHRef:
 			strHRef = self.m_strPath
-		self.append("<a class=\"ym-button %s\" style=\"margin-top:10px;\" href=\"%s\">%s</a>" % (
-			strClass, strHRef, html.escape("%s" % strTitle)))
+		self.append("<a class=\"ym-button %s\" style=\"margin-top:10px;\" %s href=\"%s\">%s</a>" % (
+			strClass,
+			"" if not bExternal else "target=\"_blank\" rel=\"noopener\"",
+			strHRef, html.escape("%s" % strTitle)))
 		return
 		
 	def closeBox(self):

@@ -284,13 +284,13 @@ class TaskModuleInit(FastTask):
 				oInstance = oModule.createModuleInstance(self.m_oWorker)
 				if (not oInstance
 					or not oInstance.moduleInit(dictModCfg=dictModCfg, dictCfgUsr=dictCfgUsr)):
-					strMsg = "Das Modul %s konnte nicht initialisiert werden." % (self.m_strModule)
+					strMsg = "Das Modul %s konnte nicht initialisiert werden. Möglicherweise müssen zusätzliche Pakete installiert werden." % (self.m_strModule)
 					globs.wrn(strMsg)
 					TaskSpeak(self.m_oWorker, strMsg).start()
 					oInstance = None
 			except:
 				globs.exc("Verwalten des Moduls %s" % (self.m_strModule))
-				strMsg = "Das Modul %s konnte nicht initialisiert werden. Wahrscheinlich ist es veraltet und nicht mehr kompatibel." % (
+				strMsg = "Das Modul %s konnte nicht initialisiert werden. Möglicherweise ist es veraltet und muss aktualisiert werden." % (
 					self.m_strModule)
 				globs.wrn(strMsg)
 				TaskSpeak(self.m_oWorker, strMsg).start()

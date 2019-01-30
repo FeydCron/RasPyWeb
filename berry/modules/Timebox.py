@@ -9,8 +9,6 @@ import threading
 from threading import Thread
 from datetime import datetime
 from time import sleep
-from PIL import Image
-from PIL import ImageSequence
 
 import socket
 import re
@@ -24,6 +22,19 @@ from .. import globs
 from .. import sdk
 from ..sdk import ModuleBase, FastTask, LongTask, TaskSpeak, TaskSound
 
+# Try to import from module "pillow" which might not be installed on the target system
+#
+try:
+	import PIL
+	from PIL import Image, ImageSequence, ImageEnhance
+
+	globs.dbg("Modul <pillow> scheint verfügbar zu sein")
+except:
+	globs.exc("Modul <pillow> scheint nicht verfügbar zu sein")
+	globs.registerMissingPipPackage(
+		"pillow", "Python Imaging Library",
+		"""Das Paket wird verwendet, um Bilder für die Timebox vorzubereitung und herunter zuladen.
+		Solange das Paket nicht installiert wird, steht nicht der volle Funktionsumfang zur Verfügung.""")
 
 def createModuleInstance(
 	oWorker):
@@ -38,24 +49,29 @@ class Timebox(ModuleBase):
 		
 		# Verfügbare Einstellungen mit Default-Werten festlegen
 		dictSettings = {
-			"bAutoConnect" 			: False,
-			"bTime24Hours"			: True,
-			"bUnitCelsius"			: True,
-			"bMute"					: False,
-			"bPowerSafe"			: False,
-			"bOnOffByClap"			: False,
-			"nPort" 				: 4,
-			"nBrightness"			: 100,
-			"nVolume"				: 7,
-			"nAutoOffDelay"			: 0,
-			"strAddress" 			: "",
-			"strColorTime"			: "#FFFFFF",
-			"strColorTemp"			: "#FFFFFF",
-			"strColorAmbient"		: "#FFFFFF",
-			"strColorPrimary"		: "#00FF00",
-			"strColorSecondary"		: "#FF0000",
-			"strTestCommand"		: "",
-			# "fFmFrequency"		: 90.7,
+			"bAutoConnect" 				: False,
+			"bTime24Hours"				: True,
+			"bUnitCelsius"				: True,
+			"bMute"						: False,
+			"bPowerSafe"				: False,
+			"bOnOffByClap"				: False,
+			"nPort" 					: 4,
+			"nBrightness"				: 100,
+			"nVolume"					: 7,
+			"nAutoOffDelay"				: 0,
+			"nImageResizeFilter"		: 0,
+			"nImageEnhanceColor"		: 100,
+			"nImageEnhanceContrast"		: 100,
+			"nImageEnhanceBrightness"	: 100,
+			"nImageEnhanceSharpness"	: 100,
+			"strAddress" 				: "",
+			"strColorTime"				: "#FFFFFF",
+			"strColorTemp"				: "#FFFFFF",
+			"strColorAmbient"			: "#FFFFFF",
+			"strColorPrimary"			: "#00FF00",
+			"strColorSecondary"			: "#FF0000",
+			"strTestCommand"			: "",
+			# "fFmFrequency"			: 90.7,
 		}
 		# Vorbelegung der Moduleigenschaften mit Default-Werten, sofern noch nicht verfügbar
 		if (not dictModCfg):
@@ -120,23 +136,23 @@ class Timebox(ModuleBase):
 				"default"		: 4
 			},
 			"nBrightness" : {
-				"title"			: "Helligkeit",
+				"title"			: "LED-Helligkeit",
 				"description"	: ("Helligkeit der LED-Anzeige einstellen."),
-				"default"		: "100",
+				"default"		: 100,
 				"type"			: "range",
 				"pattern"		: "min=\"0\" max=\"100\" step=\"10\""
 			},
 			"nVolume" : {
 				"title"			: "Lautstärke",
 				"description"	: ("Lautstärke einstellen."),
-				"default"		: "7",
+				"default"		: 7,
 				"type"			: "range",
 				"pattern"		: "min=\"0\" max=\"15\" step=\"1\""
 			},
 			"nAutoOffDelay" : {
 				"title"			: "Automatische Abschaltung",
 				"description"	: ("Schaltet das Gerät nach der eingestellten Verzögerung aus, wenn das Gerät nicht verwendet wird."),
-				"default"		: "0",
+				"default"		: 0,
 				"type"			: "radio",
 				"choices"		: {
 					"Niemals"			: 0,
@@ -146,6 +162,48 @@ class Timebox(ModuleBase):
 					"6 Stunden"			: 360,
 					"12 Stunden"		: 720
 				}
+			},
+			"nImageResizeFilter" : {
+				"title"			: "Größenanpassungsfilter",
+				"description"	: ("Auswahl eines Filters, mit dem die Größenanpassung von Bildern vorgenommen werden soll."),
+				"default"		: 0,
+				"type"			: "radio",
+				"choices"		: {
+					"0 - NEAREST"		: 0,
+					"1 - BOX"			: 1	,
+					"2 - BILINEAR"		: 2,
+					"3 - HAMMING"		: 3,
+					"4 - BICUBIC"		: 4,
+					"5 - LANCZOS"		: 5
+				}
+			},
+			"nImageEnhanceColor" : {
+				"title"			: "Farbkorrektur Größenanpassung",
+				"description"	: ("Einstellung einer Farbkorrektur, welche bei der Größenanpassung von Bildern angewendet werden soll."),
+				"default"		: 100,
+				"type"			: "range",
+				"pattern"		: "min=\"0\" max=\"200\" step=\"1\""
+			},
+			"nImageEnhanceContrast" : {
+				"title"			: "Kontrast Größenanpassung",
+				"description"	: ("Einstellung eines Kontrasts, welcher bei der Größenanpassung von Bildern angewendet werden soll."),
+				"default"		: 100,
+				"type"			: "range",
+				"pattern"		: "min=\"0\" max=\"200\" step=\"1\""
+			},
+			"nImageEnhanceBrightness" : {
+				"title"			: "Helligkeit Größenanpassung",
+				"description"	: ("Einstellung einer Helligkeit, welche bei der Größenanpassung von Bildern angewendet werden soll."),
+				"default"		: 100,
+				"type"			: "range",
+				"pattern"		: "min=\"0\" max=\"200\" step=\"1\""
+			},
+			"nImageEnhanceSharpness" : {
+				"title"			: "Schärfe Größenanpassung",
+				"description"	: ("Einstellung einer Schärfe, welche bei der Größenanpassung von Bildern angewendet werden soll."),
+				"default"		: 100,
+				"type"			: "range",
+				"pattern"		: "min=\"0\" max=\"200\" step=\"1\""
 			},
 			"strAddress" : {
 				"title"			: "Adresse der Timebox",
@@ -508,19 +566,80 @@ class Timebox(ModuleBase):
 		return
 
 	def displayImage(self, strName):
+		lstFilters = [
+			Image.NEAREST,
+			Image.BOX,
+			Image.BILINEAR,
+			Image.HAMMING,
+			Image.BICUBIC,
+			Image.LANCZOS
+		]
 		try:
-			if not self.m_oTimeboxProtocol:
+			if not self.m_oTimeboxProtocol or globs.isMissingPipPackage("pillow"):
 				return None
 
 			strFile = globs.findMatchingImageFile(strName)
 			if not strFile:
 				return None
 			
+			oFilter = lstFilters[0]
+			nFilter = globs.getSetting("Timebox", "nImageResizeFilter", r"[0-5]", 0)
+			nColor = globs.getSetting("Timebox", "nImageEnhanceColor", r"[0-9]{1,3}", 100)
+			nContrast = globs.getSetting("Timebox", "nImageEnhanceContrast", r"[0-9]{1,3}", 100)
+			nBrightness = globs.getSetting("Timebox", "nImageEnhanceBrightness", r"[0-9]{1,3}", 100)
+			nSharpness = globs.getSetting("Timebox", "nImageEnhanceSharpness", r"[0-9]{1,3}", 100)
+			if (nFilter >= 0 and nFilter < len(lstFilters)):
+				oFilter = lstFilters[nFilter]
+			
 			with Image.open(strFile) as oImage:
 				lstData = []
+				nDuration = 0
+				nFrame = 0
 				
+				try:
+					
+					if ("duration" in oImage.info.keys()):
+						nDuration = int(oImage.info["duration"])
+
+					print("--------------------------------------------------")
+					print("Version    : %s" % (PIL.__version__))
+					print("--------------------------------------------------")
+					print("Format     : %r" % (oImage.format))
+					print("Mode       : %r" % (oImage.mode))
+					print("Width      : %r" % (oImage.width))
+					print("Height     : %r" % (oImage.height))
+					print("Palette    : %r" % (oImage.palette))
+					print("Info       : %r" % (oImage.info))
+					print("Duration   : %r" % (nDuration))
+					#print("Colors     : %r" % (oImage.getcolors()))
+					print("--------------------------------------------------")
+					print("Filter     : %r" % (oFilter))
+					print("Color      : %r" % (nColor))
+					print("Contrast   : %r" % (nContrast))
+					print("Brightness : %r" % (nBrightness))
+					print("Sharpness  : %r" % (nSharpness))
+					print("--------------------------------------------------")
+				except:
+					globs.exc("displayImage(%s)" % (strName))
+
 				for oImg in ImageSequence.Iterator(oImage):
 					
+					# Preparations to get a RGB image from images with Alpha channel
+					oImg = oImg.convert('RGBA')
+					oBg = Image.new('RGBA', oImg.size, (255,255,255))
+					oImg = Image.alpha_composite(oBg, oImg)
+					oImg = oImg.convert(mode="RGB")
+
+					# Improvements to apply to the image
+					if (nColor != 100):
+						oImg = ImageEnhance.Color(oImg).enhance(nColor / 100)
+					if (nContrast != 100):
+						oImg = ImageEnhance.Contrast(oImg).enhance(nContrast / 100)
+					if (nBrightness != 100):
+						oImg = ImageEnhance.Brightness(oImg).enhance(nBrightness / 100)
+					if (nSharpness != 100):
+						oImg = ImageEnhance.Sharpness(oImg).enhance(nSharpness / 100)
+
 					if (oImg.width != 11 or oImg.height != 11):
 						if (oImg.width != oImg.height):
 							nMinSize = min(oImg.width, oImg.height)
@@ -533,10 +652,10 @@ class Timebox(ModuleBase):
 							else:
 								oBox = (0, nOffset, oImg.width, oImg.height - nOffset)
 								oImg = oImg.crop(oBox)
-						oImg = oImg.resize(size=(11, 11), resample=Image.BICUBIC)
-					oImg = oImg.convert(mode="RGB")
+						oImg = oImg.resize(size=(11, 11),  resample=oFilter)
 					
-					lyData = [0xB1, 0x00, 0x00, 0x05]
+					lyData = [0xB1, 0x00, nFrame, max(round(nDuration / 100), 1)]
+					nFrame += 1
 					lstR = list(oImg.getdata(band=0))
 					lstG = list(oImg.getdata(band=1))
 					lstB = list(oImg.getdata(band=2))

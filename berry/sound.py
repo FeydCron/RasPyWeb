@@ -28,26 +28,25 @@ class Sound:
 		fTimeout = None
 
 		# >>> Critical Section
-		globs.s_oSettingsLock.acquire()
-		try:
-			if "Sounds" in globs.s_dictSettings:
-				# Direkte Übereinstimmung finden
-				for (strCategory, dictSounds) in globs.s_dictSettings["Sounds"].items():
-					if strSound in dictSounds:
-						strFile = globs.s_dictSettings["Sounds"][strCategory][strSound]
-						break
-				if not strFile:
-					# Partiellen Treffer finden
-					for (strCategory, dictSounds) in sorted(globs.s_dictSettings["Sounds"].items()):
-						for (strName, strPath) in dictSounds.items():
-							if re.match(".*" + strSound + ".*", strName):
-								globs.log("Sound '%s' für angeforderten Sound '%s' verwendet." % (
-									strName, strSound))
-								strFile = strPath
-								break
-		except:
-			globs.exc("Sound '%s' finden" % (strSound))
-		globs.s_oSettingsLock.release()
+		with globs.s_oSettingsLock:
+			try:
+				if "Sounds" in globs.s_dictSettings:
+					# Direkte Übereinstimmung finden
+					for (strCategory, dictSounds) in globs.s_dictSettings["Sounds"].items():
+						if strSound in dictSounds:
+							strFile = globs.s_dictSettings["Sounds"][strCategory][strSound]
+							break
+					if not strFile:
+						# Partiellen Treffer finden
+						for (strCategory, dictSounds) in sorted(globs.s_dictSettings["Sounds"].items()):
+							for (strName, strPath) in dictSounds.items():
+								if re.match(".*" + strSound + ".*", strName):
+									globs.log("Sound '%s' für angeforderten Sound '%s' verwendet." % (
+										strName, strSound))
+									strFile = strPath
+									break
+			except:
+				globs.exc("Sound '%s' finden" % (strSound))
 		# <<< Critical Section
 		
 		if not strFile:

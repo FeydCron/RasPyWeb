@@ -1,14 +1,27 @@
-﻿try:
+﻿from . import globs
+
+# Try to import from module "ptvsd" which might not be installed on the target system
+#
+g_bPackageMissing = True
+try:
 	import ptvsd
-	ptvsd.enable_attach("debug")
+	ptvsd.enable_attach(address=("192.168.1.123", 5678))
+
+	globs.dbg("Modul <ptvsd> scheint verfügbar zu sein")
+	g_bPackageMissing = False
+
+	#ptvsd.wait_for_attach()
 except:
-	pass
+	globs.exc("Modul <ptvsd> scheint nicht verfügbar zu sein")
+
+globs.registerPipPackage(
+	g_bPackageMissing, "ptvsd", "Python Visual Studio Debugger engine",
+	"""Das Paket kann verwendet werden, um Python-Programme mit Visual Studio oder
+	Visual Studio Code zu debuggen.""")
 
 import re
 import traceback
 import subprocess
-
-from . import globs
 
 from .voice import Voice
 from .worker import Worker
@@ -19,20 +32,23 @@ from .sdk import TaskSpeak
 
 # Try to import from module "mutagen" which might not be installed on the target system
 #
+g_bPackageMissing = True
 try:
 	from mutagen.mp3 import MP3
 
 	globs.dbg("Modul <mutagen> scheint verfügbar zu sein")
+	g_bPackageMissing = False
 except:
 	globs.exc("Modul <mutagen> scheint nicht verfügbar zu sein")
-	globs.registerMissingPipPackage(
-		"mutagen", "Python Multimedia Tagging Library",
-		"""Das Paket wird verwendet, um die maximale Abspieldauer von MP3-Dateien zu ermitteln.
-		Anhand der Abspieldauer wird die Laufzeit des MP3-Players begrenzt, sodass dieser nicht
-		mehr Zeit als notwendig in Anspruch nehmen kann. Damit kann ein Problem mit dem omxplayer
-		behoben werden, welcher sich gelegentlich nicht beendet und damit das Abspielen weiterer
-		Klänge blockiert. Solange keine Probleme mit dem omxplayer beobachtet werden, besteht keine
-		Notwendigkeit, das Paket zu installieren.""")
+
+globs.registerPipPackage(
+	g_bPackageMissing, "mutagen", "Python Multimedia Tagging Library",
+	"""Das Paket wird verwendet, um die maximale Abspieldauer von MP3-Dateien zu ermitteln.
+	Anhand der Abspieldauer wird die Laufzeit des MP3-Players begrenzt, sodass dieser nicht
+	mehr Zeit als notwendig in Anspruch nehmen kann. Damit kann ein Problem mit dem omxplayer
+	behoben werden, welcher sich gelegentlich nicht beendet und damit das Abspielen weiterer
+	Klänge blockiert. Solange keine Probleme mit dem omxplayer beobachtet werden, besteht keine
+	Notwendigkeit, das Paket zu installieren.""")
 
 class Berry:
 	

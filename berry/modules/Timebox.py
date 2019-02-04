@@ -20,21 +20,24 @@ from bluetooth import BluetoothSocket, BluetoothError, RFCOMM
 
 from .. import globs
 from .. import sdk
-from ..sdk import ModuleBase, FastTask, LongTask, TaskSpeak, TaskSound
+from ..sdk import ModuleBase, TaskDelegateFast, TaskDelegateLong, TaskSpeak, TaskSound
 
 # Try to import from module "pillow" which might not be installed on the target system
 #
+g_bPackageMissing = True
 try:
 	import PIL
 	from PIL import Image, ImageSequence, ImageEnhance
 
 	globs.dbg("Modul <pillow> scheint verfügbar zu sein")
+	g_bPackageMissing = False
 except:
 	globs.exc("Modul <pillow> scheint nicht verfügbar zu sein")
-	globs.registerMissingPipPackage(
-		"pillow", "Python Imaging Library",
-		"""Das Paket wird verwendet, um Bilder für die Timebox vorzubereitung und herunter zuladen.
-		Solange das Paket nicht installiert wird, steht nicht der volle Funktionsumfang zur Verfügung.""")
+
+globs.registerPipPackage(
+	g_bPackageMissing, "pillow", "Python Imaging Library",
+	"""Das Paket wird verwendet, um Bilder für die Timebox vorzubereitung und herunter zuladen.
+	Solange das Paket nicht installiert wird, steht nicht der volle Funktionsumfang zur Verfügung.""")
 
 def createModuleInstance(
 	oWorker):
@@ -49,27 +52,27 @@ class Timebox(ModuleBase):
 		
 		# Verfügbare Einstellungen mit Default-Werten festlegen
 		dictSettings = {
+			"strAddress" 				: "",
+			"nPort" 					: 4,
 			"bAutoConnect" 				: False,
+			"bOnOffByClap"				: False,
+			"bPowerSafe"				: False,
+			"nAutoOffDelay"				: 0,
 			"bTime24Hours"				: True,
 			"bUnitCelsius"				: True,
 			"bMute"						: False,
-			"bPowerSafe"				: False,
-			"bOnOffByClap"				: False,
-			"nPort" 					: 4,
-			"nBrightness"				: 100,
 			"nVolume"					: 7,
-			"nAutoOffDelay"				: 0,
-			"nImageResizeFilter"		: 0,
-			"nImageEnhanceColor"		: 100,
-			"nImageEnhanceContrast"		: 100,
-			"nImageEnhanceBrightness"	: 100,
-			"nImageEnhanceSharpness"	: 100,
-			"strAddress" 				: "",
+			"nBrightness"				: 100,
 			"strColorTime"				: "#FFFFFF",
 			"strColorTemp"				: "#FFFFFF",
 			"strColorAmbient"			: "#FFFFFF",
 			"strColorPrimary"			: "#00FF00",
 			"strColorSecondary"			: "#FF0000",
+			"nImageResizeFilter"		: 0,
+			"nImageEnhanceColor"		: 100,
+			"nImageEnhanceContrast"		: 100,
+			"nImageEnhanceBrightness"	: 100,
+			"nImageEnhanceSharpness"	: 100,
 			"strTestCommand"			: "",
 			# "fFmFrequency"			: 90.7,
 		}
@@ -83,6 +86,19 @@ class Timebox(ModuleBase):
 
 		# Beschreibung der Konfigurationseinstellungen
 		dictCfgUsr.update({
+			"strAddress" : {
+				"title"			: "Adresse der Timebox",
+				"description"	: ("Einstellung der Adresse einer Timebox, zu der eine Verbindung hergestellt werden soll."),
+				"default"		: "",
+				"choices"		: {
+					"Keine Timebox verfügbar"		: ""
+				}
+			},
+			"nPort" : {
+				"title"			: "Portnummer für RFCOMM",
+				"description"	: ("Einstellung der Portnummer für RFCOMM mit einer Timebox."),
+				"default"		: 4
+			},
 			"bAutoConnect" : {
 				"title"			: "Automatischer Verbindungsaufbau",
 				"description"	: ("Automatischen oder manuellen Verbindungsaufbau aktivieren."),
@@ -90,6 +106,32 @@ class Timebox(ModuleBase):
 				"choices"		: {
 					"Automatisch verbinden"	: True,
 					"Manuell verbinden"		: False
+				}
+			},
+			"bOnOffByClap" : {
+				"title"			: "Klatsch-Befehl",
+				"description"	: ("Aktiviert oder Deaktiviert das Ein- und Ausschalten des Displays durch Klatschen."),
+				"default"		: False,
+				"type"			: "radio"
+			},
+			"bPowerSafe" : {
+				"title"			: "Energiesparmodus",
+				"description"	: ("Schaltet das Gerät nach 5 Minuten in Standby."),
+				"default"		: False,
+				"type"			: "radio"
+			},
+			"nAutoOffDelay" : {
+				"title"			: "Automatische Abschaltung",
+				"description"	: ("Schaltet das Gerät nach der eingestellten Verzögerung aus, wenn das Gerät nicht verwendet wird."),
+				"default"		: 0,
+				"type"			: "radio",
+				"choices"		: {
+					"Niemals"			: 0,
+					"30 Minuten"		: 30,
+					"1 Stunde"			: 60,
+					"3 Stunden"			: 180,
+					"6 Stunden"			: 360,
+					"12 Stunden"		: 720
 				}
 			},
 			"bTime24Hours" : {
@@ -118,22 +160,12 @@ class Timebox(ModuleBase):
 				"default"		: False,
 				"type"			: "radio"
 			},
-			"bPowerSafe" : {
-				"title"			: "Energiesparmodus",
-				"description"	: ("Schaltet das Gerät nach 5 Minuten in Standby."),
-				"default"		: False,
-				"type"			: "radio"
-			},
-			"bOnOffByClap" : {
-				"title"			: "Klatsch-Befehl",
-				"description"	: ("Aktiviert oder Deaktiviert das Ein- und Ausschalten des Displays durch Klatschen."),
-				"default"		: False,
-				"type"			: "radio"
-			},
-			"nPort" : {
-				"title"			: "Portnummer für RFCOMM",
-				"description"	: ("Einstellung der Portnummer für RFCOMM mit einer Timebox."),
-				"default"		: 4
+			"nVolume" : {
+				"title"			: "Lautstärke",
+				"description"	: ("Lautstärke einstellen."),
+				"default"		: 7,
+				"type"			: "range",
+				"pattern"		: "min=\"0\" max=\"15\" step=\"1\""
 			},
 			"nBrightness" : {
 				"title"			: "LED-Helligkeit",
@@ -142,26 +174,40 @@ class Timebox(ModuleBase):
 				"type"			: "range",
 				"pattern"		: "min=\"0\" max=\"100\" step=\"10\""
 			},
-			"nVolume" : {
-				"title"			: "Lautstärke",
-				"description"	: ("Lautstärke einstellen."),
-				"default"		: 7,
-				"type"			: "range",
-				"pattern"		: "min=\"0\" max=\"15\" step=\"1\""
+			"strColorTime" : {
+				"title"			: "Uhrzeitfarbe",
+				"description"	: ("Farbeinstellung der Uhrzeitanzeige."),
+				"default"		: "#FFFFFF",
+				"type"			: "color",
+				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
 			},
-			"nAutoOffDelay" : {
-				"title"			: "Automatische Abschaltung",
-				"description"	: ("Schaltet das Gerät nach der eingestellten Verzögerung aus, wenn das Gerät nicht verwendet wird."),
-				"default"		: 0,
-				"type"			: "radio",
-				"choices"		: {
-					"Niemals"			: 0,
-					"30 Minuten"		: 30,
-					"1 Stunde"			: 60,
-					"3 Stunden"			: 180,
-					"6 Stunden"			: 360,
-					"12 Stunden"		: 720
-				}
+			"strColorTemp" : {
+				"title"			: "Temperaturfarbe",
+				"description"	: ("Farbeinstellung der Temperaturanzeige."),
+				"default"		: "#FFFFFF",
+				"type"			: "color",
+				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
+			},
+			"strColorAmbient" : {
+				"title"			: "Umgebungslicht",
+				"description"	: ("Farbeinstellung für das Umgebungslicht."),
+				"default"		: "#FFFFFF",
+				"type"			: "color",
+				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
+			},
+			"strColorPrimary" : {
+				"title"			: "Primärfarbe",
+				"description"	: ("Einstellung einer Primärfarbe für verschiedene Anwendung, z.B. die Darstellung von Wellenformen."),
+				"default"		: "#00FF00",
+				"type"			: "color",
+				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
+			},
+			"strColorSecondary" : {
+				"title"			: "Sekundärfarbe",
+				"description"	: ("Einstellung einer Sekundärfarbe für verschiedene Anwendung, z.B. die Darstellung von Wellenformen."),
+				"default"		: "#FF0000",
+				"type"			: "color",
+				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
 			},
 			"nImageResizeFilter" : {
 				"title"			: "Größenanpassungsfilter",
@@ -204,49 +250,6 @@ class Timebox(ModuleBase):
 				"default"		: 100,
 				"type"			: "range",
 				"pattern"		: "min=\"0\" max=\"200\" step=\"1\""
-			},
-			"strAddress" : {
-				"title"			: "Adresse der Timebox",
-				"description"	: ("Einstellung der Adresse einer Timebox, zu der eine Verbindung hergestellt werden soll."),
-				"default"		: "",
-				"choices"		: {
-					"Keine Timebox verfügbar"		: ""
-				}
-			},
-			"strColorTime" : {
-				"title"			: "Uhrzeitfarbe",
-				"description"	: ("Farbeinstellung der Uhrzeitanzeige."),
-				"default"		: "#FFFFFF",
-				"type"			: "color",
-				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
-			},
-			"strColorTemp" : {
-				"title"			: "Temperaturfarbe",
-				"description"	: ("Farbeinstellung der Temperaturanzeige."),
-				"default"		: "#FFFFFF",
-				"type"			: "color",
-				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
-			},
-			"strColorAmbient" : {
-				"title"			: "Umgebungslicht",
-				"description"	: ("Farbeinstellung für das Umgebungslicht."),
-				"default"		: "#FFFFFF",
-				"type"			: "color",
-				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
-			},
-			"strColorPrimary" : {
-				"title"			: "Primärfarbe",
-				"description"	: ("Einstellung einer Primärfarbe für verschiedene Anwendung, z.B. die Darstellung von Wellenformen."),
-				"default"		: "#00FF00",
-				"type"			: "color",
-				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
-			},
-			"strColorSecondary" : {
-				"title"			: "Sekundärfarbe",
-				"description"	: ("Einstellung einer Sekundärfarbe für verschiedene Anwendung, z.B. die Darstellung von Wellenformen."),
-				"default"		: "#FF0000",
-				"type"			: "color",
-				"pattern"		: r"^#([A-Fa-f0-9]{6})$"
 			},
 			"strTestCommand" : {
 				"title"			: "Test-Kommando",
@@ -389,7 +392,7 @@ class Timebox(ModuleBase):
 				# Suche nach erreichbaren Geräten
 				if ("discover" in lstArg):
 					TaskSpeak(self.getWorker(), "Es wird nach Bluhtuhf Geräten gesucht").start()
-					TaskTimeboxLong(self.getWorker(), self.doTimeboxDiscovery).start()
+					TaskDelegateLong(self.getWorker(), self.doTimeboxDiscovery).start()
 					continue
 				# Verbindung zu ausgewähltem Gerät herstellen
 				if ("connect" in lstArg):
@@ -1395,7 +1398,7 @@ class Timebox(ModuleBase):
 	#
 	def cbConnect(self, obj):
 		# Ereignis in die Verarbeitungsqueue einhängen
-		TaskTimeboxFast(self.getWorker(), self.onConnect, obj).start()
+		TaskDelegateFast(self.getWorker(), self.onConnect, protocol=obj).start()
 		return
 
 	##
@@ -1403,7 +1406,7 @@ class Timebox(ModuleBase):
 	#
 	def cbDisconnect(self, obj):
 		# Ereignis in die Verarbeitungsqueue einhängen
-		TaskTimeboxFast(self.getWorker(), self.onDisconnect, obj).start()
+		TaskDelegateFast(self.getWorker(), self.onDisconnect, protocol=obj).start()
 		return
 
 	##
@@ -1411,54 +1414,54 @@ class Timebox(ModuleBase):
 	#
 	def cbData(self, obj):
 		# Ereignis in die Verarbeitungsqueue einhängen
-		TaskTimeboxFast(self.getWorker(), self.onData, obj).start()
+		TaskDelegateFast(self.getWorker(), self.onData, data=obj).start()
 		return
 
-class TaskTimeboxLong(LongTask):
+# class TaskTimeboxLong(LongTask):
 	
-	def __init__(self, oWorker, oFxn, oObj=None):
-		super(TaskTimeboxLong, self).__init__(oWorker)
-		self.m_oFxn = oFxn
-		self.m_oObj = oObj
-		return
+# 	def __init__(self, oWorker, oFxn, oObj=None):
+# 		super(TaskTimeboxLong, self).__init__(oWorker)
+# 		self.m_oFxn = oFxn
+# 		self.m_oObj = oObj
+# 		return
 		
-	def __str__(self):
-		strDesc = "Timebox-Aufgabe ausführen (%r, Fxn=%r, Obj=%r)" % (
-			self,
-			self.m_oFxn,
-			self.m_oObj
-		)
-		return  strDesc
+# 	def __str__(self):
+# 		strDesc = "Timebox-Aufgabe ausführen (%r, Fxn=%r, Obj=%r)" % (
+# 			self,
+# 			self.m_oFxn,
+# 			self.m_oObj
+# 		)
+# 		return  strDesc
 	
-	def do(self):
-		if (self.m_oObj):
-			self.m_oFxn(self.m_oObj)
-		else:
-			self.m_oFxn()
-		return
+# 	def do(self):
+# 		if (self.m_oObj):
+# 			self.m_oFxn(self.m_oObj)
+# 		else:
+# 			self.m_oFxn()
+# 		return
 
-class TaskTimeboxFast(FastTask):
+# class TaskTimeboxFast(FastTask):
 	
-	def __init__(self, oWorker, oFxn, oObj=None):
-		super(TaskTimeboxFast, self).__init__(oWorker)
-		self.m_oFxn = oFxn
-		self.m_oObj = oObj
-		return
+# 	def __init__(self, oWorker, oFxn, oObj=None):
+# 		super(TaskTimeboxFast, self).__init__(oWorker)
+# 		self.m_oFxn = oFxn
+# 		self.m_oObj = oObj
+# 		return
 		
-	def __str__(self):
-		strDesc = "Timebox-Aufgabe ausführen (%r, Fxn=%r, Obj=%r)" % (
-			self,
-			self.m_oFxn,
-			self.m_oObj
-		)
-		return  strDesc
+# 	def __str__(self):
+# 		strDesc = "Timebox-Aufgabe ausführen (%r, Fxn=%r, Obj=%r)" % (
+# 			self,
+# 			self.m_oFxn,
+# 			self.m_oObj
+# 		)
+# 		return  strDesc
 	
-	def do(self):
-		if (self.m_oObj):
-			self.m_oFxn(self.m_oObj)
-		else:
-			self.m_oFxn()
-		return
+# 	def do(self):
+# 		if (self.m_oObj):
+# 			self.m_oFxn(self.m_oObj)
+# 		else:
+# 			self.m_oFxn()
+# 		return
 
 class TimeboxClientProtocol:
 

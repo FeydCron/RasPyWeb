@@ -576,10 +576,12 @@ class HtmlPage(HttpContent):
 	#  
 	#  @details Details
 	#  	
-	def setAutoRefresh(self, nAutoRefresh=0):
-		if nAutoRefresh >= 5:
-			self.m_strAutoRefresh = "<meta http-equiv=\"refresh\" content=\"%s\">" % (
-				nAutoRefresh)
+	def setAutoRefresh(self, nAutoRefresh=0, strUrl=None):
+		if nAutoRefresh >= 1:
+			self.m_strAutoRefresh = "<meta http-equiv=\"refresh\" content=\"%s%s%s\">" % (
+				nAutoRefresh,
+				";" if strUrl else "",
+				strUrl if strUrl else "")
 			return True
 		self.m_strAutoRefresh = ""
 		return False
@@ -1189,6 +1191,8 @@ class QueueTask:
 	
 	def __init__(self, oWorker):
 		self.m_oWorker = oWorker
+		self.m_evtDone = threading.Event()
+		self.m_evtDone.clear()
 		return
 		
 	def __str__(self):
@@ -1199,9 +1203,17 @@ class QueueTask:
 		return
 		
 	def done(self, bResult = True):
+		self.m_evtDone.set()
 		return
 
+	def wait(self, fTimeout=None):
+		return self.m_evtDone.wait(timeout=fTimeout)
+
 class FastTask(QueueTask):
+
+	def __init__(self, oWorker):
+		super(FastTask, self).__init__(oWorker)
+		return
 	
 	def __str__(self):
 		strDesc = "Ausführen einer leichten Aufgabe"
@@ -1211,47 +1223,31 @@ class FastTask(QueueTask):
 		bResult = False
 		globs.dbg("'%s' (leicht) starten: Warten auf Freigabe" % (self))
 		# >>> Critical Section
-		self.m_oWorker.m_oLock.acquire()
-		globs.dbg("'%s' (leicht) starten: Freigabe erhalten" % (self))
-		if (self.m_oWorker.m_evtRunning.isSet()):
-			globs.dbg("'%s' (leicht) starten: In Warteschlange" % (self))
-			self.m_oWorker.m_oQueueFast.put(self)
-			bResult = True
-		else:
-			globs.wrn("'%s' (leicht) starten: Bearbeitung verweigert" % (self))
-		self.m_oWorker.m_oLock.release()
+		with self.m_oWorker.m_oLock:
+			globs.dbg("'%s' (leicht) starten: Freigabe erhalten" % (self))
+			if (self.m_oWorker.m_evtRunning.isSet()):
+				globs.dbg("'%s' (leicht) starten: In Warteschlange" % (self))
+				self.m_oWorker.m_oQueueFast.put(self)
+				bResult = True
+			else:
+				globs.wrn("'%s' (leicht) starten: Bearbeitung verweigert" % (self))
 		# <<< Critical Section
 		globs.dbg("'%s' (leicht) starten: Freigabe abgegeben (%r)" % (self, bResult))
 		return bResult
 		
 	def done(self, bResult = True):
-		globs.dbg("'%s' (leicht): Bearbeitung abgeschlossen (%r)" % (self, bResult))
 		self.m_oWorker.m_oQueueFast.task_done()
-		return
-	
-class FutureTask(FastTask):
+		super(FastTask, self).done(bResult=bResult)
 
-	def __init__(self, oWorker):	
-		super(FutureTask, self).__init__(oWorker)
-		self.m_evtDone = threading.Event()
-		self.m_evtDone.clear()
-		return
-		
-	def __str__(self):
-		strDesc = "Warten auf die Fertigstellung einer Aufgabe"
-		return  strDesc
-	
-	def done(self, bResult = True):
-		self.m_oWorker.m_oQueueFast.task_done()
-		self.m_evtDone.set()
-		return
-		
-	def wait(self):
-		self.m_evtDone.wait()
+		globs.dbg("'%s' (leicht): Bearbeitung abgeschlossen (%r)" % (self, bResult))
 		return
 
 class LongTask(QueueTask):
 	
+	def __init__(self, oWorker):
+		super(LongTask, self).__init__(oWorker)
+		return
+
 	def __str__(self):
 		strDesc = "Ausführen einer schweren Aufgabe"
 		return  strDesc
@@ -1260,22 +1256,69 @@ class LongTask(QueueTask):
 		bResult = False
 		globs.dbg("'%s' (schwer) starten: Warten auf Freigabe" % (self))
 		# >>> Critical Section
-		self.m_oWorker.m_oLock.acquire()
-		globs.dbg("'%s' (schwer) starten: Freigabe erhalten" % (self))
-		if (self.m_oWorker.m_evtRunning.isSet()):
-			globs.dbg("'%s' (schwer) starten: In Warteschlange" % (self))
-			self.m_oWorker.m_oQueueLong.put(self)
-			bResult = True
-		else:
-			globs.wrn("'%s' (schwer) starten: Bearbeitung verweigert" % (self))
-		self.m_oWorker.m_oLock.release()
+		with self.m_oWorker.m_oLock:
+			globs.dbg("'%s' (schwer) starten: Freigabe erhalten" % (self))
+			if (self.m_oWorker.m_evtRunning.isSet()):
+				globs.dbg("'%s' (schwer) starten: In Warteschlange" % (self))
+				self.m_oWorker.m_oQueueLong.put(self)
+				bResult = True
+			else:
+				globs.wrn("'%s' (schwer) starten: Bearbeitung verweigert" % (self))
 		# <<< Critical Section
 		globs.dbg("'%s' (schwer) starten: Freigabe abgegeben (%r)" % (self, bResult))
 		return bResult
 		
 	def done(self, bResult = True):
-		globs.dbg("'%s' (schwer): Bearbeitung abgeschlossen (%r)" % (self, bResult))
 		self.m_oWorker.m_oQueueLong.task_done()
+		super(LongTask, self).done(bResult=bResult)
+
+		globs.dbg("'%s' (schwer): Bearbeitung abgeschlossen (%r)" % (self, bResult))
+		return
+
+class TaskDelegateLong(LongTask):
+	
+	def __init__(self, oWorker, oDelegate, **kwargs):
+		super(TaskDelegateLong, self).__init__(oWorker)
+		self.m_oDelegate = oDelegate
+		self.m_oKwargs = kwargs
+		return
+		
+	def __str__(self):
+		strDesc = "Delegate-Aufgabe ausführen (%r, Delegate=%r, kwargs=%r)" % (
+			self,
+			self.m_oDelegate,
+			self.m_oKwargs
+		)
+		return  strDesc
+	
+	def do(self):
+		if (self.m_oKwargs):
+			self.m_oDelegate(**self.m_oKwargs)
+		else:
+			self.m_oDelegate()
+		return
+
+class TaskDelegateFast(FastTask):
+	
+	def __init__(self, oWorker, oDelegate, **kwargs):
+		super(TaskDelegateFast, self).__init__(oWorker)
+		self.m_oDelegate = oDelegate
+		self.m_oKwargs = kwargs
+		return
+		
+	def __str__(self):
+		strDesc = "Delegate-Aufgabe ausführen (%r, Delegate=%r, kwargs=%r)" % (
+			self,
+			self.m_oDelegate,
+			self.m_oKwargs
+		)
+		return  strDesc
+	
+	def do(self):
+		if (self.m_oKwargs):
+			self.m_oDelegate(**self.m_oKwargs)
+		else:
+			self.m_oDelegate()
 		return
 
 class TaskSpeak(LongTask):

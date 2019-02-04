@@ -21,7 +21,7 @@ from . import globs
 from .worker import TaskModuleInit, TaskExit
 
 from . import sdk
-from .sdk import TaskSpeak, TaskSound, FastTask, FutureTask, ImageObject, HtmlPage, TaskModuleEvt, TaskSaveSettings
+from .sdk import TaskSpeak, TaskSound, FastTask, ImageObject, HtmlPage, TaskModuleEvt, TaskSaveSettings
 
 g_oHttpdWorker = None
 	
@@ -369,7 +369,7 @@ class Button:
 				"%s %s" % (self.m_strIcon, self.m_strColor))
 		return
 		
-class TaskModuleCmd(FutureTask):
+class TaskModuleCmd(FastTask):
 	
 	def __init__(self,
 		oWorker,
@@ -459,7 +459,7 @@ class TaskEnableModule(FastTask):
 				globs.saveSettings()
 		return
 		
-class TaskDisplayModules(FutureTask):
+class TaskDisplayModules(FastTask):
 	
 	def __init__(self, oWorker, oHtmlPage, dictQuery=None):
 		super(TaskDisplayModules, self).__init__(oWorker)
@@ -522,7 +522,7 @@ class TaskDisplayModules(FutureTask):
 			})
 		return
 		
-class TaskDisplaySystem(FutureTask):
+class TaskDisplaySystem(FastTask):
 	
 	def __init__(self, oWorker, oHtmlPage, dictForm=None, dictQuery=None):
 		super(TaskDisplaySystem, self).__init__(oWorker)
@@ -677,7 +677,7 @@ class TaskDisplaySystem(FutureTask):
 
 		return False
 		
-class TaskDisplaySettings(FutureTask):
+class TaskDisplaySettings(FastTask):
 	
 	def __init__(self, oWorker, oHtmlPage, dictForm=None, dictQuery=None):
 		super(TaskDisplaySettings, self).__init__(oWorker)
@@ -725,59 +725,58 @@ class TaskDisplaySettings(FutureTask):
 		
 	def displayValues(self):
 		# >>> Critical Section
-		globs.s_oSettingsLock.acquire()
-		try:
-			bOpened = False
-			for strSubsystem in sorted(globs.s_dictUserSettings.keys()):
-	
-				if (strSubsystem not in globs.s_dictSettings
-					or not globs.s_dictSettings[strSubsystem]
-					or not globs.s_dictUserSettings[strSubsystem]):
-					continue
-				if (strSubsystem not in ("System", "PIP") and strSubsystem not in globs.s_dictSettings["listModules"]):
-					continue
-				if (strSubsystem in globs.s_dictSettings["listInactiveModules"]):
-					continue
-				
-				if bOpened:
-					self.m_oHtmlPage.appendHeader([strSubsystem, ""])
-				else:
-					bOpened = True
-					self.m_oHtmlPage.openTable("Konfigurationseinstellungen",
-						[strSubsystem, ""], True, True)
+		with globs.s_oSettingsLock:
+			try:
+				bOpened = False
+				for strSubsystem in sorted(globs.s_dictUserSettings.keys()):
+		
+					if (strSubsystem not in globs.s_dictSettings
+						or not globs.s_dictSettings[strSubsystem]
+						or not globs.s_dictUserSettings[strSubsystem]):
+						continue
+					if (strSubsystem not in ("System", "PIP") and strSubsystem not in globs.s_dictSettings["listModules"]):
+						continue
+					if (strSubsystem in globs.s_dictSettings["listInactiveModules"]):
+						continue
+					
+					if bOpened:
+						self.m_oHtmlPage.appendHeader([strSubsystem, ""])
+					else:
+						bOpened = True
+						self.m_oHtmlPage.openTable("Konfigurationseinstellungen",
+							[strSubsystem, ""], True, True)
 
-				for strProperty in sorted(globs.s_dictUserSettings[strSubsystem].keys()):
-					if strProperty in globs.s_dictSettings[strSubsystem]:
-						strTitle = strProperty
-						dictProperties = globs.s_dictUserSettings[strSubsystem][strProperty]
-						if ("title" in dictProperties):
-							strTitle = dictProperties["title"]
-						if ("readonly" in dictProperties and dictProperties["readonly"]):
-							self.m_oHtmlPage.appendTable([
-								strTitle,
-								"%s" % (globs.s_dictSettings[strSubsystem][strProperty])
-								], bFirstIsHead=True, bEscape=False)
-						elif ("showlink" in dictProperties and dictProperties["showlink"]
-							and "description" in dictProperties
-							and dictProperties["description"]):
-							self.m_oHtmlPage.appendTable([
-								strTitle,
-								"<a href=\"%s\">&#x027A5; %s</a>" % (
-									dictProperties["default"],
-									dictProperties["description"])
-								], bFirstIsHead=True, bEscape=False)
-						else:
-							self.m_oHtmlPage.appendTable([
-								strTitle,
-								"<a href=\"%s?edit=%s&key=%s\">&#x0270E; %s</a>" % (
-									"/system/settings.html", strProperty, strSubsystem,
-									globs.s_dictSettings[strSubsystem][strProperty])
-								], bFirstIsHead=True, bEscape=False)
-			if bOpened:
-				self.m_oHtmlPage.closeTable()
-		except:
-			globs.exc("Darstellen der Konfiguration")
-		globs.s_oSettingsLock.release()
+					for strProperty in sorted(globs.s_dictUserSettings[strSubsystem].keys()):
+						if strProperty in globs.s_dictSettings[strSubsystem]:
+							strTitle = strProperty
+							dictProperties = globs.s_dictUserSettings[strSubsystem][strProperty]
+							if ("title" in dictProperties):
+								strTitle = dictProperties["title"]
+							if ("readonly" in dictProperties and dictProperties["readonly"]):
+								self.m_oHtmlPage.appendTable([
+									strTitle,
+									"%s" % (globs.s_dictSettings[strSubsystem][strProperty])
+									], bFirstIsHead=True, bEscape=False)
+							elif ("showlink" in dictProperties and dictProperties["showlink"]
+								and "description" in dictProperties
+								and dictProperties["description"]):
+								self.m_oHtmlPage.appendTable([
+									strTitle,
+									"<a href=\"%s\">&#x027A5; %s</a>" % (
+										dictProperties["default"],
+										dictProperties["description"])
+									], bFirstIsHead=True, bEscape=False)
+							else:
+								self.m_oHtmlPage.appendTable([
+									strTitle,
+									"<a href=\"%s?edit=%s&key=%s\">&#x0270E; %s</a>" % (
+										"/system/settings.html", strProperty, strSubsystem,
+										globs.s_dictSettings[strSubsystem][strProperty])
+									], bFirstIsHead=True, bEscape=False)
+				if bOpened:
+					self.m_oHtmlPage.closeTable()
+			except:
+				globs.exc("Darstellen der Konfiguration")
 		# <<< Critical Section
 		return
 		
@@ -792,37 +791,36 @@ class TaskDisplaySettings(FutureTask):
 		varVal = None
 		bUseKeyAsValue = False
 		# >>> Critical Section
-		globs.s_oSettingsLock.acquire()
-		try:
-			if (self.m_strKey in globs.s_dictUserSettings
-				and self.m_strKey in globs.s_dictSettings
-				and self.m_strVal in globs.s_dictSettings[self.m_strKey]
-				and self.m_strKey not in (
-				"listModules", "listInactiveModules", "Redirects")):
-				dictValues = globs.s_dictUserSettings[self.m_strKey]
-				varVal = globs.s_dictSettings[self.m_strKey][self.m_strVal]
-				strDefault = "%s" % (varVal)
-			if dictValues and self.m_strVal in dictValues:
-				dictProperties = dictValues[self.m_strVal]
-			if dictProperties:
-				if "title" in dictProperties:
-					strTitle = dictProperties["title"]
-				if "description" in dictProperties:
-					strDesc = dictProperties["description"]
-				if "default" in dictProperties:
-					strDefault = dictProperties["default"]
-				if "choices" in dictProperties:
-					dictChoices = dictProperties["choices"]
-				if "keyIsValue" in dictProperties:
-					bUseKeyAsValue = dictProperties["keyIsValue"]
-				if "type" in dictProperties:
-					strType = dictProperties["type"]
-				if "pattern" in dictProperties:
-					strPattern = dictProperties["pattern"]
-		except:
-			globs.exc("Ändern der Konfiguration")
-			varVal = None
-		globs.s_oSettingsLock.release()
+		with globs.s_oSettingsLock:
+			try:
+				if (self.m_strKey in globs.s_dictUserSettings
+					and self.m_strKey in globs.s_dictSettings
+					and self.m_strVal in globs.s_dictSettings[self.m_strKey]
+					and self.m_strKey not in (
+					"listModules", "listInactiveModules", "Redirects")):
+					dictValues = globs.s_dictUserSettings[self.m_strKey]
+					varVal = globs.s_dictSettings[self.m_strKey][self.m_strVal]
+					strDefault = "%s" % (varVal)
+				if dictValues and self.m_strVal in dictValues:
+					dictProperties = dictValues[self.m_strVal]
+				if dictProperties:
+					if "title" in dictProperties:
+						strTitle = dictProperties["title"]
+					if "description" in dictProperties:
+						strDesc = dictProperties["description"]
+					if "default" in dictProperties:
+						strDefault = dictProperties["default"]
+					if "choices" in dictProperties:
+						dictChoices = dictProperties["choices"]
+					if "keyIsValue" in dictProperties:
+						bUseKeyAsValue = dictProperties["keyIsValue"]
+					if "type" in dictProperties:
+						strType = dictProperties["type"]
+					if "pattern" in dictProperties:
+						strPattern = dictProperties["pattern"]
+			except:
+				globs.exc("Ändern der Konfiguration")
+				varVal = None
 		# <<< Critical Section
 		if varVal == None:
 			return False
@@ -875,7 +873,7 @@ class TaskDisplaySettings(FutureTask):
 						return True
 				elif (self.m_strVal == "uninstall"):
 					if (os.system("pip3 uninstall -y %s" %(self.m_strFxn)) == 0):
-						globs.unregisterMissingPipPackage(self.m_strFxn)
+						globs.unregisterPipPackage(self.m_strFxn)
 						globs.saveSettings()
 						return True
 			self.m_oHtmlPage.createBox(self.m_strFxn,
@@ -900,7 +898,7 @@ class TaskDisplaySettings(FutureTask):
 			strType="warning")
 		return False
 
-class TaskDisplayLogMem(FutureTask):
+class TaskDisplayLogMem(FastTask):
 	
 	def __init__(self, oWorker, oHtmlPage, dictQuery=None, dictForm=None):
 		super(TaskDisplayLogMem, self).__init__(oWorker)
@@ -1013,7 +1011,7 @@ class TaskDisplayLogMem(FutureTask):
 		self.m_oHtmlPage.closeTable()
 		return
 		
-class TaskDisplaySounds(FutureTask):
+class TaskDisplaySounds(FastTask):
 	
 	def __init__(self,
 		oWorker,
@@ -1105,7 +1103,7 @@ class TaskDisplaySounds(FutureTask):
 		])
 		return
 
-class TaskDisplayImages(FutureTask):
+class TaskDisplayImages(FastTask):
 	
 	def __init__(self,
 		oWorker,
@@ -1211,7 +1209,7 @@ class TaskDisplayImages(FutureTask):
 		])
 		return
 
-class TaskConfigSound(FutureTask):
+class TaskConfigSound(FastTask):
 	
 	def __init__(self,
 		oWorker,
@@ -1271,7 +1269,7 @@ class TaskConfigSound(FutureTask):
 		self.m_oHtmlPage.closeBox()
 		return
 	
-class TaskStartPage(FutureTask):
+class TaskStartPage(FastTask):
 	
 	def __init__(self,
 		oWorker,

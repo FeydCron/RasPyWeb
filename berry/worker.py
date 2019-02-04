@@ -1,6 +1,8 @@
 import threading
 import queue
 
+from collections import OrderedDict
+
 from . import globs
 from . import sdk
 from .sdk import LongTask, FastTask, TaskSpeak
@@ -274,45 +276,41 @@ class TaskModuleInit(FastTask):
 				return
 			
 			# >>> Critical Section
-			globs.s_oSettingsLock.acquire()
-
-			if self.m_strModule not in globs.s_dictSettings:
-				globs.s_dictSettings.update({self.m_strModule : {}})
-			dictModCfg = globs.s_dictSettings[self.m_strModule]
-			dictCfgUsr = {}
-			try:
-				oInstance = oModule.createModuleInstance(self.m_oWorker)
-				if (not oInstance
-					or not oInstance.moduleInit(dictModCfg=dictModCfg, dictCfgUsr=dictCfgUsr)):
-					strMsg = "Das Modul %s konnte nicht initialisiert werden. Möglicherweise müssen zusätzliche Pakete installiert werden." % (self.m_strModule)
+			with globs.s_oSettingsLock:
+				if self.m_strModule not in globs.s_dictSettings:
+					globs.s_dictSettings.update({self.m_strModule : {}})
+				dictModCfg = globs.s_dictSettings[self.m_strModule]
+				dictCfgUsr = {}
+				try:
+					oInstance = oModule.createModuleInstance(self.m_oWorker)
+					if (not oInstance
+						or not oInstance.moduleInit(dictModCfg=dictModCfg, dictCfgUsr=dictCfgUsr)):
+						strMsg = "Das Modul %s konnte nicht initialisiert werden. Möglicherweise müssen zusätzliche Pakete installiert werden." % (self.m_strModule)
+						globs.wrn(strMsg)
+						TaskSpeak(self.m_oWorker, strMsg).start()
+						oInstance = None
+				except:
+					globs.exc("Verwalten des Moduls %s" % (self.m_strModule))
+					strMsg = "Das Modul %s konnte nicht initialisiert werden. Möglicherweise ist es veraltet und muss aktualisiert werden." % (
+						self.m_strModule)
 					globs.wrn(strMsg)
 					TaskSpeak(self.m_oWorker, strMsg).start()
 					oInstance = None
-			except:
-				globs.exc("Verwalten des Moduls %s" % (self.m_strModule))
-				strMsg = "Das Modul %s konnte nicht initialisiert werden. Möglicherweise ist es veraltet und muss aktualisiert werden." % (
-					self.m_strModule)
-				globs.wrn(strMsg)
-				TaskSpeak(self.m_oWorker, strMsg).start()
-				oInstance = None
 
-			if oInstance:
-				self.m_oWorker.m_dictModules.update({self.m_strModule : (oInstance, oModule.__name__)})
-				globs.s_dictUserSettings.update({self.m_strModule : dictCfgUsr})
-
-			globs.s_oSettingsLock.release()
+				if oInstance:
+					self.m_oWorker.m_dictModules.update({self.m_strModule : (oInstance, oModule.__name__)})
+					globs.s_dictUserSettings.update({self.m_strModule : dictCfgUsr})
 			# <<< Critical Section
 
 			return
 		
 		if (self.m_strModule not in globs.s_dictSettings["listModules"]):
 			# >>> Critical Section
-			globs.s_oSettingsLock.acquire()
-			if self.m_strModule in globs.s_dictSettings:
-				globs.s_dictSettings.pop(self.m_strModule)
-			if self.m_strModule in globs.s_dictUserSettings:
-				globs.s_dictUserSettings.pop(self.m_strModule)
-			globs.s_oSettingsLock.release()
+			with globs.s_oSettingsLock:
+				if self.m_strModule in globs.s_dictSettings:
+					globs.s_dictSettings.pop(self.m_strModule)
+				if self.m_strModule in globs.s_dictUserSettings:
+					globs.s_dictUserSettings.pop(self.m_strModule)
 			# <<< Critical Section
 			strMsg = "Das Modul %s wurde dauerhaft entfernt." % (self.m_strModule)
 			globs.log(strMsg)
@@ -351,20 +349,21 @@ class Worker:
 	
 	def __init__(self):
 		self.m_oLock = threading.RLock()
-		self.m_oLock.acquire()
-		self.m_evtRunning = threading.Event()
-		self.m_evtInit = threading.Event()
-		self.m_evtRunning.clear()
-		self.m_evtInit.clear()
-		self.m_oWatchDogTimer = None
-		self.m_oThreadFast = None
-		self.m_oThreadLong = None
-		self.m_oQueueFast = None
-		self.m_oQueueLong = None
-		self.m_bIsQueueFastShutdown = True
-		self.m_bIsQueueLongShutdown = True
-		self.m_dictModules = {}
-		self.m_oLock.release()
+		# >>> Critical Section
+		with self.m_oLock:
+			self.m_evtRunning = threading.Event()
+			self.m_evtInit = threading.Event()
+			self.m_evtRunning.clear()
+			self.m_evtInit.clear()
+			self.m_oWatchDogTimer = None
+			self.m_oThreadFast = None
+			self.m_oThreadLong = None
+			self.m_oQueueFast = None
+			self.m_oQueueLong = None
+			self.m_bIsQueueFastShutdown = True
+			self.m_bIsQueueLongShutdown = True
+			self.m_dictModules = {}
+		# <<< Critical Section
 		return
 		
 	def onRunSystemWatchDog(self):
@@ -427,19 +426,18 @@ class Worker:
 	def startQueue(self):
 		globs.dbg("Start Aufgabenbearbeitung: Warten auf Freigabe")
 		# >>> Critical Section
-		self.m_oLock.acquire()
-		globs.dbg("Start Aufgabenbearbeitung: Freigabe erhalten")
-		self.m_oThreadFast = threading.Thread(target=self.fastThreadProc)
-		self.m_oThreadFast.daemon = True
-		self.m_oThreadLong = threading.Thread(target=self.longThreadProc)
-		self.m_oThreadLong.daemon = True
-		self.m_oQueueFast = queue.Queue()
-		self.m_oQueueLong = queue.Queue()
-		self.m_oThreadFast.start()
-		self.m_oThreadLong.start()
-		self.m_evtRunning.set()
-		globs.dbg("Start Aufgabenbearbeitung: Freigabe abgeben")
-		self.m_oLock.release()
+		with self.m_oLock:
+			globs.dbg("Start Aufgabenbearbeitung: Freigabe erhalten")
+			self.m_oThreadFast = threading.Thread(target=self.fastThreadProc)
+			self.m_oThreadFast.daemon = True
+			self.m_oThreadLong = threading.Thread(target=self.longThreadProc)
+			self.m_oThreadLong.daemon = True
+			self.m_oQueueFast = queue.Queue()
+			self.m_oQueueLong = queue.Queue()
+			self.m_oThreadFast.start()
+			self.m_oThreadLong.start()
+			self.m_evtRunning.set()
+			globs.dbg("Start Aufgabenbearbeitung: Freigabe abgeben")
 		# <<< Critical Section
 		TaskInit(self).start()
 		# Synchronization Point (Initialisation)
@@ -458,17 +456,16 @@ class Worker:
 			return bResult
 		globs.dbg("Stop Aufgabenbearbeitung: Warten auf Freigabe")
 		# >>> Critical Section
-		self.m_oLock.acquire()
-		globs.dbg("Stop Aufgabenbearbeitung: Freigabe erhalten")
-		if self.m_oWatchDogTimer:
-			self.m_oWatchDogTimer.cancel()
-			self.m_oWatchDogTimer = None
-		if not TaskQueueFastStop(self).start():
-			bResult = False
-		if not TaskQueueLongStop(self).start():
-			bResult = False		
-		self.m_evtRunning.clear()
-		self.m_oLock.release()
+		with self.m_oLock:
+			globs.dbg("Stop Aufgabenbearbeitung: Freigabe erhalten")
+			if self.m_oWatchDogTimer:
+				self.m_oWatchDogTimer.cancel()
+				self.m_oWatchDogTimer = None
+			if not TaskQueueFastStop(self).start():
+				bResult = False
+			if not TaskQueueLongStop(self).start():
+				bResult = False		
+			self.m_evtRunning.clear()
 		# <<< Critical Section
 		globs.dbg("Stop Aufgabenbearbeitung: Freigabe abgegeben")
 		if (self.m_oThreadFast):

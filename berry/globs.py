@@ -55,20 +55,22 @@ s_dictSettings = {
 	# Systemeinstellungen
 	# {"<Eigenschaft>" : "<Wert>"}
 	"System" : {
-		"strLogLvl" 		: "DBG",  # Aktuelles Log-Level
-		"bTestMode" 		: False,  # Aktivierung des Testmodus
-		"strHttpIp" 		: "0.0.0.0",  # IP-Adresse für den HTTP-Server
-		"nHttpPort" 		: 8081,  # Portnummer für den HTTP-Server
-		"strNetInfoName"	: "google.com",  # Computername zum ermitteln der eigenen IP-Adresse
-		"fCpuTempA" 		: 60.0,  # Abschalt-Temperaturgrenze
-		"fCpuTempB" 		: 56.0,  # Kritische Temperaturgrenze
-		"fCpuTempC" 		: 53.0,  # Warn-Temperaturgrenze
-		"fCpuTempH" 		: 1.0,  # Hysterese Temperaturgrenze
+		"strLogLvl" 			: "DBG",  # Aktuelles Log-Level
+		"bTestMode" 			: False,  # Aktivierung des Testmodus
+		"strHttpIp" 			: "0.0.0.0",  # IP-Adresse für den HTTP-Server
+		"nHttpPort" 			: 8081,  # Portnummer für den HTTP-Server
+		"strNetInfoName"		: "google.com",  # Computername zum ermitteln der eigenen IP-Adresse
+		"fCpuTempA" 			: 60.0,  # Abschalt-Temperaturgrenze
+		"fCpuTempB" 			: 56.0,  # Kritische Temperaturgrenze
+		"fCpuTempC" 			: 53.0,  # Warn-Temperaturgrenze
+		"fCpuTempH" 			: 1.0,  # Hysterese Temperaturgrenze
 		"strSysSoundLocation"	: "/usr/share/scratch/Media/Sounds",
 		"strUsrSoundLocation"	: s_strSoundPath,
 		"strSysImageLocation"	: "/usr/share/icons/Adwaita/32x32",
 		"strUsrImageLocation"	: s_strImagePath,
-		"fVersion"			: 0.1,
+		"fVersion"				: 0.1,
+		"strTimeSunrise"		: "06:00:00",
+		"strTimeSunset"			: "22:00:00",
 	},
 	# Fehlende Python-Pakete, die optional mit Pip installiert werden können
 	# {"<Paketname>" : "<Pip Installationskommando>"}
@@ -88,8 +90,25 @@ s_dictSettings = {
 # macht an dieser Stelle nur deshalb Sinn, weil das Dictionary auf
 # oberster Ebene nur einen Schlüssel enthält.
 #
-s_dictUserSettings = OrderedDict({
+s_dictUserSettings = {
 	"System" : {
+		"properties" : [
+			"strHttpIp",
+			"nHttpPort",
+			"strNetInfoName",
+			"bTestMode",
+			"fCpuTempC",
+			"fCpuTempB",
+			"fCpuTempA",
+			"fCpuTempH",
+			"strSysSoundLocation",
+			"strUsrSoundLocation",
+			"strSysImageLocation",
+			"strUsrImageLocation",
+			"strTimeSunrise",
+			"strTimeSunset",
+		],
+
 		"bTestMode" : {
 			"title"			: "Testmodus",
 			"description"	: ("Der Testmodus ist eine Eigenschaft, die von anderen Modulen " + 
@@ -186,9 +205,27 @@ s_dictUserSettings = OrderedDict({
 								"werden diese dort abgelegt, gegebenenfalls auch kategorisiert in " + 
 								"Unterordnern."),
 			"default"		: s_strImagePath
-		}
+		},
+		"strTimeSunrise" : {
+			"title"			: "Sonnenaufgang",
+			"description"	: ("Legt den Zeitpunkt des Sonnenaufgangs fest, sodass sich bestimmte " + 
+								"Funktionen darauf beziehen können. Eine manuelle Einstellung legt " + 
+								"einen Standardwert fest, welcher jedoch durch die Installation " + 
+								"bestimmter Module automatisch angepasst und gepflegt werden kann."),
+			"default"		: "06:00:00",
+			"type"			: "time"
+		},
+		"strTimeSunset" : {
+			"title"			: "Sonnenuntergang",
+			"description"	: ("Legt den Zeitpunkt des Sonnenuntergangs fest, sodass sich bestimmte " + 
+								"Funktionen darauf beziehen können. Eine manuelle Einstellung legt " + 
+								"einen Standardwert fest, welcher jedoch durch die Installation " + 
+								"bestimmter Module automatisch angepasst und gepflegt werden kann."),
+			"default"		: "22:00:00",
+			"type"			: "time"
+		},
 	},
-})
+}
 
 s_dictSystemValues = {
 	"CPU" : {
@@ -211,7 +248,7 @@ s_dictSystemValues = {
 	}
 }
 
-s_oLogMem = deque([], 255)
+s_oLogMem = deque([], 256)
 s_oLogMemLock = threading.RLock()
 s_oSettingsLock = threading.RLock()
 

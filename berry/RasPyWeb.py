@@ -5,7 +5,6 @@
 g_bPackageMissing = True
 try:
 	import ptvsd
-	ptvsd.enable_attach(address=("192.168.1.123", 5678))
 
 	globs.dbg("Modul <ptvsd> scheint verfügbar zu sein")
 	g_bPackageMissing = False
@@ -134,6 +133,10 @@ class Berry:
 		return
 
 def main():
+
+	if (not globs.isMissingPipPackage("ptvsd")):
+		ptvsd.enable_attach(address=("0.0.0.0", 5678))
+
 	oBerry = Berry()
 	oBerry.run()
 	return

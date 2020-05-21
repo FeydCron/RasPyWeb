@@ -746,10 +746,15 @@ class TaskDisplaySettings(FastTask):
 						self.m_oHtmlPage.openTable("Konfigurationseinstellungen",
 							[strSubsystem, ""], True, True)
 
-					for strProperty in sorted(globs.s_dictUserSettings[strSubsystem].keys()):
+					for strProperty in (
+						globs.s_dictUserSettings[strSubsystem]["properties"]
+						if "properties" in globs.s_dictUserSettings[strSubsystem] else
+						globs.s_dictUserSettings[strSubsystem].keys()):
 						if strProperty in globs.s_dictSettings[strSubsystem]:
 							strTitle = strProperty
 							dictProperties = globs.s_dictUserSettings[strSubsystem][strProperty]
+							if ("hidden" in dictProperties and dictProperties["hidden"]):
+								continue
 							if ("title" in dictProperties):
 								strTitle = dictProperties["title"]
 							if ("readonly" in dictProperties and dictProperties["readonly"]):

@@ -86,6 +86,30 @@ class Timebox(ModuleBase):
 
 		# Beschreibung der Konfigurationseinstellungen
 		dictCfgUsr.update({
+			"properties" : [
+				"strAddress",
+				"nPort",
+				"bAutoConnect",
+				"bPowerSafe",
+				"nAutoOffDelay",
+				"bOnOffByClap",
+				"bTime24Hours",
+				"bUnitCelsius",
+				"bMute",
+				"nVolume",
+				"nBrightness",
+				"strColorTime",
+				"strColorTemp",
+				"strColorAmbient",
+				"strColorPrimary",
+				"strColorSecondary",
+				"nImageResizeFilter",
+				"nImageEnhanceColor",
+				"nImageEnhanceContrast",
+				"nImageEnhanceBrightness",
+				"nImageEnhanceSharpness",
+				"strTestCommand",
+			],
 			"strAddress" : {
 				"title"			: "Adresse der Timebox",
 				"description"	: ("Einstellung der Adresse einer Timebox, zu der eine Verbindung hergestellt werden soll."),
@@ -228,28 +252,28 @@ class Timebox(ModuleBase):
 				"description"	: ("Einstellung einer Farbkorrektur, welche bei der Größenanpassung von Bildern angewendet werden soll."),
 				"default"		: 100,
 				"type"			: "range",
-				"pattern"		: "min=\"0\" max=\"200\" step=\"1\""
+				"pattern"		: "min=\"-32768\" max=\"32767\" step=\"1\""
 			},
 			"nImageEnhanceContrast" : {
 				"title"			: "Kontrast Größenanpassung",
 				"description"	: ("Einstellung eines Kontrasts, welcher bei der Größenanpassung von Bildern angewendet werden soll."),
 				"default"		: 100,
 				"type"			: "range",
-				"pattern"		: "min=\"0\" max=\"200\" step=\"1\""
+				"pattern"		: "min=\"-32768\" max=\"32767\" step=\"1\""
 			},
 			"nImageEnhanceBrightness" : {
 				"title"			: "Helligkeit Größenanpassung",
 				"description"	: ("Einstellung einer Helligkeit, welche bei der Größenanpassung von Bildern angewendet werden soll."),
 				"default"		: 100,
 				"type"			: "range",
-				"pattern"		: "min=\"0\" max=\"200\" step=\"1\""
+				"pattern"		: "min=\"-32768\" max=\"32767\" step=\"1\""
 			},
 			"nImageEnhanceSharpness" : {
 				"title"			: "Schärfe Größenanpassung",
 				"description"	: ("Einstellung einer Schärfe, welche bei der Größenanpassung von Bildern angewendet werden soll."),
 				"default"		: 100,
 				"type"			: "range",
-				"pattern"		: "min=\"0\" max=\"200\" step=\"1\""
+				"pattern"		: "min=\"-32768\" max=\"32767\" step=\"1\""
 			},
 			"strTestCommand" : {
 				"title"			: "Test-Kommando",
@@ -756,8 +780,8 @@ class Timebox(ModuleBase):
 			globs.log("Eingestellte Anzeige abgerufen: %r" % (self.m_nSelectedDisplay))
 			# Ausgewählte Temperatureinheit (0/1)
 			nUnitCelsius = min(max(int.from_bytes(data[4:5], byteorder='big', signed=False), 0), 1)
-			globs.setSetting("Timebox", "bUnitCelsius", True if nUnitCelsius == 0x01 else False)
-			globs.log("Temperatureinheit abgerufen (°C): %r (%r)" % (True if nUnitCelsius == 0x01 else False, nUnitCelsius))
+			globs.setSetting("Timebox", "bUnitCelsius", True if nUnitCelsius == 0x00 else False)
+			globs.log("Temperatureinheit abgerufen (°C): %r (%r)" % (True if nUnitCelsius == 0x00 else False, nUnitCelsius))
 			# Ausgewählte Animation (0...7)
 			self.m_nSelectedAnimation = min(max(int.from_bytes(data[5:6], byteorder='big', signed=False), 0), 7)
 			# Ausgewählte Umgebungslichtfarbe (RGB)
@@ -971,6 +995,8 @@ class Timebox(ModuleBase):
 				return None
 			
 			self.m_nWeatherTemp = min(max(int(strTemp), -99), +127)
+			self.m_nWeatherCond = min(max(self.m_nWeatherCond, 1), 17)
+
 			lyData = [0x5F,
 				int.from_bytes(struct.pack('b', self.m_nWeatherTemp), byteorder='big', signed=False),
 				self.m_nWeatherCond]
@@ -983,33 +1009,49 @@ class Timebox(ModuleBase):
 
 	def changeWeatherCondition(self, strType=None):
 		lstConditions = [
-			"sunny",					# 0x01 - sonnig				(sunny)
-			"cheerful",					# 0x02 - heiter				(cheerful)
-			"cloudy",					# 0x03 - bewölkt			(cloudy)
-			"covered",					# 0x04 - bedeckt			(covered)
-			"rainy",					# 0x05 - regnerisch			(rainy)
-			"changeable",				# 0x06 - wechselhaft		(changeable)
-			"thunderstorm",				# 0x07 - gewittrig			(thunderstorm)
-			"snowy",					# 0x08 - schneeig			(snowy)
-			"foggy",					# 0x09 - neblig				(foggy)
-			"clear-at-night",			# 0x10 - nachts klar		(clear-at-night)
-			"cloudy-at-night",			# 0x11 - nachts wolkig		(cloudy-at-night)
-			"covered-at-night",			# 0x12 - nachts bedeckt		(covered-at-night)
-			"rainy-at-night",			# 0x13 - nachts regnerisch	(rainy-at-night)
-			"changeable-at-night",		# 0x14 - nachts wechselhaft	(changeable-at-night)
-			"thunderstorm-at-night",	# 0x15 - nachts gewittrig	(thunderstorm-at-night)
-			"snowy-at-night",			# 0x16 - nachts schneeig	(snowy-at-night)
-			"foggy-at-night",			# 0x17 - nachts neblig		(foggy-at-night)
-			# "clock-change",			# 0x18 - Zeitumstellung		(clock-change)
+			"sunny",					# 01 - sonnig				(sunny)
+			"cheerful",					# 02 - heiter				(cheerful)
+			"cloudy",					# 03 - bewölkt				(cloudy)
+			"covered",					# 04 - bedeckt				(covered)
+			"rainy",					# 05 - regnerisch			(rainy)
+			"changeable",				# 06 - wechselhaft			(changeable)
+			"thunderstorm",				# 07 - gewittrig			(thunderstorm)
+			"snowy",					# 08 - schneeig				(snowy)
+			"foggy",					# 09 - neblig				(foggy)
+			"clear",					# 10 - klar (nachts)		(clear)
+			"cloudy-at-night",			# 11 - nachts wolkig		(cloudy-at-night)
+			"covered-at-night",			# 12 - nachts bedeckt		(covered-at-night)
+			"rainy-at-night",			# 13 - nachts regnerisch	(rainy-at-night)
+			"changeable-at-night",		# 14 - nachts wechselhaft	(changeable-at-night)
+			"thunderstorm-at-night",	# 15 - nachts gewittrig		(thunderstorm-at-night)
+			"snowy-at-night",			# 16 - nachts schneeig		(snowy-at-night)
+			"foggy-at-night",			# 17 - nachts neblig		(foggy-at-night)
+			# "clock-change",			# 18 - Zeitumstellung		(clock-change)
 		]	
 
 		try:
 			if not self.m_oTimeboxProtocol:
 				return None
+
+			oTimeSunrise = sdk.strToDateTime(globs.getSetting("System", "strTimeSunrise"), "%Y-%m-%d %H:%M:%S").time()
+			oTimeSunset = sdk.strToDateTime(globs.getSetting("System", "strTimeSunset"), "%Y-%m-%d %H:%M:%S").time()
+			oNow = datetime.now().time()
+			bIsDayTime = (oNow >= oTimeSunrise and oNow < oTimeSunset)
+			
+			self.m_nWeatherTemp = min(max(self.m_nWeatherTemp, -99), +127)
 			if strType.isdigit():
 				self.m_nWeatherCond = min(max(int(strType), 1), 17)
 			elif strType in lstConditions:
 				self.m_nWeatherCond = lstConditions.index(strType) + 1
+			
+			if (not bIsDayTime):
+				if (self.m_nWeatherCond == 1):
+					self.m_nWeatherCond = 10
+				elif (self.m_nWeatherCond == 2):
+					self.m_nWeatherCond = 11
+				elif (self.m_nWeatherCond >= 3
+					and self.m_nWeatherCond <= 9):
+					self.m_nWeatherCond += 8
 			
 			lyData = [0x5F,
 				int.from_bytes(struct.pack('b', self.m_nWeatherTemp), byteorder='big', signed=False),
@@ -1151,7 +1193,7 @@ class Timebox(ModuleBase):
 				return None
 			
 			lyData = [0x45, 0x01]
-			# °F/°C (0x00/0x01)
+			# °C/°F (0x00/0x01)
 			lyData.append(
 				0x00 if globs.getSetting("Timebox", "bUnitCelsius", r"(True|False)", True) else
 				0x01)

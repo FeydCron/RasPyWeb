@@ -1552,16 +1552,42 @@ def getNetworkInfo(strComputerName="google.com"):
 	except:
 		globs.exc("Ermitteln der IP-Adresse")
 	return strIpAddr
-	
+
+def convertFtoC(fFahrenheit):
+	return ((fFahrenheit - 32) / 1.8)
+
+def convertCtoF(fCelsius):
+	return ((fCelsius * 1.8) + 32)
+
+def translateToLocalTime(oDateTimeUTC):
+	oRefUTC = datetime.utcnow()
+	oRefLoc = datetime.now()
+	oOffset = oRefUTC - oRefLoc		
+	return oDateTimeUTC - oOffset
+
+def translateStrToLocalTimeStr(strDateTimeUTC, strFormat):
+	return translateToLocalTime(strToDateTime(strDateTimeUTC, strFormat)).strftime(strFormat)
+
+def strToDateTime(strDateTime, strFormat):
+	oDateTime = datetime.strptime(strDateTime, strFormat)
+	return oDateTime
+
+def strToLocalTime(strDateTimeUTC, strFormat):
+	oDateTimeUTC = strToDateTime(strDateTimeUTC, strFormat)
+	oRefUTC = datetime.utcnow()
+	oRefLoc = datetime.now()
+	oOffset = oRefUTC - oRefLoc		
+	return oDateTimeUTC - oOffset
+
 def setDate(strDate, strFormat):
-	oDate = datetime.strptime(strDate, strFormat).date()
+	oDate = strToDateTime(strDate, strFormat).date()
 	oTime = datetime.today().time()
 	oDateTime = datetime.combine(oDate, oTime)
 	return setDateTime(oDateTime)
 
 def setTime(strTime, strFormat):
+	oTime = strToDateTime(strTime, strFormat).time()
 	oDate = datetime.today().date()
-	oTime = datetime.strptime(strTime, strFormat).time()
 	oDateTime = datetime.combine(oDate, oTime)
 	return setDateTime(oDateTime)
 

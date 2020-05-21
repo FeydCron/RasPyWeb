@@ -27,6 +27,13 @@ class Clock(ModuleBase):
 					dictModCfg.update({strName : strValue})
 		
 		dictCfgUsr.update({
+			"properties" : [
+				"strSoundHour",
+				"nTellTimeInt",
+				"bPlayOnce",
+				"nSilenceFrom",
+				"nSilenceTo",
+			],
 			"nSilenceFrom" : {
 				"title"			: "Beginn der Ruhezeit",
 				"description"	: ("Der Beginn der Ruhezeit gibt an, ab welcher Stunde (0..23) "+

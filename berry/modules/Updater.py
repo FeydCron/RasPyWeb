@@ -63,6 +63,15 @@ class Updater(ModuleBase):
 					dictModCfg.update({strName : strValue})
 		
 		dictCfgUsr.update({
+			"properties" : [
+				"bAutoUpdate",
+				"bAutoReboot",
+				"nUpdateHour",
+				"lnkManUpdate",
+				"fChkVersion",
+				"strSystemUrl",
+				"strChkUpdUrl",
+			],
 			"strSystemUrl" : {
 				"title"			: "URL für Systemaktualisierung",
 				"description"	: ("Die Einstellung legt die URL zur Quell-Datei für die "+

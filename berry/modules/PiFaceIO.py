@@ -1,11 +1,12 @@
 import pifacedigitalio as piface
-
 import re
 
-import globs
+from .. import globs
+from ..sdk import ModuleBase, TaskModuleEvt
 
-from sdk import ModuleBase
-from sdk import TaskModuleEvt
+def createModuleInstance(
+	oWorker):
+	return PiFaceIO(oWorker)
 
 class PiFaceIO(ModuleBase):
 	
@@ -223,7 +224,7 @@ class PiFaceIO(ModuleBase):
 
 		self.updateContext()
 
-		if (self.m_strEventDO1 in dictQuery):
+		if (self.m_strPinDO in dictQuery):
 			pass
 				
 		return True
@@ -239,5 +240,4 @@ class PiFaceIO(ModuleBase):
 		self.m_strChkUpdUrl = globs.getSetting("Updater", "strChkUpdUrl",
 			"[Hh][Tt][Tt][Pp][Ss]+\\://.+/.+", "")
 			
-		globs.setSetting("Updater", "fChkVersion", self.m_fChkVersion)
 		return

@@ -2,11 +2,12 @@
 from datetime import datetime
 from datetime import timedelta
 
-import globs
+from .. import globs
+from ..sdk import ModuleBase, TaskSound, TaskSpeak
 
-from sdk import ModuleBase
-from sdk import TaskSound
-from sdk import TaskSpeak
+def createModuleInstance(
+	oWorker):
+	return Clock(oWorker)
 
 class Clock(ModuleBase):
 	
@@ -26,6 +27,13 @@ class Clock(ModuleBase):
 					dictModCfg.update({strName : strValue})
 		
 		dictCfgUsr.update({
+			"properties" : [
+				"strSoundHour",
+				"nTellTimeInt",
+				"bPlayOnce",
+				"nSilenceFrom",
+				"nSilenceTo",
+			],
 			"nSilenceFrom" : {
 				"title"			: "Beginn der Ruhezeit",
 				"description"	: ("Der Beginn der Ruhezeit gibt an, ab welcher Stunde (0..23) "+
@@ -177,7 +185,7 @@ class Clock(ModuleBase):
 			return (self.m_nHour24h < self.m_nSilenceFrom and self.m_nHour24h > self.m_nSilenceTo)
 		elif self.m_nSilenceFrom < self.m_nSilenceTo:
 			# Outside-Range
-			return (self.m_nHour24 < self.m_nSilenceFrom or self.m_nHour24h > self.m_nSilenceTo)
+			return (self.m_nHour24h < self.m_nSilenceFrom or self.m_nHour24h > self.m_nSilenceTo)
 
 		# No range
 		return True

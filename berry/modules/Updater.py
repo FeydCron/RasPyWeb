@@ -8,22 +8,21 @@ import os
 import re
 import tempfile
 import time
-import zipfile
 import uuid
-
-from datetime import datetime
-from zipfile import ZipFile
-from io import BytesIO
+import zipfile
 from collections import OrderedDict
+from datetime import datetime
+from io import BytesIO
+from zipfile import ZipFile
 
-import globs
+from .. import globs
+from ..sdk import ModuleBase, TaskModuleEvt, TaskSpeak, WebClient
+from ..worker import TaskExit
 
-from sdk import ModuleBase
-from sdk import WebClient
-from sdk import TaskSpeak
-from sdk import TaskModuleEvt
 
-from worker import TaskExit
+def createModuleInstance(
+	oWorker):
+	return Updater(oWorker)
 
 class Updater(ModuleBase):
 	
@@ -38,7 +37,7 @@ class Updater(ModuleBase):
 		dictSettings = {
 			"strSystemUrl" : Updater.s_strSystemUrl,
 			"strChkUpdUrl" : Updater.s_strChkUpdUrl,
-			"lnkManUpdate" : "/modules/Updater.html",
+			"lnkManUpdate" : "",
 			"bAutoUpdate" : False,
 			"bAutoReboot" : False,
 			"nUpdateHour" : 0,
@@ -64,6 +63,15 @@ class Updater(ModuleBase):
 					dictModCfg.update({strName : strValue})
 		
 		dictCfgUsr.update({
+			"properties" : [
+				"bAutoUpdate",
+				"bAutoReboot",
+				"nUpdateHour",
+				"lnkManUpdate",
+				"fChkVersion",
+				"strSystemUrl",
+				"strChkUpdUrl",
+			],
 			"strSystemUrl" : {
 				"title"			: "URL für Systemaktualisierung",
 				"description"	: ("Die Einstellung legt die URL zur Quell-Datei für die "+
@@ -100,7 +108,7 @@ class Updater(ModuleBase):
 				"description"	: ("Der Aktualisierungszeitpunkt gibt an, zu welcher Zeit "+
 									"täglich nach einer verfügbaren Aktualisierung gesucht "+
 									"und diese gegebenenfalls installiert werden soll."),
-				"default"		: 1,
+				"default"		: 0,
 				"choices"		: {
 					"nachts"		: "0",
 					"früh morgens"	: "3",
@@ -120,8 +128,8 @@ class Updater(ModuleBase):
 			},
 			"lnkManUpdate" : {
 				"title"			: "Manuelle Aktualisierung",
-				"description"	: ("Anzeigen"),
-				"default"		: None,
+				"description"	: ("Anzeigen..."),
+				"default"		: "/modules/Updater.html",
 				"showlink"		: True
 			},
 		})
@@ -171,7 +179,7 @@ class Updater(ModuleBase):
 		print("%r::moduleExec(strPath=%s, oHtmlPage=%s, dictQuery=%s, dictForm=%s) [%s]" % (
 			self, strPath, oHtmlPage, dictQueryKeys, dictFormKeys, datetime.today().strftime("%X")))
 		
-		if (re.match("/modules/Updater\\.html", strPath)
+		if (re.match(r"/modules/Updater\.html", strPath)
 			and not oHtmlPage == None):
 			return self.serveHtmlPage(oHtmlPage, dictQuery, dictForm)
 			

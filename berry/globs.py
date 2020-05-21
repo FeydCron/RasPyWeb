@@ -1,20 +1,19 @@
-import os
-import sys
-import json
-import re
-import traceback
-import pickle
-import threading
-import socket
-import queue
 import datetime
+import importlib
+import json
+import os
+import pickle
+import queue
+import re
+import socket
+import sys
+import threading
+import traceback
+from collections import OrderedDict, deque
 
-from collections import deque
-from collections import OrderedDict
+from . import httpd
+from .httpd import StartPage
 
-from httpd import StartPage
-
-	
 # Defines test values for CPU temperatures for being used with
 # a module test
 s_oQueueTestCpuTempValues = queue.Queue()
@@ -39,6 +38,7 @@ s_nLogLvl = 4
 
 s_strBasePath = "/home/pi/berry"
 s_strSoundPath = "/home/pi/berry/sounds"
+s_strImagePath = "/home/pi/berry/images"
 s_strModulePath = "/home/pi/berry/modules"
 s_strConfigFile = "/home/pi/berry/config.json"
 s_strLogMemFile = "/home/pi/berry/logmem.pickle"
@@ -47,27 +47,34 @@ s_strStartPageUrl = "/system/startpage.html"
 
 s_dictSettings = {
 	# Registrierung der installierten Module
-	# {"<Paket/Modul>" : "<Klasse>"}
-	"dictModules" : {},
+	# ["<Paket/Modul>", ...]
+	"listModules" : [],
 	# Auflistung der explizit deaktivierten Module
 	# ["<Paket/Modul>", ...]
 	"listInactiveModules" : [],
 	# Systemeinstellungen
 	# {"<Eigenschaft>" : "<Wert>"}
 	"System" : {
-		"strLogLvl" 		: "DBG",  # Aktuelles Log-Level
-		"bTestMode" 		: False,  # Aktivierung des Testmodus
-		"strHttpIp" 		: "0.0.0.0",  # IP-Adresse für den HTTP-Server
-		"nHttpPort" 		: 8081,  # Portnummer für den HTTP-Server
-		"strNetInfoName"	: "google.com",  # Computername zum ermitteln der eigenen IP-Adresse
-		"fCpuTempA" 		: 60.0,  # Abschalt-Temperaturgrenze
-		"fCpuTempB" 		: 56.0,  # Kritische Temperaturgrenze
-		"fCpuTempC" 		: 53.0,  # Warn-Temperaturgrenze
-		"fCpuTempH" 		: 1.0,  # Hysterese Temperaturgrenze
+		"strLogLvl" 			: "DBG",  # Aktuelles Log-Level
+		"bTestMode" 			: False,  # Aktivierung des Testmodus
+		"strHttpIp" 			: "0.0.0.0",  # IP-Adresse für den HTTP-Server
+		"nHttpPort" 			: 8081,  # Portnummer für den HTTP-Server
+		"strNetInfoName"		: "google.com",  # Computername zum ermitteln der eigenen IP-Adresse
+		"fCpuTempA" 			: 60.0,  # Abschalt-Temperaturgrenze
+		"fCpuTempB" 			: 56.0,  # Kritische Temperaturgrenze
+		"fCpuTempC" 			: 53.0,  # Warn-Temperaturgrenze
+		"fCpuTempH" 			: 1.0,  # Hysterese Temperaturgrenze
 		"strSysSoundLocation"	: "/usr/share/scratch/Media/Sounds",
 		"strUsrSoundLocation"	: s_strSoundPath,
-		"fVersion"			: 0.1,
+		"strSysImageLocation"	: "/usr/share/icons/Adwaita/32x32",
+		"strUsrImageLocation"	: s_strImagePath,
+		"fVersion"				: 0.1,
+		"strTimeSunrise"		: "06:00:00",
+		"strTimeSunset"			: "22:00:00",
 	},
+	# Fehlende Python-Pakete, die optional mit Pip installiert werden können
+	# {"<Paketname>" : "<Pip Installationskommando>"}
+	"PIP" : {},
 	# HTTP-Weiterleitungen
 	# {"<ID>" : "<URL>"}
 	"Redirects" : {
@@ -83,8 +90,25 @@ s_dictSettings = {
 # macht an dieser Stelle nur deshalb Sinn, weil das Dictionary auf
 # oberster Ebene nur einen Schlüssel enthält.
 #
-s_dictUserSettings = OrderedDict({
+s_dictUserSettings = {
 	"System" : {
+		"properties" : [
+			"strHttpIp",
+			"nHttpPort",
+			"strNetInfoName",
+			"bTestMode",
+			"fCpuTempC",
+			"fCpuTempB",
+			"fCpuTempA",
+			"fCpuTempH",
+			"strSysSoundLocation",
+			"strUsrSoundLocation",
+			"strSysImageLocation",
+			"strUsrImageLocation",
+			"strTimeSunrise",
+			"strTimeSunset",
+		],
+
 		"bTestMode" : {
 			"title"			: "Testmodus",
 			"description"	: ("Der Testmodus ist eine Eigenschaft, die von anderen Modulen " + 
@@ -156,20 +180,52 @@ s_dictUserSettings = OrderedDict({
 			"title"			: "Ablageort Systemklänge",
 			"description"	: ("Legt den Ablageort von Klangdateien fest, die auf dem System " + 
 								"standardmäßig zur Verfügung stehen. Dieser Ort wird bei der " + 
-								"Installation oder Verwaltung von Klangdateienwerden nicht " + 
-								"verändert."),
+								"Installation oder Verwaltung von Klangdateien nicht verändert."),
 			"default"		: "/usr/share/scratch/Media/Sounds"
 		},
 		"strUsrSoundLocation" : {
-			"title"			: "sound-Datei Ablageort",
+			"title"			: "Ablageort Klangdateien",
 			"description"	: ("Legt den Ablageort von Klangdateien fest, die für das System " + 
-								"zur Verfügung stehen sollen. Bei der Installieren neuer Klänge " + 
-								"werden diese dort abgelegt, gegebenenfalls auch in Unterordnern " + 
-								"kategorisiert."),
+								"zur Verfügung stehen sollen. Bei der Installation neuer Klänge " + 
+								"werden diese dort abgelegt, gegebenenfalls auch kategorisiert in " + 
+								"Unterordnern."),
 			"default"		: s_strSoundPath
-		}
+		},
+		"strSysImageLocation" : {
+			"title"			: "Ablageort System-Bilddateien",
+			"description"	: ("Legt den Ablageort von Bilddateien fest, die auf dem System " + 
+								"standardmäßig zur Verfügung stehen. Dieser Ort wird bei der " + 
+								"Installation oder Verwaltung von Bilddateien nicht verändert."),
+			"default"		: "/usr/share/icons/Adwaita/32x32"
+		},
+		"strUsrImageLocation" : {
+			"title"			: "Ablageort Bilddateien",
+			"description"	: ("Legt den Ablageort von Bilddateien fest, die für das System " + 
+								"zur Verfügung stehen sollen. Bei der Installation neuer Bilder " + 
+								"werden diese dort abgelegt, gegebenenfalls auch kategorisiert in " + 
+								"Unterordnern."),
+			"default"		: s_strImagePath
+		},
+		"strTimeSunrise" : {
+			"title"			: "Sonnenaufgang",
+			"description"	: ("Legt den Zeitpunkt des Sonnenaufgangs fest, sodass sich bestimmte " + 
+								"Funktionen darauf beziehen können. Eine manuelle Einstellung legt " + 
+								"einen Standardwert fest, welcher jedoch durch die Installation " + 
+								"bestimmter Module automatisch angepasst und gepflegt werden kann."),
+			"default"		: "06:00:00",
+			"type"			: "time"
+		},
+		"strTimeSunset" : {
+			"title"			: "Sonnenuntergang",
+			"description"	: ("Legt den Zeitpunkt des Sonnenuntergangs fest, sodass sich bestimmte " + 
+								"Funktionen darauf beziehen können. Eine manuelle Einstellung legt " + 
+								"einen Standardwert fest, welcher jedoch durch die Installation " + 
+								"bestimmter Module automatisch angepasst und gepflegt werden kann."),
+			"default"		: "22:00:00",
+			"type"			: "time"
+		},
 	},
-})
+}
 
 s_dictSystemValues = {
 	"CPU" : {
@@ -192,7 +248,7 @@ s_dictSystemValues = {
 	}
 }
 
-s_oLogMem = deque([], 255)
+s_oLogMem = deque([], 256)
 s_oLogMemLock = threading.RLock()
 s_oSettingsLock = threading.RLock()
 
@@ -234,7 +290,10 @@ def stop():
 	return
 
 def getVersion():
-	return float(0.8)
+	return float(0.9)
+
+def getWatchDogInterval():
+	return float(10.0)
 
 def getRedirect(strID, strDefault):
 	if ("Redirects" in s_dictSettings
@@ -244,22 +303,22 @@ def getRedirect(strID, strDefault):
 		strID, strDefault))
 	return strDefault
 
-def importComponent(strModuleName, strComponentName):
-	oComponent = None
+def importComponent(
+	strModuleName):
+	oModule = None
 	try:
-		log("Importieren des Moduls '%s'" % (strModuleName))
-		oComponent = __import__(strModuleName)
-		strFullName = strModuleName + "." + strComponentName
-		lstComponents = strFullName.split(".")
-		for strComponent in lstComponents[1:]:
-			log("Laden des Attributes '%s' aus dem Objekt '%r'" % (
-				strComponent, oComponent))
-			oComponent = getattr(oComponent, strComponent)
+		if strModuleName in sys.modules:
+			log("Importieren des Moduls '%s' via Reload" % (strModuleName))
+			oModule = importlib.reload(sys.modules[strModuleName])
+		else:
+			log("Importieren des Moduls '%s' via Import" % (strModuleName))
+			oModule = importlib.import_module(strModuleName, __package__)
 	except:
-		exc("Importieren der Komponente %s aus dem Modul %s" % (
-			strComponentName, strModuleName))
-		oComponent = None
-	return oComponent
+		exc("Importieren des Moduls '%s'" % (
+			strModuleName))
+		oModule = None
+	log("Modul %r (%s) importiert" % (oModule, oModule.__name__))
+	return oModule
 
 def loadSettings():
 	global s_strBasePath
@@ -270,37 +329,36 @@ def loadSettings():
 	global s_oStartPage
 	
 	# >>> Critical Section
-	s_oSettingsLock.acquire()
-	# Einstellungen lesen
-	
-	s_strBasePath = ("%s" % os.path.dirname(__file__))		
-	# print("BasePath=%s" % s_strBasePath)
-	
-	s_strModulePath = os.path.join(s_strBasePath, "modules")
-	# print("ModulePath=%s" % s_strModulePath)
-	s_strConfigFile = os.path.join(s_strBasePath, "config.json")
-	# print("ConfigFile=%s" % s_strConfigFile)
-	s_strLogMemFile = os.path.join(s_strBasePath, "logmem.pickle")
-	# print("LogMemFile=%s" % s_strLogMemFile)
-	s_strStartPageFile = os.path.join(s_strBasePath, "startpage.pickle")
-	# print("StartPageFile=%s" % s_strStartPageFile)
-	
-	dbg("Laden der Konfigurationseinstellungen von '%s'" % (
-		s_strConfigFile))
-	try:
-		foFile = open(s_strConfigFile, "r")
-		oObj = json.load(foFile)
-		foFile.close()
-		for (strKey, varVal) in oObj.items():
-			if (strKey in ["System", "Redirects"]
-				and strKey in s_dictSettings):
-				s_dictSettings[strKey].update(oObj[strKey])
-			else:
-				s_dictSettings.update({strKey : varVal})
-	except:
-		exc("Laden der Einstellungen von '%s'" % (
+	with s_oSettingsLock:
+		# Einstellungen lesen
+		
+		s_strBasePath = ("%s" % os.path.dirname(__file__))		
+		# print("BasePath=%s" % s_strBasePath)
+		
+		s_strModulePath = os.path.join(s_strBasePath, "modules")
+		# print("ModulePath=%s" % s_strModulePath)
+		s_strConfigFile = os.path.join(s_strBasePath, "config.json")
+		# print("ConfigFile=%s" % s_strConfigFile)
+		s_strLogMemFile = os.path.join(s_strBasePath, "logmem.pickle")
+		# print("LogMemFile=%s" % s_strLogMemFile)
+		s_strStartPageFile = os.path.join(s_strBasePath, "startpage.pickle")
+		# print("StartPageFile=%s" % s_strStartPageFile)
+		
+		dbg("Laden der Konfigurationseinstellungen von '%s'" % (
 			s_strConfigFile))
-	s_oSettingsLock.release()
+		try:
+			foFile = open(s_strConfigFile, "r")
+			oObj = json.load(foFile)
+			foFile.close()
+			for (strKey, varVal) in oObj.items():
+				if (strKey in ["System", "PIP", "Redirects"]
+					and strKey in s_dictSettings):
+					s_dictSettings[strKey].update(oObj[strKey])
+				else:
+					s_dictSettings.update({strKey : varVal})
+		except:
+			exc("Laden der Einstellungen von '%s'" % (
+				s_strConfigFile))
 	# <<< Critical Section
 	
 	dbg("Wiederherstellen des Fehlerspeichers von '%s'" % (
@@ -312,10 +370,10 @@ def loadSettings():
 		log("Fehlerspeicher nicht vorhanden: '%s'" % (
 			s_strLogMemFile))
 	while bRetry and os.path.isfile(s_strLogMemFile):
+		bRetry = False
 		try:
 			with open(s_strLogMemFile, "rb") as f:
 				oLogMem = pickle.load(f)
-			bRetry = False
 		except:
 			exc("Laden des Fehlerspeichers von '%s'" % (
 				s_strLogMemFile))
@@ -325,12 +383,11 @@ def loadSettings():
 	if oLogMem:
 		dbg("Zusammenführen des aktuellen und wiederhergestellten Fehlerspeichers")
 		# >>> Critical Section
-		s_oLogMemLock.acquire()
-		oBackup = list(s_oLogMem)
-		s_oLogMem.clear()
-		s_oLogMem.extendleft(reversed(oLogMem))
-		s_oLogMem.extendleft(reversed(oBackup))
-		s_oLogMemLock.release()
+		with s_oLogMemLock:
+			oBackup = list(s_oLogMem)
+			s_oLogMem.clear()
+			s_oLogMem.extendleft(reversed(oLogMem))
+			s_oLogMem.extendleft(reversed(oBackup))
 		# <<< Critical Section
 		del oLogMem
 		del oBackup
@@ -340,11 +397,10 @@ def loadSettings():
 		log("Startseite nicht vorhanden: '%s'" % (
 			s_strLogMemFile))
 	while bRetry and os.path.isfile(s_strStartPageFile):
-		# Startseite lesen
+		bRetry = False
 		try:
 			with open(s_strStartPageFile, "rb") as f:
 				s_oStartPage = pickle.load(f)
-			bRetry = False
 		except:
 			exc("Laden der Startseite von '%s'" % (
 				s_strStartPageFile))
@@ -353,12 +409,22 @@ def loadSettings():
 	dbg("Klangdateien erfassen")
 	# Sounds einmalig scannen
 	scanSoundFiles()
+
+	dbg("Bilddateien erfassen")
+	# Bilder einmalig scannen
+	scanImageFiles()
 	
 	dbg("Konfigurationsparameter synchronisieren")
 	# Konfigurationsparameter synchronisieren
 	if ("System" in s_dictSettings):
 		if ("strLogLvl" in s_dictSettings["System"]):
 			setLogLvl(s_dictSettings["System"]["strLogLvl"])
+
+	# Modulkonfiguration migrieren
+	if ("dictModules" in s_dictSettings
+		and "listModules"  in s_dictSettings):
+		s_dictSettings["listModules"].extend(s_dictSettings["dictModules"].keys())
+		s_dictSettings.pop("dictModules")
 			
 	dbg("Konfiguration: %r" % (s_dictSettings))
 	dbg("Startseite: %r" % (s_oStartPage))
@@ -374,7 +440,7 @@ def migrateFile(strFilename):
 	try:
 		with open(strFilename, "rb") as f:
 			oData = f.read()
-		if oData.find(bOld):
+		if bOld in oData:
 			with open(strFilename, "wb") as f:
 				f.write(oData.replace(bOld, bNew))
 			log("Migration der Datei '%s' erfolgreich" % (
@@ -393,25 +459,24 @@ def migrateFile(strFilename):
 def saveSettings():
 	dbg("Einstellungen für Speichern vorbereiten")
 	# >>> Critical Section
-	s_oSettingsLock.acquire()
-	# Einstellungen vorbereiten
-	if (not "System" in s_dictSettings):
-		s_dictSettings.update({"System" : {}})
-	# Konfigurationsparameter synchronisieren
-	s_dictSettings["System"].update({
-		"strLogLvl" : getLogLvl()
-	})
-	
-	# Einstellungen speichern
-	dbg("Speichern der Einstellungen")
-	try:
-		foFile = open(s_strConfigFile, "w")
-		json.dump(s_dictSettings, foFile, sort_keys=True)
-		foFile.close()
-	except:
-		exc("Speichern der Einstellungen in %s" % (
-			s_strConfigFile))
-	s_oSettingsLock.release()
+	with s_oSettingsLock:
+		# Einstellungen vorbereiten
+		if (not "System" in s_dictSettings):
+			s_dictSettings.update({"System" : {}})
+		# Konfigurationsparameter synchronisieren
+		s_dictSettings["System"].update({
+			"strLogLvl" : getLogLvl()
+		})
+		
+		# Einstellungen speichern
+		dbg("Speichern der Einstellungen")
+		try:
+			foFile = open(s_strConfigFile, "w")
+			json.dump(s_dictSettings, foFile, sort_keys=True)
+			foFile.close()
+		except:
+			exc("Speichern der Einstellungen in %s" % (
+				s_strConfigFile))
 	# <<< Critical Section
 	
 	# Startseite speichern
@@ -427,9 +492,8 @@ def saveSettings():
 	# Snapshot des Fehlerspeichers sichern
 	dbg("Abbild des Fehlerspeichers speichern")
 	# >>> Critical Section
-	s_oLogMemLock.acquire()
-	oSnapshot = list(s_oLogMem)
-	s_oLogMemLock.release()
+	with s_oLogMemLock:
+		oSnapshot = list(s_oLogMem)
 	# <<< Critical Section	
 	if oSnapshot:
 		try:
@@ -444,16 +508,15 @@ def saveSettings():
 	
 def scanSoundFiles(bRescan=False, bClear=False):
 	# >>> Critical Section
-	s_oSettingsLock.acquire()
-	try:
-		if "Sounds" not in s_dictSettings:
-			bRescan = True
-		elif bClear:
-			s_dictSettings["Sounds"].clear()
-			bRescan = True
-	except:
-		exc("Erfassen von Klangdateien")
-	s_oSettingsLock.release()
+	with s_oSettingsLock:
+		try:
+			if "Sounds" not in s_dictSettings:
+				bRescan = True
+			elif bClear:
+				s_dictSettings["Sounds"].clear()
+				bRescan = True
+		except:
+			exc("Erfassen von Klangdateien")
 	# <<< Critical Section
 	if not bRescan:
 		return
@@ -492,72 +555,254 @@ def registerSoundFile(strFile, strCategory="Default"):
 	if not re.match("\\.([Ww][Aa][Vv]|[Mm][Pp]3)", strExt):
 		return
 	# >>> Critical Section
-	s_oSettingsLock.acquire()
-	try:
-		if "Sounds" not in s_dictSettings:
-			s_dictSettings.update({"Sounds" : {}})
-		if not strCategory in s_dictSettings["Sounds"]:
-			s_dictSettings["Sounds"].update({strCategory : {}})
-		s_dictSettings["Sounds"][strCategory].update({strName : strFile})
-	except:
-		exc("Klangdatei erfassen: '%s'" % (strFile))
-	s_oSettingsLock.release()
+	with s_oSettingsLock:
+		try:
+			if "Sounds" not in s_dictSettings:
+				s_dictSettings.update({"Sounds" : {}})
+			if not strCategory in s_dictSettings["Sounds"]:
+				s_dictSettings["Sounds"].update({strCategory : {}})
+			s_dictSettings["Sounds"][strCategory].update({strName : strFile})
+		except:
+			exc("Klangdatei erfassen: '%s'" % (strFile))
 	# <<< Critical Section
+	return
+
+def scanImageFiles(bRescan=False, bClear=False):
+	# >>> Critical Section
+	with s_oSettingsLock:
+		try:
+			if "Images" not in s_dictSettings:
+				bRescan = True
+			elif bClear:
+				s_dictSettings["Images"].clear()
+				bRescan = True
+		except:
+			exc("Erfassen von Bilddateien")
+	# <<< Critical Section
+	if not bRescan:
+		return
+	
+	lstDir = (
+		getSetting("System", "strSysImageLocation",
+			varDefault="/usr/share/icons/Adwaita/32x32"),
+		getSetting("System", "strUsrImageLocation",
+			varDefault=s_strImagePath))
+		
+	for strDir in lstDir:
+		# Verzeichnisstruktur scannen (Kategorie, Datei)
+		try:
+			for strCategory in os.listdir(strDir):
+				strFile = None
+				strPath = os.path.join(strDir, strCategory)
+				if os.path.isdir(strPath):
+					for strEntry in os.listdir(strPath):
+						strFile = os.path.join(strPath, strEntry)
+						if os.path.isfile(strFile):
+							registerImageFile(strFile, strCategory)
+				elif os.path.isfile(strPath):
+					strFile = strPath
+					registerImageFile(strFile)
+		except:
+			exc("Erfassen von Bilddateien aus: '%s'" % (strDir))
+	return
+	
+def registerImageFile(strFile, strCategory="Default"):
+	_, strTail = os.path.split(strFile)
+	if not strTail:
+		return
+	strName, strExt = os.path.splitext(strTail)
+	if not strExt or not strName:
+		return
+	# if not re.match("\\.([Ww][Aa][Vv]|[Mm][Pp]3)", strExt):
+	# 	return
+	# >>> Critical Section
+	with s_oSettingsLock:
+		try:
+			if "Images" not in s_dictSettings:
+				s_dictSettings.update({"Images" : {}})
+			if not strCategory in s_dictSettings["Images"]:
+				s_dictSettings["Images"].update({strCategory : {}})
+			s_dictSettings["Images"][strCategory].update({strName : strFile})
+		except:
+			exc("Bilddatei erfassen: '%s'" % (strFile))
+	# <<< Critical Section
+	return
+
+def findMatchingImageFile(strImage):
+	# >>> Critical Section
+	with s_oSettingsLock:
+		try:
+			if "Images" in s_dictSettings:
+				# Direkte Übereinstimmung finden
+				strFile = None
+				for (strCategory, dictSounds) in s_dictSettings["Images"].items():
+					if strImage in dictSounds:
+						strFile = s_dictSettings["Images"][strCategory][strImage]
+						break
+				if not strFile:
+					# Partiellen Treffer finden
+					for (strCategory, dictSounds) in sorted(s_dictSettings["Images"].items()):
+						for (strName, strPath) in dictSounds.items():
+							if re.match(strImage + ".*", strName):
+								log("Bild '%s' für angefordertes Bild '%s' verwendet." % (
+									strName, strImage))
+								strFile = strPath
+								break
+							if re.match(".*" + strImage + ".*", strName):
+								log("Bild '%s' für angefordertes Bild '%s' verwendet." % (
+									strName, strImage))
+								strFile = strPath
+								break
+		except:
+			exc("Bilddatei '%s' finden" % (strImage))
+	# <<< Critical Section
+	return strFile
+
+def registerPipPackage(
+	bMissing,
+	strPackage,
+	strTitle,
+	strDescription):
+	if not strPackage or not strTitle or not strDescription:
+		err("Ungültige Parameter '%s', '%s', '%s' für optionale Installation von Python-Packages" % (
+			strPackage, strTitle, strDescription))
+		return
+	# >>> Critical Section
+	with s_oSettingsLock:
+		try:
+			if "PIP" not in s_dictSettings:
+				s_dictSettings.update({"PIP" : {}})
+			if "PIP" not in s_dictUserSettings:
+				s_dictUserSettings.update({"PIP" : {}})
+			s_dictSettings["PIP"].update({strPackage : "install" if bMissing else "uninstall"})
+			s_dictUserSettings["PIP"].update(
+				{strPackage : {
+					"title"			: "%s (%s)" % (strTitle, strPackage),
+					"description"	: strDescription,
+					"default"		: "install",
+					"choices"		: {
+						"Paket hinzufügen"	: "install",
+						"Paket entfernen" 	: "uninstall"
+					}
+				}})
+			log("Optional installierbares Python-Paket erfasst: '%s'" % (strPackage))
+		except:
+			exc("Optional installierbares Python-Paket erfassen: '%s'" % (strPackage))
+	# <<< Critical Section
+	return
+
+def isMissingPipPackage(strPackage):
+	# >>> Critical Section
+	with s_oSettingsLock:
+		try:
+			if ("PIP" in s_dictSettings
+				and s_dictSettings["PIP"]
+				and strPackage in s_dictSettings["PIP"].keys()
+				and s_dictSettings["PIP"][strPackage] == "uninstall"):
+				return False
+		except:
+			exc("Optional installierbares Python-Paket abfragen: '%s'" % (strPackage))
+	# <<< Critical Section
+	return True
+
+def unregisterPipPackage(
+	strPackage):
+	if not strPackage:
+		err("Ungültiger Parameter '%s' für das Verwerfen von Python-Packages" % (
+			strPackage))
+		return
+	# >>> Critical Section
+	with s_oSettingsLock:
+		try:
+			if ("PIP" in s_dictSettings
+				and strPackage in s_dictSettings["PIP"]):
+				s_dictSettings["PIP"].pop(strPackage)
+			if ("PIP" in s_dictUserSettings
+				and strPackage in s_dictUserSettings["PIP"]):
+				s_dictUserSettings["PIP"].pop(strPackage)
+			log("Optional installierbares Python-Paket verworfen: '%s'" % (strPackage))
+		except:
+			exc("Optional installierbares Python-Paket verwerfen: '%s'" % (strPackage))
+	# <<< Critical Section
+	return
+
+def updateModuleUserSetting(
+	strModule,
+	strSettingsName,
+	dictSettingsDesc):
+
+	if not strModule or not strSettingsName or not dictSettingsDesc:
+		err("Ungültiger Parameter '%s', '%s', %r für das Aktualisieren von Benutzereinstellungen" % (
+			strModule, strSettingsName, dictSettingsDesc))
+		return
+
+	# >>> Critical Section
+	with s_oSettingsLock:
+		try:
+			if (strModule in s_dictUserSettings
+				and strModule in s_dictSettings
+				and strSettingsName in s_dictUserSettings[strModule]
+				and strSettingsName in s_dictSettings[strModule]):
+
+				s_dictUserSettings[strModule].update({strSettingsName : dictSettingsDesc})		
+				log("Benutzereinstellungen aktualisiert: '%s', '%s', %r" % (strModule, strSettingsName, dictSettingsDesc))
+			else:
+				err("Benutzereinstellungen aktualisiert: '%s', '%s', %r" % (strModule, strSettingsName, dictSettingsDesc))
+		except:
+			exc("Benutzereinstellungen aktualisieren: '%s', '%s', %r" % (strModule, strSettingsName, dictSettingsDesc))
+	# <<< Critical Section
+
 	return
 	
 def dbg(strText):
 	# >>> Critical Section
-	s_oLogMemLock.acquire()
-	if s_nLogLvl >= 4:
-		oEntry = LogEntry(
-			strType="DBG",
-			strText=strText,
-			lstTB=traceback.extract_stack())
-		print("%s" % (oEntry))
-		s_oLogMem.appendleft(oEntry)
-	s_oLogMemLock.release()
+	with s_oLogMemLock:
+		if s_nLogLvl >= 4:
+			oEntry = LogEntry(
+				strType="DBG",
+				strText=strText,
+				lstTB=traceback.extract_stack())
+			print("%s" % (oEntry))
+			s_oLogMem.appendleft(oEntry)
 	# <<< Critical Section
 	return
 
 def log(strText):
 	# >>> Critical Section
-	s_oLogMemLock.acquire()
-	if s_nLogLvl >= 3:
-		oEntry = LogEntry(
-			strType="INF",
-			strText=strText,
-			lstTB=traceback.extract_stack())
-		print("%s" % (oEntry))
-		s_oLogMem.appendleft(oEntry)
-	s_oLogMemLock.release()
+	with s_oLogMemLock:
+		if s_nLogLvl >= 3:
+			oEntry = LogEntry(
+				strType="INF",
+				strText=strText,
+				lstTB=traceback.extract_stack())
+			print("%s" % (oEntry))
+			s_oLogMem.appendleft(oEntry)
 	# <<< Critical Section
 	return
 
 def wrn(strText):
 	# >>> Critical Section
-	s_oLogMemLock.acquire()
-	if s_nLogLvl >= 2:
-		oEntry = LogEntry(
-			strType="WRN",
-			strText=strText,
-			lstTB=traceback.extract_stack())
-		print("%s" % (oEntry))
-		s_oLogMem.appendleft(oEntry)
-	s_oLogMemLock.release()
+	with s_oLogMemLock:
+		if s_nLogLvl >= 2:
+			oEntry = LogEntry(
+				strType="WRN",
+				strText=strText,
+				lstTB=traceback.extract_stack())
+			print("%s" % (oEntry))
+			s_oLogMem.appendleft(oEntry)
 	# <<< Critical Section
 	return
 
 def err(strText):
 	# >>> Critical Section
-	s_oLogMemLock.acquire()
-	if s_nLogLvl >= 1:
-		oEntry = LogEntry(
-			strType="ERR",
-			strText=strText,
-			lstTB=traceback.extract_stack())
-		print("%s" % (oEntry))
-		s_oLogMem.appendleft(oEntry)
-	s_oLogMemLock.release()
+	with s_oLogMemLock:
+		if s_nLogLvl >= 1:
+			oEntry = LogEntry(
+				strType="ERR",
+				strText=strText,
+				lstTB=traceback.extract_stack())
+			print("%s" % (oEntry))
+			s_oLogMem.appendleft(oEntry)
 	# <<< Critical Section
 	return
 
@@ -569,9 +814,8 @@ def exc(strText):
 		lstTB=traceback.extract_tb(exTraceback))
 	print("%s" % (oEntry))
 	# >>> Critical Section
-	s_oLogMemLock.acquire()
-	s_oLogMem.appendleft(oEntry)
-	s_oLogMemLock.release()
+	with s_oLogMemLock:
+		s_oLogMem.appendleft(oEntry)
 	# <<< Critical Section
 	return
 
@@ -583,10 +827,9 @@ def getLogMem(bUpdate=False):
 	global s_lstSnapshot
 	
 	# >>> Critical Section
-	s_oLogMemLock.acquire()
-	if bUpdate or not s_lstSnapshot:
-		s_lstSnapshot = list(s_oLogMem)
-	s_oLogMemLock.release()
+	with s_oLogMemLock:
+		if bUpdate or not s_lstSnapshot:
+			s_lstSnapshot = list(s_oLogMem)
 	# <<< Critical Section
 	return s_lstSnapshot
 
@@ -606,9 +849,8 @@ def setLogLvl(strLogLvl):
 	else:
 		nLogLvl = 0
 	# >>> Critical Section
-	s_oLogMemLock.acquire()
-	s_nLogLvl = nLogLvl
-	s_oLogMemLock.release()
+	with s_oLogMemLock:
+		s_nLogLvl = nLogLvl
 	# <<< Critical Section
 	return
 
@@ -618,19 +860,18 @@ def getLogLvl():
 	
 	strLogLvl = "EXC"
 	# >>> Critical Section
-	s_oLogMemLock.acquire()
-	if s_nLogLvl == 4:
-		strLogLvl = "DBG"
-	elif s_nLogLvl == 3:
-		strLogLvl = "INF"
-	elif s_nLogLvl == 2:
-		strLogLvl = "WRN"
-	elif s_nLogLvl == 1:
-		strLogLvl = "ERR"
-	else:
-		s_nLogLvl = 0
-		strLogLvl = "EXC"
-	s_oLogMemLock.release()
+	with s_oLogMemLock:
+		if s_nLogLvl == 4:
+			strLogLvl = "DBG"
+		elif s_nLogLvl == 3:
+			strLogLvl = "INF"
+		elif s_nLogLvl == 2:
+			strLogLvl = "WRN"
+		elif s_nLogLvl == 1:
+			strLogLvl = "ERR"
+		else:
+			s_nLogLvl = 0
+			strLogLvl = "EXC"
 	# <<< Critical Section
 	return strLogLvl
 	
@@ -642,26 +883,25 @@ def getSetting(
 	):
 	varValue = varDefault
 	# >>> Critical Section
-	s_oSettingsLock.acquire()
-	try:
-		if (strKeyName in s_dictSettings
-			and strValName in s_dictSettings[strKeyName]
-			and re.match(strRegEx, "%s" % (s_dictSettings[strKeyName][strValName]))):
-			if varDefault == None:
-				varValue = s_dictSettings[strKeyName][strValName]
-			elif (isinstance(s_dictSettings[strKeyName][strValName], type(varDefault))):
-				varValue = s_dictSettings[strKeyName][strValName]
-			else:
-				err("Konfigurationseinstellung holen: \"%s\".\"%s\"=\"%s\" (RexEx \"%s\", Default: \"%r\") - Erwartet wurde Typ \"%s\" jedoch liegt Typ \"%s\" vor" % (
-					strKeyName, strValName,
-					s_dictSettings[strKeyName][strValName],
-					strRegEx, varDefault,
-					type(varDefault), 						
-					type(s_dictSettings[strKeyName][strValName])))
-	except:
-		exc("Konfigurationseinstellung holen: \"%s\".\"%s\" (RexEx \"%s\", Default: \"%r\")" % (
-			strKeyName, strValName, strRegEx, varDefault))
-	s_oSettingsLock.release()
+	with s_oSettingsLock:
+		try:
+			if (strKeyName in s_dictSettings
+				and strValName in s_dictSettings[strKeyName]
+				and re.match(strRegEx, "%s" % (s_dictSettings[strKeyName][strValName]))):
+				if varDefault == None:
+					varValue = s_dictSettings[strKeyName][strValName]
+				elif (isinstance(s_dictSettings[strKeyName][strValName], type(varDefault))):
+					varValue = s_dictSettings[strKeyName][strValName]
+				else:
+					err("Konfigurationseinstellung holen: \"%s\".\"%s\"=\"%s\" (RexEx \"%s\", Default: \"%r\") - Erwartet wurde Typ \"%s\" jedoch liegt Typ \"%s\" vor" % (
+						strKeyName, strValName,
+						s_dictSettings[strKeyName][strValName],
+						strRegEx, varDefault,
+						type(varDefault), 						
+						type(s_dictSettings[strKeyName][strValName])))
+		except:
+			exc("Konfigurationseinstellung holen: \"%s\".\"%s\" (RexEx \"%s\", Default: \"%r\")" % (
+				strKeyName, strValName, strRegEx, varDefault))
 	# <<< Critical Section
 	return varValue
 	
@@ -674,43 +914,42 @@ def setSetting(
 	
 	bResult = False
 	# >>> Critical Section
-	s_oSettingsLock.acquire()
-	try:
-		primitives = (bool, int, float, str)
-		if strKeyName in s_dictSettings:
-			if strValName in s_dictSettings[strKeyName]:
-				varOldVal = s_dictSettings[strKeyName][strValName]
-				oOldType = type(varOldVal)
-				oSetType = type(varValue)
-				varNewVal = None					
-				oNewType = oSetType
-				if isinstance(varValue, oOldType):
-					varNewVal = varValue
-				elif isinstance(varValue, primitives):
-					if isinstance(varOldVal, bool):
-						varNewVal = (("%s" % (varValue)) == "True")
-						oNewType = type(varNewVal)
+	with s_oSettingsLock:
+		try:
+			primitives = (bool, int, float, str)
+			if strKeyName in s_dictSettings:
+				if strValName in s_dictSettings[strKeyName]:
+					varOldVal = s_dictSettings[strKeyName][strValName]
+					oOldType = type(varOldVal)
+					oSetType = type(varValue)
+					varNewVal = None					
+					oNewType = oSetType
+					if isinstance(varValue, oOldType):
+						varNewVal = varValue
+					elif isinstance(varValue, primitives):
+						if isinstance(varOldVal, bool):
+							varNewVal = (("%s" % (varValue)) == "True")
+							oNewType = type(varNewVal)
+						else:
+							varNewVal = oOldType("%s" % (varValue))
+							oNewType = type(varNewVal)
+					if varNewVal == None:
+						err("Konfiguration \"%s\".\"%s\" von \"%s\" %r auf \"%s\" %r ändern: Unverträgliche Datentypen!" % (
+							strKeyName, strValName, varOldVal, oOldType, varValue, oSetType))
 					else:
-						varNewVal = oOldType("%s" % (varValue))
-						oNewType = type(varNewVal)
-				if varNewVal == None:
-					err("Konfiguration \"%s\".\"%s\" von \"%s\" %r auf \"%s\" %r ändern: Unverträgliche Datentypen!" % (
-						strKeyName, strValName, varOldVal, oOldType, varValue, oSetType))
+						s_dictSettings[strKeyName][strValName] = varNewVal
+						bResult = True
+						dbg("Konfiguration \"%s\".\"%s\" von \"%s\" %r auf \"%s\" %r geändert." % (
+							strKeyName, strValName, varOldVal, oOldType, varNewVal, oNewType))
 				else:
-					s_dictSettings[strKeyName][strValName] = varNewVal
-					bResult = True
-					dbg("Konfiguration \"%s\".\"%s\" von \"%s\" %r auf \"%s\" %r geändert." % (
-						strKeyName, strValName, varOldVal, oOldType, varNewVal, oNewType))
+					err("Konfigurationseinstellung setzen: \"%s\".\"%s\" -> \"%s\" - Adressierter Wert existiert nicht" % (
+						strKeyName, strValName, varValue))
 			else:
-				err("Konfigurationseinstellung setzen: \"%s\".\"%s\" -> \"%s\" - Adressierter Wert existiert nicht" % (
+				err("Konfigurationseinstellung setzen: \"%s\".\"%s\" -> \"%s\" - Adressierter Schlüssel existiert nicht" % (
 					strKeyName, strValName, varValue))
-		else:
-			err("Konfigurationseinstellung setzen: \"%s\".\"%s\" -> \"%s\" - Adressierter Schlüssel existiert nicht" % (
+		except:
+			exc("Konfigurationseinstellung setzen: \"%s\".\"%s\" -> \"%s\"" % (
 				strKeyName, strValName, varValue))
-	except:
-		exc("Konfigurationseinstellung setzen: \"%s\".\"%s\" -> \"%s\"" % (
-			strKeyName, strValName, varValue))
-	s_oSettingsLock.release()
 	# <<< Critical Section
 	return bResult
 

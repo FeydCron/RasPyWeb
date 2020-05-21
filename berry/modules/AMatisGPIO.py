@@ -6,10 +6,14 @@ import RPi.GPIO as IO
 from threading import Thread
 from subprocess import call
 
-import sdk
-from sdk import ModuleBase
+from .. import sdk
+from ..sdk import ModuleBase
 
 VERBOSE = 0
+
+def createModuleInstance(
+	oWorker):
+	return AMatisGPIO(oWorker)
 
 class AMatisGPIO(ModuleBase):
 	

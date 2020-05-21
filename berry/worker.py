@@ -1,11 +1,11 @@
 import threading
 import queue
 
-import globs
-import sdk
-from sdk import LongTask
-from sdk import FastTask
-from sdk import TaskSpeak
+from collections import OrderedDict
+
+from . import globs
+from . import sdk
+from .sdk import LongTask, FastTask, TaskSpeak
 
 class TaskInit(LongTask):
 	
@@ -34,8 +34,9 @@ class TaskExit(FastTask):
 	
 	def do(self):
 		globs.s_strExitMode = self.m_strMode
-		for oInstance in self.m_oWorker.m_dictModules.values():
-			oInstance.moduleExit()
+		for (oInstance, _) in self.m_oWorker.m_dictModules.values():
+			if (oInstance):
+				oInstance.moduleExit()
 		self.m_oWorker.m_dictModules.clear()
 		globs.saveSettings()
 		globs.shutdown()
@@ -123,9 +124,9 @@ class TaskSystemWatchDog(FastTask):
 		if "CPU" not in globs.s_dictSystemValues:
 			globs.s_dictSystemValues.update({"CPU" : {}})
 		if "RAM" not in globs.s_dictSystemValues:
-			globs.s_dictSystemValues.update({"Arbeitsspeicher" : {}})
+			globs.s_dictSystemValues.update({"RAM" : {}})
 		if "MEM" not in globs.s_dictSystemValues:
-			globs.s_dictSystemValues.update({"Speicherkapazität" : {}})
+			globs.s_dictSystemValues.update({"MEM" : {}})
 		if "Netzwerk" not in globs.s_dictSystemValues:
 			globs.s_dictSystemValues.update({"Netzwerk" : {}})
 		# Systemwerte eintragen
@@ -227,82 +228,95 @@ class TaskLoadSettings(FastTask):
 	def do(self):
 		globs.loadSettings()
 		self.m_oWorker.m_evtInit.set()
-		for strComponent in globs.s_dictSettings["dictModules"].keys():
+		for strComponent in globs.s_dictSettings["listModules"]:
 			TaskModuleInit(self.m_oWorker, strComponent).start()
 		return
 		
 class TaskModuleInit(FastTask):
 	
-	def __init__(self, oWorker, strComponent):
+	def __init__(self, oWorker, strModule):
 		super(TaskModuleInit, self).__init__(oWorker)
-		self.m_strComponent = strComponent
+		self.m_strModule = strModule
 		return
 		
 	def __str__(self):
-		strDesc = "Verwalten des Moduls %s" % (self.m_strComponent)
+		strDesc = "Verwalten des Moduls %s" % (self.m_strModule)
 		return  strDesc
 	
 	def do(self):
 		# Gegebenenfalls die alte Instanz des Moduls entladen
 		bUnloaded = False
-		if (self.m_strComponent in self.m_oWorker.m_dictModules):
-			oInstance = self.m_oWorker.m_dictModules.pop(self.m_strComponent)
-			oInstance.moduleExit()
-			del oInstance
-			bUnloaded = True
-		if (self.m_strComponent in globs.s_dictSettings["dictModules"] and
-			self.m_strComponent not in globs.s_dictSettings["listInactiveModules"]):
-			# Klasse des Moduls laden
-			clsModule = globs.importComponent("modules." + self.m_strComponent,
-				globs.s_dictSettings["dictModules"][self.m_strComponent])
-			if not clsModule:
+
+		# Solange das Modul noch nicht geladen worden ist, ist es u.U. nur
+		# unter einem relativen Namen bekannt. Erst nach dem Laden des Moduls
+		# ist sein absoluter Name bekannt, sodass über diesen Namen ein
+		# Reload des Moduls initiiert werden kann.
+		strKnownModuleName = ".modules." + self.m_strModule
+
+		globs.log("m_dictModules: %r" % (self.m_oWorker.m_dictModules))
+		
+		if (self.m_strModule in self.m_oWorker.m_dictModules.keys()):
+			(oInstance, strKnownModuleName) = self.m_oWorker.m_dictModules[self.m_strModule]
+			globs.log("KnownModuleName: '%s'" % (strKnownModuleName))
+			if (oInstance):
+				self.m_oWorker.m_dictModules.update({self.m_strModule : (None, strKnownModuleName)})
+				oInstance.moduleExit()
+				del oInstance
+				bUnloaded = True
+		
+		if (self.m_strModule in globs.s_dictSettings["listModules"] and
+			self.m_strModule not in globs.s_dictSettings["listInactiveModules"]):
+			# Modul importieren bzw. neu laden (via Reload)
+			oModule = globs.importComponent(strKnownModuleName)
+			if not oModule:
 				strMsg = "Das Modul %s kann nicht geladen werden. Wahrscheinlich sind die Einstellungen falsch." % (
-					self.m_strComponent)
+					strKnownModuleName)
 				globs.wrn(strMsg)
 				TaskSpeak(self.m_oWorker, strMsg).start()
 				return
-			# Module instanziieren
-			oInstance = clsModule(self.m_oWorker)
-			del clsModule
+			
 			# >>> Critical Section
-			globs.s_oSettingsLock.acquire()
-			if self.m_strComponent not in globs.s_dictSettings:
-				globs.s_dictSettings.update({self.m_strComponent : {}})
-			dictModCfg = globs.s_dictSettings[self.m_strComponent]
-			globs.s_oSettingsLock.release()
-			# <<< Critical Section
-			dictCfgUsr = {}
-			try:
-				if not oInstance.moduleInit(dictModCfg=dictModCfg, dictCfgUsr=dictCfgUsr):
-					strMsg = "Das Modul %s konnte nicht initialisiert werden." % (self.m_strComponent)
+			with globs.s_oSettingsLock:
+				if self.m_strModule not in globs.s_dictSettings:
+					globs.s_dictSettings.update({self.m_strModule : {}})
+				dictModCfg = globs.s_dictSettings[self.m_strModule]
+				dictCfgUsr = {}
+				try:
+					oInstance = oModule.createModuleInstance(self.m_oWorker)
+					if (not oInstance
+						or not oInstance.moduleInit(dictModCfg=dictModCfg, dictCfgUsr=dictCfgUsr)):
+						strMsg = "Das Modul %s konnte nicht initialisiert werden. Möglicherweise müssen zusätzliche Pakete installiert werden." % (self.m_strModule)
+						globs.wrn(strMsg)
+						TaskSpeak(self.m_oWorker, strMsg).start()
+						oInstance = None
+				except:
+					globs.exc("Verwalten des Moduls %s" % (self.m_strModule))
+					strMsg = "Das Modul %s konnte nicht initialisiert werden. Möglicherweise ist es veraltet und muss aktualisiert werden." % (
+						self.m_strModule)
 					globs.wrn(strMsg)
 					TaskSpeak(self.m_oWorker, strMsg).start()
-					return
-			except:
-				globs.exc("Verwalten des Moduls %s" % (self.m_strComponent))
-				strMsg = "Das Modul %s konnte nicht initialisiert werden. Wahrscheinlich ist es veraltet und nicht mehr kompatibel." % (
-					self.m_strComponent)
-				globs.wrn(strMsg)
-				TaskSpeak(self.m_oWorker, strMsg).start()
-				return
-			# Module registrieren
-			self.m_oWorker.m_dictModules.update({self.m_strComponent : oInstance})
-			globs.s_dictUserSettings.update({self.m_strComponent : dictCfgUsr})
-			return
-		if (self.m_strComponent not in globs.s_dictSettings["dictModules"]):
-			# >>> Critical Section
-			globs.s_oSettingsLock.acquire()
-			if self.m_strComponent in globs.s_dictSettings:
-				globs.s_dictSettings.pop(self.m_strComponent)
-			if self.m_strComponent in globs.s_dictUserSettings:
-				globs.s_dictUserSettings.pop(self.m_strComponent)
-			globs.s_oSettingsLock.release()
+					oInstance = None
+
+				if oInstance:
+					self.m_oWorker.m_dictModules.update({self.m_strModule : (oInstance, oModule.__name__)})
+					globs.s_dictUserSettings.update({self.m_strModule : dictCfgUsr})
 			# <<< Critical Section
-			strMsg = "Das Modul %s wurde dauerhaft entfernt." % (self.m_strComponent)
+
+			return
+		
+		if (self.m_strModule not in globs.s_dictSettings["listModules"]):
+			# >>> Critical Section
+			with globs.s_oSettingsLock:
+				if self.m_strModule in globs.s_dictSettings:
+					globs.s_dictSettings.pop(self.m_strModule)
+				if self.m_strModule in globs.s_dictUserSettings:
+					globs.s_dictUserSettings.pop(self.m_strModule)
+			# <<< Critical Section
+			strMsg = "Das Modul %s wurde dauerhaft entfernt." % (self.m_strModule)
 			globs.log(strMsg)
 			TaskSpeak(self.m_oWorker, strMsg).start()
 			return
-		strMsg = "Das Modul %s wurde ausgeschaltet" % (self.m_strComponent)
+		strMsg = "Das Modul %s wurde ausgeschaltet" % (self.m_strModule)
 		if (bUnloaded):
 			strMsg += " und entladen"
 		strMsg += "."
@@ -335,20 +349,21 @@ class Worker:
 	
 	def __init__(self):
 		self.m_oLock = threading.RLock()
-		self.m_oLock.acquire()
-		self.m_evtRunning = threading.Event()
-		self.m_evtInit = threading.Event()
-		self.m_evtRunning.clear()
-		self.m_evtInit.clear()
-		self.m_oWatchDogTimer = None
-		self.m_oThreadFast = None
-		self.m_oThreadLong = None
-		self.m_oQueueFast = None
-		self.m_oQueueLong = None
-		self.m_bIsQueueFastShutdown = True
-		self.m_bIsQueueLongShutdown = True
-		self.m_dictModules = {}
-		self.m_oLock.release()
+		# >>> Critical Section
+		with self.m_oLock:
+			self.m_evtRunning = threading.Event()
+			self.m_evtInit = threading.Event()
+			self.m_evtRunning.clear()
+			self.m_evtInit.clear()
+			self.m_oWatchDogTimer = None
+			self.m_oThreadFast = None
+			self.m_oThreadLong = None
+			self.m_oQueueFast = None
+			self.m_oQueueLong = None
+			self.m_bIsQueueFastShutdown = True
+			self.m_bIsQueueLongShutdown = True
+			self.m_dictModules = {}
+		# <<< Critical Section
 		return
 		
 	def onRunSystemWatchDog(self):
@@ -357,7 +372,9 @@ class Worker:
 
 	def runSystemWatchDog(self):
 		self.m_oWatchDogTimer = threading.Timer(
-			10.0, self.onRunSystemWatchDog).start()
+			globs.getWatchDogInterval(),
+			self.onRunSystemWatchDog)
+		self.m_oWatchDogTimer.start()
 		globs.dbg("Systemüberwachung: Nächste Prüfung eingeplant (%s)" % (
 			self.m_oWatchDogTimer))
 		return
@@ -409,19 +426,18 @@ class Worker:
 	def startQueue(self):
 		globs.dbg("Start Aufgabenbearbeitung: Warten auf Freigabe")
 		# >>> Critical Section
-		self.m_oLock.acquire()
-		globs.dbg("Start Aufgabenbearbeitung: Freigabe erhalten")
-		self.m_oThreadFast = threading.Thread(target=self.fastThreadProc)
-		self.m_oThreadFast.daemon = True
-		self.m_oThreadLong = threading.Thread(target=self.longThreadProc)
-		self.m_oThreadLong.daemon = True
-		self.m_oQueueFast = queue.Queue()
-		self.m_oQueueLong = queue.Queue()
-		self.m_oThreadFast.start()
-		self.m_oThreadLong.start()
-		self.m_evtRunning.set()
-		globs.dbg("Start Aufgabenbearbeitung: Freigabe abgeben")
-		self.m_oLock.release()
+		with self.m_oLock:
+			globs.dbg("Start Aufgabenbearbeitung: Freigabe erhalten")
+			self.m_oThreadFast = threading.Thread(target=self.fastThreadProc)
+			self.m_oThreadFast.daemon = True
+			self.m_oThreadLong = threading.Thread(target=self.longThreadProc)
+			self.m_oThreadLong.daemon = True
+			self.m_oQueueFast = queue.Queue()
+			self.m_oQueueLong = queue.Queue()
+			self.m_oThreadFast.start()
+			self.m_oThreadLong.start()
+			self.m_evtRunning.set()
+			globs.dbg("Start Aufgabenbearbeitung: Freigabe abgeben")
 		# <<< Critical Section
 		TaskInit(self).start()
 		# Synchronization Point (Initialisation)
@@ -440,17 +456,16 @@ class Worker:
 			return bResult
 		globs.dbg("Stop Aufgabenbearbeitung: Warten auf Freigabe")
 		# >>> Critical Section
-		self.m_oLock.acquire()
-		globs.dbg("Stop Aufgabenbearbeitung: Freigabe erhalten")
-		if self.m_oWatchDogTimer:
-			self.m_oWatchDogTimer.cancel()
-			self.m_oWatchDogTimer = None
-		if not TaskQueueFastStop(self).start():
-			bResult = False
-		if not TaskQueueLongStop(self).start():
-			bResult = False		
-		self.m_evtRunning.clear()
-		self.m_oLock.release()
+		with self.m_oLock:
+			globs.dbg("Stop Aufgabenbearbeitung: Freigabe erhalten")
+			if self.m_oWatchDogTimer:
+				self.m_oWatchDogTimer.cancel()
+				self.m_oWatchDogTimer = None
+			if not TaskQueueFastStop(self).start():
+				bResult = False
+			if not TaskQueueLongStop(self).start():
+				bResult = False		
+			self.m_evtRunning.clear()
 		# <<< Critical Section
 		globs.dbg("Stop Aufgabenbearbeitung: Freigabe abgegeben")
 		if (self.m_oThreadFast):

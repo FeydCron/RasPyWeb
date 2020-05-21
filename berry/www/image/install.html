@@ -5,7 +5,7 @@
 	<meta charset="utf-8"/>
 	<meta http-equiv="expires" content="0">
 	<!-- #BeginEditable "doctitle" -->
-	<title>Fehler</title>
+	<title>Bildinstallation</title>
 
 	<!-- #EndEditable -->
 
@@ -31,10 +31,27 @@
 	<div class="ym-column linearize-level-1">
 	<div class="ym-col1">
 	<!-- #BeginEditable "content" -->
-	<div class="box error">
-		<h3>Fehler</h3>
-		<p>Bei der Generierung von dynamischen Inhalten (Konfigurationseinstellungen) ist ein Fehler aufgetreten.</p>
-		<a class="ym-reply ym-button ym-primary" href="#">Erneut versuchen</a>
+	<div class="box info">
+		<h3>Installation</h3>
+		<p>
+		Mit dieser Funktion können neue Bilder hochgeladen und installiert werden.
+		Der Dateiname ist dabei so zu wählen, wie das Bild nach der Installation zur
+		Auswahl stehen soll.
+		</p><p>
+		Unterstützte Bilddateien liegen in gängigen Formaten vor (*.gif, *.jpeg, *.bmp, *.png).
+		</p>
+	    <form class="ym-form ym-full" method="post" enctype="multipart/form-data" action="">
+	    <!-- form row wrapper -->
+	    <div class="ym-fbox">
+		    <label for="ModuleFile">Bilddatei</label>
+		    <input type="file" name="ImageFile" id="ImageFile" accept="image/*" multiple/>
+		</div>
+        <div class="ym-fbox-footer">
+		    <!-- custom buttons -->
+		    <button type="reset" class="reset ym-delete ym-warning" id="reset">Zurücksetzen</button>
+		    <button type="submit" class="save ym-save ym-success" id="submit">Installieren</button>
+	    </div>
+	    </form>
 	</div>
 	<!-- #EndEditable -->
 	</div>

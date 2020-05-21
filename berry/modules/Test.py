@@ -5,11 +5,13 @@
 #  @brief Plug-In für Testzwecke.
 #  
 
-import globs
+from .. import globs
+from .. import sdk
+from ..sdk import ModuleBase, TaskSpeak
 
-import sdk
-from sdk import ModuleBase
-from sdk import TaskSpeak
+def createModuleInstance(
+	oWorker):
+	return Test(oWorker)
 
 class Test(ModuleBase):
 	

@@ -3,6 +3,7 @@
 <!-- #BeginTemplate "../dynamic.dwt" -->
 <head>
 	<meta charset="utf-8"/>
+	<meta http-equiv="expires" content="0">
 	<!-- #BeginEditable "doctitle" -->
 	<title>Modulinstallation</title>
 
@@ -33,10 +34,12 @@
 	<div class="box info">
 		<h3>Installation</h3>
 		<p>
-		Hiermit kann ein Erweiterungsmodul hochgeladen, installiert und eingerichtet werden.
+		Mit dieser Funktion können Erweiterungsmodule hochgeladen, installiert und eingerichtet werden.
 		</p><p>
-		Falls eine neuere Version eines bereits installierten Erweiterungsmoduls hochgeladen wird,
-		ist in der Regel ein Neustart des Systems erforderlich, um die Änderungen wirksam werden zu lassen.
+		Neuere Versionen bereits installierter Erweiterungsmodule können ebenfalls hochgeladen werden.
+		In diesen Fällen werden die betroffenen Erweiterungsmodule beendet, um aktualisiert zu werden.
+		Im Anschluss wird die neue Version des betreffenden Erweiterungsmoduls gestartet. Ein Neustart
+		des Systems ist in der Regel nicht erforderlich, um die Änderungen wirksam werden zu lassen.
 		</p>
 	    <form class="ym-form ym-full" method="post" enctype="multipart/form-data" action="">
 	    <!-- form row wrapper -->
@@ -44,10 +47,6 @@
 		    <label for="ModuleFile">Erweiterungsmoduldatei (Python3-Datei)</label>
 		    <input type="file" name="ModuleFile" id="ModuleFile" accept="text/*"/>
 		</div>
-		<div class="ym-fbox">
-		    <label for="ModuleClass">Name des Erweiterungsmoduls (Klassenname)</label>
-		    <input type="text" name="ModuleClass" id="ModuleClass" placeholder="Klassenname" />
-	    </div>
         <div class="ym-fbox-footer">
 		    <!-- custom buttons -->
 		    <button type="reset" class="reset ym-delete ym-warning" id="reset">Zurücksetzen</button>

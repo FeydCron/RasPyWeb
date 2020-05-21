@@ -35,8 +35,11 @@
 		<!-- #BeginEditable "navigation" -->
 		<div>
 			<ul>
-				<li><a href="../index.html">Start</a></li>
-				<li class="active"><strong>System</strong></li>
+				<li><a href="/index.html">Start</a></li>
+				<li><a href="/system/index.html">System</a></li>
+				<li><a href="/sound/index.html">Klänge</a></li>
+				<li class="active"><strong>Bilder</strong></li>
+			</ul>
 		</div>
 		<!-- #EndEditable -->
 		<form class="ym-searchform" method="post" action="">
@@ -49,40 +52,34 @@
 	<div class="ym-column linearize-level-1">
 		<div class="ym-col1">
 			<!-- #BeginEditable "content" -->
-			<div class="ym-cbox">
-				<section class="box error">
-					<h2>Programm beenden</h2>
-					<p>Soll das Programm wirklich beendet werden?</p>
-					<p>Das Web-Interface steht erst wieder zur Verfügung, wenn das Programm neu gestartet wurde.</p>
-					<a class="ym-warnsign ym-button ym-danger" href="exit.html?exit=term">Beenden</a>
-					<a class="ym-next ym-button ym-primary" href="../system/index.html">Abbrechen</a>
-
-				</section>
-			</div>
+					<div class="ym-cbox">
+						<iframe name="iFrameDynamic" border="0" frameborder="0" src="/image/values.html" style="height: 600px" width="100%" class="flexible bordered">
+								Your browser does not support inline frames or is currently configured not to display inline frames.
+						</iframe>
+					</div>
 		<!-- #EndEditable -->
 		</div>
 		<aside class="ym-col3" style="left: 0px; top: 0px">
 			<!-- #BeginEditable "sidebar" -->
-			<div class="ym-cbox">
-				<h2>Sidebar</h2>
-				<h4>Advertisement</h4>
-				<div class="ym-contain-dt">
-					<img src="http://dummyimage.com/128x128/cccccc/fff.png" alt="ads" class="float-left bordered"/>
-					<img src="http://dummyimage.com/128x128/cccccc/fff.png" alt="ads" class="float-left bordered"/>
-					<img src="http://dummyimage.com/128x128/cccccc/fff.png" alt="ads" class="float-left bordered"/>
-					<img src="http://dummyimage.com/128x128/cccccc/fff.png" alt="ads" class="float-left bordered"/>
-					<img src="http://dummyimage.com/128x128/cccccc/fff.png" alt="ads" class="float-left bordered"/>
-					<img src="http://dummyimage.com/128x128/cccccc/fff.png" alt="ads" class="float-left bordered"/>
-				</div>
-				<h4>Widget</h4>
+		<div class="ym-cbox">
+			<nav class="ym-vlist">
+				<h6 class="ym-vtitle">Menü</h6>
 				<ul>
-					<li>Item 1</li>
-					<li>Item 2</li>
-					<li>Item 3</li>
-					<li>Item 4</li>
-					<li>Item 5</li>
+					<li><a href="/image/values.html" target="iFrameDynamic">&#x1F441; Bilder anschauen</a></li>
+					<li><span>&#x1F465; Eigene Bilder</span>
+						<ul>
+							<li><a href="/image/install.html" target="iFrameDynamic">&#x1F5BC; Bild installieren</a></li>
+						</ul>
+					</li>
+					<li><span>&#x1F5C2; Bilddatenbank</span>
+						<ul>
+							<li><a href="/image/values.html?cache=rescan" target="iFrameDynamic">&#x1F504; Neue Dateien erfassen</a></li>
+							<li><a href="/image/values.html?cache=clear" target="iFrameDynamic">&#x1F4E5; Datenbank neu aufbauen</a></li>
+						</ul>
+					</li>
 				</ul>
-			</div>
+			</nav>
+		</div>
 		<!-- #EndEditable -->
 		</aside>
 	</div>

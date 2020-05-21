@@ -448,15 +448,56 @@ import socket
 import subprocess
 import urllib.parse
 import threading
+import os
 
-import globs
-from sound import Sound
-from voice import Voice
+from . import globs
+from .sound import Sound
+from .voice import Voice
+
+class HttpContent(list):
+	def __init__(self, strPath):
+		list.__init__([])
+
+		self.m_strPath = strPath
+		return
+	
+	## 
+	#  @brief Liefert den Inhalt eines HTTP-Content Objekts als Bytes in Standardkodierung zurück.
+	#  
+	#  @param [in] self
+	#  Instanzverweis
+	#  
+	#  @return
+	#  Liefert den Inhalt des HTTP-Content Objekts als Bytes in Standardkodierung zurück.
+	#  
+	def getContent(self):
+		return []
+
+class ImageObject(HttpContent):
+	def __init__(self, strPath):
+		super().__init__(strPath)
+		self.append(strPath)
+		return
+
+	def getContent(self):
+		_, strFilename = os.path.split(self.m_strPath)
+		if not strFilename:
+			return []
+		strName, _ = os.path.splitext(strFilename)
+		if not strName:
+			return []
+		strFile = globs.findMatchingImageFile(strName)
+		if not strFile:
+			return []
+		foFile = open(strFile, "rb")
+		oData = foFile.read()
+		foFile.close()
+		return oData
 
 ## 
 #  @brief Werkzeug zum Erstellen von einfach strukturieren HTML-Seiten.
 #  
-class HtmlPage(list):
+class HtmlPage(HttpContent):
 
 	## 
 	#  @brief Erzeugt eine Instanz zum Erstellen einer HTML-Seite.
@@ -483,12 +524,11 @@ class HtmlPage(list):
 	#  @details Details
 	#  
 	def __init__(self, strPath, strTitle=None, nAutoRefresh=0):
-		list.__init__([])
+		super().__init__(strPath)
 		
 		if (not strTitle):
 			strTitle = ""
 		
-		self.m_strPath = strPath
 		self.m_strTitle = strTitle
 		self.m_bPageEnded = False
 		self.m_bChk = False
@@ -536,10 +576,12 @@ class HtmlPage(list):
 	#  
 	#  @details Details
 	#  	
-	def setAutoRefresh(self, nAutoRefresh=0):
-		if nAutoRefresh >= 5:
-			self.m_strAutoRefresh = "<meta http-equiv=\"refresh\" content=\"%s\">" % (
-				nAutoRefresh)
+	def setAutoRefresh(self, nAutoRefresh=0, strUrl=None):
+		if nAutoRefresh >= 1:
+			self.m_strAutoRefresh = "<meta http-equiv=\"refresh\" content=\"%s%s%s\">" % (
+				nAutoRefresh,
+				";" if strUrl else "",
+				strUrl if strUrl else "")
 			return True
 		self.m_strAutoRefresh = ""
 		return False
@@ -569,7 +611,7 @@ class HtmlPage(list):
 			"<html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\">" +
 			"<head>" +
 			"<meta charset=\"utf-8\"/>" +
-			"<title>%s</title>" % (html.escape(self.m_strTitle)) +
+			"<title>%s</title>" % (html.escape("%s" % self.m_strTitle)) +
 			"%s" % (self.m_strAutoRefresh) +
 			"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">" +
 			"<link href=\"../css/flexible-columns.css\" rel=\"stylesheet\" type=\"text/css\"/>" +
@@ -643,16 +685,16 @@ class HtmlPage(list):
 				"ym-form ym-full", "post", "multipart/form-data", self.m_strPath),
 			"<div class=\"ym-fbox\">",
 			"<table%s>" % (strClass),
-			"<caption>%s</caption>" % (html.escape(strCaption)),
+			"<caption>%s</caption>" % (html.escape("%s" % strCaption)),
 			"<thead>",
 			"<tr>",
 		])
 		if self.m_bChk:
-			self.append("<th>%s</th>" % (html.escape(strChk)))
+			self.append("<th>%s</th>" % (html.escape("%s" % strChk)))
 		for strHead in lstHeader:
-			self.append("<th>%s</th>" % (html.escape(strHead)))
+			self.append("<th>%s</th>" % (html.escape("%s" % strHead)))
 		if self.m_bAct:
-			self.append("<th>%s</th>" % (html.escape(strAct)))
+			self.append("<th>%s</th>" % (html.escape("%s" % strAct)))
 		self.extend([
 			"</tr>",
 			"</thead>",
@@ -730,7 +772,7 @@ class HtmlPage(list):
 			self.append("</td>")
 		for strData in lstData:
 			if bEscape:
-				strData = html.escape(strData)
+				strData = html.escape("%s" % strData)
 			self.append("<td>%s</td>" % (strData))
 		if self.m_bAct:
 			self.append("<td style=\"white-space:nowrap\">")
@@ -745,7 +787,7 @@ class HtmlPage(list):
 					elif strParam == "content":
 						strContent = strValue
 						if bEscape:
-							strContent = html.escape(strContent)
+							strContent = html.escape("%s" % strContent)
 					elif strParam == "query":
 						strHRef += "?" + strValue
 					else:
@@ -788,7 +830,7 @@ class HtmlPage(list):
 						strAttr += " %s=\"%s\"" % (strParam, strValue)
 				self.append(
 					"<button class=\"%s\" name=\"submit\" value=\"%s\" type=\"submit\" style=\"margin-top:10px;\" %s>%s</button>"  % (
-					strType, strName, strAttr, html.escape(strContent)))
+					strType, strName, strAttr, html.escape("%s" % strContent)))
 			if bReset:
 				self.append(
 					"<button type=\"reset\" class=\"reset ym-delete ym-warning\" style=\"margin-top:10px;\">Zurücksetzen</button>")
@@ -814,12 +856,12 @@ class HtmlPage(list):
 			strClass = ""
 		self.extend([
 			"<table%s>" % (strClass),
-			"<caption>%s</caption>" % (html.escape(strCaption)),
+			"<caption>%s</caption>" % (html.escape("%s" % strCaption)),
 			"<thead>",
 			"<tr>",
 		])
 		for strHead in lstHeader:
-			self.append("<th>%s</th>" % (html.escape(strHead)))
+			self.append("<th>%s</th>" % (html.escape("%s" % strHead)))
 		self.extend([
 			"</tr>",
 			"</thead>",
@@ -833,7 +875,7 @@ class HtmlPage(list):
 		])
 		for strData in lstData:
 			if bEscape:
-				strData = html.escape(strData)
+				strData = html.escape("%s" % strData)
 			if bFirstIsHead:
 				bFirstIsHead = False
 				self.append("<th>%s</th>" % (strData))
@@ -849,7 +891,7 @@ class HtmlPage(list):
 		])
 		for strData in lstData:
 			if bEscape:
-				strData = html.escape(strData)
+				strData = html.escape("%s" % strData)
 			self.append("<th>%s</th>" % (strData))
 		self.extend([
 			"</tr></thead>",
@@ -903,8 +945,9 @@ class HtmlPage(list):
 			for (strName, lstProps) in dictButtons.items():
 				self.append(
 					"<button name=\"%s\" value=\"%s\" type=\"submit\" class=\"%s\">%s</button>" % (
-						strName, lstProps[0], lstProps[2], html.escape(lstProps[1])))
+						strName, lstProps[0], lstProps[2], html.escape("%s" % lstProps[1])))
 			self.append("</div>")
+		self.append("</form>")
 		return
 		
 	def appendForm(self, strName, strInput="", strTitle="", bSelected=False,
@@ -914,9 +957,9 @@ class HtmlPage(list):
 		strSelected = ""
 		if bEscape:
 			if strTitle:
-				strTitle = html.escape(strTitle)
+				strTitle = html.escape("%s" % strTitle)
 			if strTip:
-				strTip = html.escape(strTip)
+				strTip = html.escape("%s" % strTip)
 		if dictChoice:
 			if bCheck or bRadio:
 				strType = "checkbox"
@@ -937,7 +980,7 @@ class HtmlPage(list):
 						self.append("<p>%s</p>" % (oName))
 						for oItem in sorted(oValue):
 							self.m_nId += 1
-							if (bSelected or strInput == oItem):
+							if (bSelected or strInput == "%s" % oItem):
 								strSelected = "checked"
 							else:
 								strSelected = ""
@@ -946,12 +989,12 @@ class HtmlPage(list):
 								"<input type=\"%s\" name=\"%s\" value=\"%s\" id=\"%s\" %s/>" % (
 									strType, strName, oItem, self.m_nId, strSelected),
 								"<label for=\"%s\">%s</label>" % (
-									self.m_nId, html.escape(oItem)),
+									self.m_nId, html.escape("%s" % oItem)),
 								"</div>"
 							])
 					else:
 						self.m_nId += 1
-						if (bSelected or strInput == oValue):
+						if (bSelected or strInput == "%s" % oValue):
 							strSelected = "checked"
 						else:
 							strSelected = ""
@@ -982,34 +1025,34 @@ class HtmlPage(list):
 						strName, nSize, self.m_nId))
 				for (oName, oValue) in sorted(dictChoice.items()):
 					if bEscape:
-						oName = html.escape(oName)
+						oName = html.escape("%s" % oName)
 					self.m_nId += 1
 					if (isinstance(oValue, dict)):
 						self.append("<optgroup label=\"%s\">" % (oName))
 						for (oName, oItem) in sorted(oValue.items()):
-							if ((bUseKeyAsValue and strInput == oName) or
-								(not bUseKeyAsValue and strInput == oItem)):
+							if ((bUseKeyAsValue and strInput == "%s" % oName) or
+								(not bUseKeyAsValue and strInput == "%s" % oItem)):
 								strSelected = "selected=\"selected\""
 							else:
 								strSelected = ""
 							if bUseKeyAsValue:
 								oItem = oName
 							if bEscape:
-								oItem = html.escape(oItem)
+								oItem = html.escape("%s" % oItem)
 							self.append(
 								"<option value=\"%s\" %s>%s</option>" % (
 									oItem, strSelected, oName))
 						self.append("</optgroup>")
 					else:
-						if ((bUseKeyAsValue and strInput == oName) or
-							(not bUseKeyAsValue and strInput == oValue)):
+						if ((bUseKeyAsValue and strInput == "%s" % oName) or
+							((not bUseKeyAsValue) and strInput == "%s" % oValue)):
 							strSelected = "selected=\"selected\""
 						else:
 							strSelected = ""
 						if bUseKeyAsValue:
 							oValue = oName
 						if bEscape:
-							oValue = html.escape(oValue)
+							oValue = html.escape("%s" % (oValue))
 						self.append(
 							"<option value=\"%s\" %s>%s</option>" % (
 								oValue, strSelected, oName))
@@ -1024,7 +1067,7 @@ class HtmlPage(list):
 					self.m_nId, strTitle))
 			self.append(
 				"<textarea id=\"%s\" rows=\"%s\" name=\"%s\">%s</textarea>" % (
-				self.m_nId, nLines, strName, html.escape(strInput)))
+				self.m_nId, nLines, strName, html.escape("%s" % strInput)))
 			self.append("</div>")
 		elif bCheck:
 			# Einzelne Check-Box
@@ -1036,7 +1079,7 @@ class HtmlPage(list):
 			if not strTitle:
 				strTitle = strInput
 				if strTitle and bEscape:
-					strTitle = html.escape(strTitle)
+					strTitle = html.escape("%s" % strTitle)
 			self.m_nId += 1
 			self.extend([
 				"<input type=\"checkbox\" name=\"%s\" value=\"%s\" id=\"%s\" %s/>" % (
@@ -1060,14 +1103,14 @@ class HtmlPage(list):
 				"<label for=\"%s\">%s</label>" % (
 					self.m_nId, strTitle),
 				"<input type=\"%s\" name=\"%s\" value=\"%s\" id=\"%s\" %s placeholder=\"%s\"/>" % (
-					strTextType, strName, strInput, self.m_nId, strTypePattern, html.escape(strInput)),
+					strTextType, strName, strInput, self.m_nId, strTypePattern, html.escape("%s" % strInput)),
 				"</div>"
 			])
 		return
 		
 	def createText(self, strText):
 		self.extend([
-			"<p>%s</p>" % (html.escape(strText))
+			"<p>%s</p>" % (html.escape("%s" % strText))
 		])
 		return
 	
@@ -1079,8 +1122,8 @@ class HtmlPage(list):
 		
 		self.extend([
 			"<div class=\"box %s\">" % (strType),
-			"<h3>%s</h3>" % (html.escape(strTitle)),
-			"<p>%s</p>" % (html.escape(strMsg)),
+			"<h3>%s</h3>" % (html.escape("%s" % strTitle)),
+			"<p>%s</p>" % (html.escape("%s" % strMsg)),
 		])
 		if bClose:
 			self.append(
@@ -1089,11 +1132,13 @@ class HtmlPage(list):
 			self.append("</div>")
 		return
 		
-	def createButton(self, strTitle, strHRef="", strClass=""):
+	def createButton(self, strTitle, strHRef="", strClass="", bExternal=False):
 		if not strHRef:
 			strHRef = self.m_strPath
-		self.append("<a class=\"ym-button %s\" style=\"margin-top:10px;\" href=\"%s\">%s</a>" % (
-			strClass, strHRef, html.escape(strTitle)))
+		self.append("<a class=\"ym-button %s\" style=\"margin-top:10px;\" %s href=\"%s\">%s</a>" % (
+			strClass,
+			"" if not bExternal else "target=\"_blank\" rel=\"noopener\"",
+			strHRef, html.escape("%s" % strTitle)))
 		return
 		
 	def closeBox(self):
@@ -1146,6 +1191,8 @@ class QueueTask:
 	
 	def __init__(self, oWorker):
 		self.m_oWorker = oWorker
+		self.m_evtDone = threading.Event()
+		self.m_evtDone.clear()
 		return
 		
 	def __str__(self):
@@ -1156,9 +1203,17 @@ class QueueTask:
 		return
 		
 	def done(self, bResult = True):
+		self.m_evtDone.set()
 		return
 
+	def wait(self, fTimeout=None):
+		return self.m_evtDone.wait(timeout=fTimeout)
+
 class FastTask(QueueTask):
+
+	def __init__(self, oWorker):
+		super(FastTask, self).__init__(oWorker)
+		return
 	
 	def __str__(self):
 		strDesc = "Ausführen einer leichten Aufgabe"
@@ -1168,47 +1223,31 @@ class FastTask(QueueTask):
 		bResult = False
 		globs.dbg("'%s' (leicht) starten: Warten auf Freigabe" % (self))
 		# >>> Critical Section
-		self.m_oWorker.m_oLock.acquire()
-		globs.dbg("'%s' (leicht) starten: Freigabe erhalten" % (self))
-		if (self.m_oWorker.m_evtRunning.isSet()):
-			globs.dbg("'%s' (leicht) starten: In Warteschlange" % (self))
-			self.m_oWorker.m_oQueueFast.put(self)
-			bResult = True
-		else:
-			globs.wrn("'%s' (leicht) starten: Bearbeitung verweigert" % (self))
-		self.m_oWorker.m_oLock.release()
+		with self.m_oWorker.m_oLock:
+			globs.dbg("'%s' (leicht) starten: Freigabe erhalten" % (self))
+			if (self.m_oWorker.m_evtRunning.isSet()):
+				globs.dbg("'%s' (leicht) starten: In Warteschlange" % (self))
+				self.m_oWorker.m_oQueueFast.put(self)
+				bResult = True
+			else:
+				globs.wrn("'%s' (leicht) starten: Bearbeitung verweigert" % (self))
 		# <<< Critical Section
 		globs.dbg("'%s' (leicht) starten: Freigabe abgegeben (%r)" % (self, bResult))
 		return bResult
 		
 	def done(self, bResult = True):
-		globs.dbg("'%s' (leicht): Bearbeitung abgeschlossen (%r)" % (self, bResult))
 		self.m_oWorker.m_oQueueFast.task_done()
-		return
-	
-class FutureTask(FastTask):
+		super(FastTask, self).done(bResult=bResult)
 
-	def __init__(self, oWorker):	
-		super(FutureTask, self).__init__(oWorker)
-		self.m_evtDone = threading.Event()
-		self.m_evtDone.clear()
-		return
-		
-	def __str__(self):
-		strDesc = "Warten auf die Fertigstellung einer Aufgabe"
-		return  strDesc
-	
-	def done(self, bResult = True):
-		self.m_oWorker.m_oQueueFast.task_done()
-		self.m_evtDone.set()
-		return
-		
-	def wait(self):
-		self.m_evtDone.wait()
+		globs.dbg("'%s' (leicht): Bearbeitung abgeschlossen (%r)" % (self, bResult))
 		return
 
 class LongTask(QueueTask):
 	
+	def __init__(self, oWorker):
+		super(LongTask, self).__init__(oWorker)
+		return
+
 	def __str__(self):
 		strDesc = "Ausführen einer schweren Aufgabe"
 		return  strDesc
@@ -1217,22 +1256,69 @@ class LongTask(QueueTask):
 		bResult = False
 		globs.dbg("'%s' (schwer) starten: Warten auf Freigabe" % (self))
 		# >>> Critical Section
-		self.m_oWorker.m_oLock.acquire()
-		globs.dbg("'%s' (schwer) starten: Freigabe erhalten" % (self))
-		if (self.m_oWorker.m_evtRunning.isSet()):
-			globs.dbg("'%s' (schwer) starten: In Warteschlange" % (self))
-			self.m_oWorker.m_oQueueLong.put(self)
-			bResult = True
-		else:
-			globs.wrn("'%s' (schwer) starten: Bearbeitung verweigert" % (self))
-		self.m_oWorker.m_oLock.release()
+		with self.m_oWorker.m_oLock:
+			globs.dbg("'%s' (schwer) starten: Freigabe erhalten" % (self))
+			if (self.m_oWorker.m_evtRunning.isSet()):
+				globs.dbg("'%s' (schwer) starten: In Warteschlange" % (self))
+				self.m_oWorker.m_oQueueLong.put(self)
+				bResult = True
+			else:
+				globs.wrn("'%s' (schwer) starten: Bearbeitung verweigert" % (self))
 		# <<< Critical Section
 		globs.dbg("'%s' (schwer) starten: Freigabe abgegeben (%r)" % (self, bResult))
 		return bResult
 		
 	def done(self, bResult = True):
-		globs.dbg("'%s' (schwer): Bearbeitung abgeschlossen (%r)" % (self, bResult))
 		self.m_oWorker.m_oQueueLong.task_done()
+		super(LongTask, self).done(bResult=bResult)
+
+		globs.dbg("'%s' (schwer): Bearbeitung abgeschlossen (%r)" % (self, bResult))
+		return
+
+class TaskDelegateLong(LongTask):
+	
+	def __init__(self, oWorker, oDelegate, **kwargs):
+		super(TaskDelegateLong, self).__init__(oWorker)
+		self.m_oDelegate = oDelegate
+		self.m_oKwargs = kwargs
+		return
+		
+	def __str__(self):
+		strDesc = "Delegate-Aufgabe ausführen (%r, Delegate=%r, kwargs=%r)" % (
+			self,
+			self.m_oDelegate,
+			self.m_oKwargs
+		)
+		return  strDesc
+	
+	def do(self):
+		if (self.m_oKwargs):
+			self.m_oDelegate(**self.m_oKwargs)
+		else:
+			self.m_oDelegate()
+		return
+
+class TaskDelegateFast(FastTask):
+	
+	def __init__(self, oWorker, oDelegate, **kwargs):
+		super(TaskDelegateFast, self).__init__(oWorker)
+		self.m_oDelegate = oDelegate
+		self.m_oKwargs = kwargs
+		return
+		
+	def __str__(self):
+		strDesc = "Delegate-Aufgabe ausführen (%r, Delegate=%r, kwargs=%r)" % (
+			self,
+			self.m_oDelegate,
+			self.m_oKwargs
+		)
+		return  strDesc
+	
+	def do(self):
+		if (self.m_oKwargs):
+			self.m_oDelegate(**self.m_oKwargs)
+		else:
+			self.m_oDelegate()
 		return
 
 class TaskSpeak(LongTask):
@@ -1303,9 +1389,10 @@ class TaskModuleEvt(FastTask):
 		return  strDesc
 	
 	def do(self):
-		for oInstance in self.m_oWorker.m_dictModules.values():
-			self.m_oResult = oInstance.moduleExec(self.m_strPath,
-				None, self.m_dictQuery, self.m_dictForm)
+		for (oInstance, _) in self.m_oWorker.m_dictModules.values():
+			if (oInstance):
+				self.m_oResult = oInstance.moduleExec(self.m_strPath,
+					None, self.m_dictQuery, self.m_dictForm)
 		return
 
 class WebResponse:
@@ -1316,7 +1403,7 @@ class WebResponse:
 		oHeader,
 		oData
 		):
-		self.m_bOK = (nStatus == http.client.OK)
+		self.m_bOK = (nStatus == http.HTTPStatus.OK)
 		self.m_nStatus = nStatus
 		self.m_strReason = ("%s" % oReason)
 		self.m_dictHeader = dict(oHeader)
@@ -1336,10 +1423,10 @@ class WebClient:
 		):
 		
 		lstRedirect = (
-			http.client.MOVED_PERMANENTLY,
-			http.client.FOUND,
-			http.client.SEE_OTHER,
-			http.client.TEMPORARY_REDIRECT)
+			http.HTTPStatus.MOVED_PERMANENTLY,
+			http.HTTPStatus.FOUND,
+			http.HTTPStatus.SEE_OTHER,
+			http.HTTPStatus.TEMPORARY_REDIRECT)
 		oConn = None
 		oUrlSplit = urllib.parse.urlsplit(strUrl)
 		
@@ -1351,7 +1438,7 @@ class WebClient:
 		oConn.request("GET", strUrl)
 		oResp = oConn.getresponse()
 		
-		if (oResp.status == http.client.OK):
+		if (oResp.status == http.HTTPStatus.OK):
 			oWebResponse = WebResponse(
 				nStatus=oResp.status,
 				oReason=oResp.reason,
@@ -1448,7 +1535,7 @@ def getCpuTemp():
 # Return current CPU usage in percent as a string value
 def getCpuUse():
 	strResult = subprocess.check_output(
-		"top -b -n1 | awk '/Cpu\(s\):/ {print $2}'",
+		"top -b -n1 | awk '/Cpu\\(s\\):/ {print $2}'",
 		stderr = subprocess.STDOUT,
 		shell = True,
 		universal_newlines = True)
@@ -1465,16 +1552,42 @@ def getNetworkInfo(strComputerName="google.com"):
 	except:
 		globs.exc("Ermitteln der IP-Adresse")
 	return strIpAddr
-	
+
+def convertFtoC(fFahrenheit):
+	return ((fFahrenheit - 32) / 1.8)
+
+def convertCtoF(fCelsius):
+	return ((fCelsius * 1.8) + 32)
+
+def translateToLocalTime(oDateTimeUTC):
+	oRefUTC = datetime.utcnow()
+	oRefLoc = datetime.now()
+	oOffset = oRefUTC - oRefLoc		
+	return oDateTimeUTC - oOffset
+
+def translateStrToLocalTimeStr(strDateTimeUTC, strFormat):
+	return translateToLocalTime(strToDateTime(strDateTimeUTC, strFormat)).strftime(strFormat)
+
+def strToDateTime(strDateTime, strFormat):
+	oDateTime = datetime.strptime(strDateTime, strFormat)
+	return oDateTime
+
+def strToLocalTime(strDateTimeUTC, strFormat):
+	oDateTimeUTC = strToDateTime(strDateTimeUTC, strFormat)
+	oRefUTC = datetime.utcnow()
+	oRefLoc = datetime.now()
+	oOffset = oRefUTC - oRefLoc		
+	return oDateTimeUTC - oOffset
+
 def setDate(strDate, strFormat):
-	oDate = datetime.strptime(strDate, strFormat).date()
+	oDate = strToDateTime(strDate, strFormat).date()
 	oTime = datetime.today().time()
 	oDateTime = datetime.combine(oDate, oTime)
 	return setDateTime(oDateTime)
 
 def setTime(strTime, strFormat):
+	oTime = strToDateTime(strTime, strFormat).time()
 	oDate = datetime.today().date()
-	oTime = datetime.strptime(strTime, strFormat).time()
 	oDateTime = datetime.combine(oDate, oTime)
 	return setDateTime(oDateTime)
 
@@ -1501,7 +1614,7 @@ def getAlsaControlValue(
 	regexSep = r"[\n\r]"
 	lstLines = re.split(regexSep, strResult)
 	for strLine in lstLines:
-		if (re.match(".*name\=\'" + strName + "\'", strLine)):
+		if (re.match(r".*name\=\'" + strName + r"\'", strLine)):
 			regexSep = r"[\,]"
 			strIdent = re.split(regexSep, strLine)[0]
 			break
@@ -1519,7 +1632,7 @@ def getAlsaControlValue(
 	lstLines = re.split(regexSep, strResult)
 	strResult = ""
 	for strLine in lstLines:
-		if (re.match("\s+\: values\=", strLine)):
+		if (re.match(r"\s+\: values\=", strLine)):
 			regexSep = r"[\=]"
 			strResult = re.split(regexSep, strLine)[1]
 			break
@@ -1541,7 +1654,7 @@ def setAlsaControlValue(
 	regexSep = r"[\n\r]"
 	lstLines = re.split(regexSep, strResult)
 	for strLine in lstLines:
-		if (re.match(".*name\=\'" + strName + "\'", strLine)):
+		if (re.match(r".*name\=\'" + strName + r"\'", strLine)):
 			regexSep = r"[\,]"
 			strIdent = re.split(regexSep, strLine)[0]
 			break
@@ -1691,19 +1804,19 @@ def fetchImapEmail(
 		strResp, tupData = oImapSession.login(strUsername, strPassword)
 		if (strResp != "OK"):
 			globs.err("IMAP4_SSL login response ("+strResp+"): "+str(tupData))
-			raise
+			return
 		globs.log("IMAP4_SSL login response ("+strResp+"): "+str(tupData))
 		# Select a mailbox
 		strResp, tupData = oImapSession.select(strMailbox)
 		if (strResp != "OK"):
 			globs.err("IMAP4_SSL select mailbox response ("+strResp+"): "+str(tupData))
-			raise
+			return
 		bMailboxSelected = True
 		globs.dbg("IMAP4_SSL select mailbox response ("+strResp+"): "+str(tupData))
 		strResp, tupData = oImapSession.search(None, strSearch)
 		if (strResp != "OK"):
 			globs.err("IMAP4_SSL search mailbox response ("+strResp+"): "+str(tupData))
-			raise
+			return
 		bMailboxSelected = True
 		globs.dbg("IMAP4_SSL search mailbox response ("+strResp+"): "+str(tupData))
 		# Iterate over emails
@@ -1712,7 +1825,7 @@ def fetchImapEmail(
 			strResp, oEmailData = oImapSession.fetch(msgId, "(RFC822)")
 			if (strResp != "OK"):
 				globs.err("IMAP4_SSL fetch response ("+strResp+"): "+str(oEmailData))
-				raise
+				return
 			globs.dbg("IMAP4_SSL fetch response ("+strResp+")")
 			try:
 				oRawMail = oEmailData[0][1]

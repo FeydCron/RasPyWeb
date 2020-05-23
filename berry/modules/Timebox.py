@@ -298,7 +298,7 @@ class Timebox(ModuleBase):
 		self.m_nScoreLower = 0
 		self.m_nScoreUpper = 0
 
-		self.m_nWeatherCond = 0x00
+		self.m_nWeatherCond = 0
 		self.m_nWeatherTemp = 0
 
 		self.m_nSelectedDisplay = 0
@@ -309,6 +309,15 @@ class Timebox(ModuleBase):
 		# TODO
 		# - Nach verfügbaren Bluetooth Geräten suchen (zyklisch, solange keine Timebox-Geräte gefunden wurden)
 		# - Je nach Einstellung automatisch die Verbindung aufbauen
+
+		if (self.m_bAutoConnect):
+			if (globs.getSetting("Timebox", "strAddress", r"^([0-9a-fA-F]{2}[:]){5}([0-9A-F]{2})$", "")
+				and globs.getSetting("Timebox", "nPort", r"\d{1,5}", 4)):
+				self.connectTimebox()
+			else:
+				TaskSpeak(self.getWorker(), "Es wird nach Bluhtuhf Geräten gesucht").start()
+				TaskSpeak(self.getWorker(), "Bitte wählen Sie im Anschluss das gewünschte Teimbox Gerät aus").start()
+				TaskDelegateLong(self.getWorker(), self.doTimeboxDiscovery).start()
 
 		return True
 	
@@ -398,6 +407,7 @@ class Timebox(ModuleBase):
 			if (strCmd == "system" and lstArg and self.m_oTimeboxProtocol):
 				if ("date" in lstArg or "time" in lstArg):
 					self.changeDateAndTime()
+					self.changeWeatherCondition()
 					continue
 				continue
 			if (strCmd == "picture" and lstArg and self.m_oTimeboxProtocol):
@@ -409,6 +419,7 @@ class Timebox(ModuleBase):
 			if (strCmd == "timer" and lstArg and self.m_oTimeboxProtocol):
 				if ("cron" in lstArg):
 					self.changeDateAndTime()
+					self.changeWeatherCondition()
 					continue
 				continue
 			# Gerätekommandos
@@ -990,12 +1001,15 @@ class Timebox(ModuleBase):
 		return
 
 	def changeTemperature(self, strTemp=None):
-		try:
+		try:			
+			self.m_nWeatherCond = min(max(self.m_nWeatherCond, 1), 17)
+			if (strTemp):
+				self.m_nWeatherTemp = min(max(int(strTemp), -99), +127)
+			else:
+				self.m_nWeatherTemp = min(max(self.m_nWeatherTemp, -99), +127)
+
 			if not self.m_oTimeboxProtocol:
 				return None
-			
-			self.m_nWeatherTemp = min(max(int(strTemp), -99), +127)
-			self.m_nWeatherCond = min(max(self.m_nWeatherCond, 1), 17)
 
 			lyData = [0x5F,
 				int.from_bytes(struct.pack('b', self.m_nWeatherTemp), byteorder='big', signed=False),
@@ -1029,7 +1043,16 @@ class Timebox(ModuleBase):
 			# "clock-change",			# 18 - Zeitumstellung		(clock-change)
 		]	
 
-		try:
+		try:			
+			self.m_nWeatherTemp = min(max(self.m_nWeatherTemp, -99), +127)
+			if (strType):
+				if strType.isdigit():
+					self.m_nWeatherCond = min(max(int(strType), 1), 17)
+				elif strType in lstConditions:
+					self.m_nWeatherCond = lstConditions.index(strType) + 1
+			else:
+				self.m_nWeatherCond = min(max(self.m_nWeatherCond, 1), 17)			
+			
 			if not self.m_oTimeboxProtocol:
 				return None
 
@@ -1037,25 +1060,20 @@ class Timebox(ModuleBase):
 			oTimeSunset = sdk.strToDateTime(globs.getSetting("System", "strTimeSunset"), "%Y-%m-%d %H:%M:%S").time()
 			oNow = datetime.now().time()
 			bIsDayTime = (oNow >= oTimeSunrise and oNow < oTimeSunset)
-			
-			self.m_nWeatherTemp = min(max(self.m_nWeatherTemp, -99), +127)
-			if strType.isdigit():
-				self.m_nWeatherCond = min(max(int(strType), 1), 17)
-			elif strType in lstConditions:
-				self.m_nWeatherCond = lstConditions.index(strType) + 1
-			
-			if (not bIsDayTime):
-				if (self.m_nWeatherCond == 1):
-					self.m_nWeatherCond = 10
-				elif (self.m_nWeatherCond == 2):
-					self.m_nWeatherCond = 11
-				elif (self.m_nWeatherCond >= 3
-					and self.m_nWeatherCond <= 9):
-					self.m_nWeatherCond += 8
+
+			if (bIsDayTime):
+				nWeatherCond = self.m_nWeatherCond
+			elif (self.m_nWeatherCond == 1):
+				nWeatherCond = 10
+			elif (self.m_nWeatherCond == 2):
+				nWeatherCond = 11
+			elif (self.m_nWeatherCond >= 3
+				and self.m_nWeatherCond <= 9):
+				nWeatherCond = self.m_nWeatherCond + 8
 			
 			lyData = [0x5F,
 				int.from_bytes(struct.pack('b', self.m_nWeatherTemp), byteorder='big', signed=False),
-				self.m_nWeatherCond]
+				nWeatherCond]
 
 			self.m_oTimeboxProtocol.send(lyData)
 			return lyData[0:1]
@@ -1324,6 +1342,9 @@ class Timebox(ModuleBase):
 			self.synchronizeBasicSettings(bReadback=True, bAll=True)
 			self.synchronizeMute(bReadback=True)
 			self.synchronizeVolume()
+			self.changeDateAndTime()
+			self.changeTemperature()
+			self.changeWeatherCondition()
 
 		return
 

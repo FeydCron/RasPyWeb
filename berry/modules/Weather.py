@@ -299,14 +299,13 @@ class Weather(ModuleBase):
 		self.m_oWeatherApi = None
 		self.m_oObservation = None
 		self.m_oWeather = None
-		self.createWeatherApiObjects()
-
-		self.m_lstCityIDs = []
 		self.m_oTaskFindCityIDsForLocation = None
-
 		self.m_nLastTemperature = None
 		self.m_nLastWeatherCondition = None
+		self.m_lstCityIDs = []
 
+		self.createWeatherApiObjects()
+		self.checkWeather()
 		return True
 
 	def createWeatherApiObjects(self, bRenew=False):

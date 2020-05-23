@@ -53,8 +53,8 @@ class Berry:
 	
 	def __init__(self):
 		
-		self.m_oWorker = Worker()
-		self.m_oHttpd = Httpd(self.m_oWorker)
+		globs.s_oWorker = Worker()
+		globs.s_oHttpd = Httpd(globs.s_oWorker)
 		
 		return
 	
@@ -66,16 +66,16 @@ class Berry:
 		strGoodBye = "Tschüssikovski!"
 		
 		print("Attempt to start message queue ...")
-		self.m_oWorker.startQueue()
+		globs.s_oWorker.startQueue()
 		print("OK")
 		
-		TaskSpeak(self.m_oWorker, "Servus!").start()
+		TaskSpeak(globs.s_oWorker, "Servus!").start()
 		
 		while True:
 			
 			print("Attempt to start HTTP Server ...")
 			try:
-				self.m_oHttpd.run()
+				globs.s_oHttpd.run()
 				break
 			except:
 				globs.exc("HTTP Server starten und laufen lassen")
@@ -85,8 +85,8 @@ class Berry:
 					oLines = sdk.getShellCmdOutput("netstat -pant")
 					for strLine in oLines:
 						if re.match(r"tcp\s+.*\s+%s\:%s\s+%s\s+LISTEN\s+\d+/dbus-daemon" % (
-							re.escape(globs.s_oHttpd.server_address[0]),
-							globs.s_oHttpd.server_address[1],
+							re.escape(globs.s_oHttpd.m_oServer.server_address[0]),
+							globs.s_oHttpd.m_oServer.server_address[1],
 							re.escape("0.0.0.0:*")), strLine):
 							for strToken in re.split(r"\s+", strLine):
 								if (re.match(r"\d+/dbus-daemon", strToken)):
@@ -95,17 +95,17 @@ class Berry:
 							if (strProgram and strPID):
 								break
 					if (strProgram and strPID):
-						TaskSpeak(self.m_oWorker,
+						TaskSpeak(globs.s_oWorker,
 							"Das Program %s mit der Prozesskennung %s belegt den Port %s" % (
-							strProgram, strPID, globs.s_oHttpd.server_address[1])).start()
-						TaskSpeak(self.m_oWorker,
+							strProgram, strPID, globs.s_oHttpd.m_oServer.server_address[1])).start()
+						TaskSpeak(globs.s_oWorker,
 							"Ich versuche, das Program %s mit der Prozesskennung %s zu beenden" % (
 							strProgram, strPID)).start()
 							
 						sdk.getShellCmdOutput("sudo kill %s" % strPID)
 						continue
 						
-				TaskSpeak(self.m_oWorker,
+				TaskSpeak(globs.s_oWorker,
 					"Hoppla! Es gibt wohl Probleme mit dem Webb-Sörver.").start()
 				break
 
@@ -118,10 +118,10 @@ class Berry:
 			oSysCallCmd = "sudo reboot"
 			strGoodBye += " Das System wird jetzt neu gestartet."
 		
-		TaskSpeak(self.m_oWorker, strGoodBye).start()
+		TaskSpeak(globs.s_oWorker, strGoodBye).start()
 		
 		print("Attempt to stop message queue ...")
-		if not self.m_oWorker.stopQueue():
+		if not globs.s_oWorker.stopQueue():
 			print("FAILED")
 		else:
 			print("OK")

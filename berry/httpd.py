@@ -22,8 +22,6 @@ from .worker import TaskModuleInit, TaskExit
 
 from . import sdk
 from .sdk import TaskSpeak, TaskSound, FastTask, ImageObject, HtmlPage, TaskModuleEvt, TaskSaveSettings
-
-g_oHttpdWorker = None
 	
 # {<name> : <Section>}
 class StartPage(OrderedDict):
@@ -390,7 +388,7 @@ class TaskModuleCmd(FastTask):
 		return  strDesc
 	
 	def do(self):
-		for (strName, (oInstance, _)) in self.m_oWorker.m_dictModules.items():
+		for (strName, (oInstance, _)) in globs.s_oWorker.m_dictModules.items():
 			if (oInstance and re.match("/modules/%s\\..+" % (strName), self.m_strPath)):
 				self.m_oResult = oInstance.moduleExec(self.m_strPath,
 					self.m_oHtmlPage, self.m_dictQuery, self.m_dictForm)
@@ -492,7 +490,7 @@ class TaskDisplayModules(FastTask):
 			if strModule in globs.s_dictSettings["listInactiveModules"]:
 				strStatus = "warning"
 				strContent = "Ausgeschaltet"
-			elif strModule not in self.m_oWorker.m_dictModules.keys():
+			elif strModule not in globs.s_oWorker.m_dictModules.keys():
 				strStatus = "error"
 				strContent = "Fehlerhaft"
 			else:
@@ -564,7 +562,7 @@ class TaskDisplaySystem(FastTask):
 		if (self.m_strFxn and self.m_strArg):
 			if not self.updateValue():
 				return
-			TaskModuleEvt(g_oHttpdWorker, "/int/evt.src",
+			TaskModuleEvt(globs.s_oWorker, "/int/evt.src",
 				dictQuery={
 					"system" : [self.m_strFxn]
 				}
@@ -888,7 +886,7 @@ class TaskDisplaySettings(FastTask):
 			return False
 		elif globs.setSetting(self.m_strKey, self.m_strFxn, self.m_strVal):
 			globs.saveSettings()
-			TaskModuleEvt(g_oHttpdWorker, "/int/evt.src",
+			TaskModuleEvt(globs.s_oWorker, "/int/evt.src",
 				dictQuery={
 					"settings" : [self.m_strKey]
 				},
@@ -1164,7 +1162,7 @@ class TaskDisplayImages(FastTask):
 					if strName == strImage:
 						#strActive = "&#x1F440;"
 						strActive = "<div><img src=\"/image/%s\" alt=\"%s\"/></div>" % (strTail, strFile)
-						TaskModuleEvt(g_oHttpdWorker, "/int/evt.src",
+						TaskModuleEvt(globs.s_oWorker, "/int/evt.src",
 							dictQuery={
 								"picture" : [strImage]
 							}
@@ -1193,7 +1191,7 @@ class TaskDisplayImages(FastTask):
 					if strName == strImage:
 						#strActive = "&#x1F440;"
 						strActive = "<div><img src=\"/image/%s\" alt=\"%s\"/></div>" % (strTail, strFile)
-						TaskModuleEvt(g_oHttpdWorker, "/int/evt.src",
+						TaskModuleEvt(globs.s_oWorker, "/int/evt.src",
 							dictQuery={
 								"picture" : [strImage]
 							}
@@ -1497,10 +1495,10 @@ class TaskStartPage(FastTask):
 class Httpd:
 	
 	def __init__(self, oWorker):
-		global g_oHttpdWorker
 		
 		globs.signalCriticalActivity()
-		g_oHttpdWorker = oWorker
+		
+		self.m_oServer = None
 		return
 	
 	## 
@@ -1522,7 +1520,7 @@ class Httpd:
 			# Das Arbeitsverzeichnis muss das "www"-Verzeichnis sein
 			os.chdir(strHttpDir)
 			# Web-Server instanziieren
-			globs.s_oHttpd = BerryHttpServer((
+			self.m_oServer = BerryHttpServer((
 				globs.getSetting("System", "strHttpIp",
 					"\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}",
 					"0.0.0.0"),
@@ -1532,10 +1530,10 @@ class Httpd:
 				BerryHttpHandler)
 			# Web-Server starten
 			print("Running HTTP Server on %s at %s ..." % (
-				globs.s_oHttpd.server_name, globs.s_oHttpd.server_address))
-			globs.s_oHttpd.serve_forever()
+				self.m_oServer.server_name, self.m_oServer.server_address))
+			self.m_oServer.serve_forever()
 			# Ressourcen des Web-Servers freigeben
-			globs.s_oHttpd.server_close()
+			self.m_oServer.server_close()
 		else:
 			globs.err("Arbeitsverzeichnis des Web-Servers nicht gefunden: " +
 				strHttpDir)
@@ -1584,10 +1582,10 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				strType="error")
 			return oHtmlPage
 		# Tasks ausführen
-		TaskInstallModule(g_oHttpdWorker, strModule).start()
-		TaskModuleInit(g_oHttpdWorker, strModule).start()
-		TaskSaveSettings(g_oHttpdWorker).start()
-		oTask = TaskDisplayModules(g_oHttpdWorker, oHtmlPage)
+		TaskInstallModule(globs.s_oWorker, strModule).start()
+		TaskModuleInit(globs.s_oWorker, strModule).start()
+		TaskSaveSettings(globs.s_oWorker).start()
+		oTask = TaskDisplayModules(globs.s_oWorker, oHtmlPage)
 		if oTask.start():
 			oTask.wait()
 		return oHtmlPage
@@ -1630,7 +1628,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			return oHtmlPage
 		# Tasks ausführen
 		globs.scanSoundFiles(bRescan=True)
-		oTask = TaskDisplaySounds(g_oHttpdWorker, oHtmlPage)
+		oTask = TaskDisplaySounds(globs.s_oWorker, oHtmlPage)
 		if oTask.start():
 			oTask.wait()
 		return oHtmlPage
@@ -1673,7 +1671,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			return oHtmlPage
 		# Tasks ausführen
 		globs.scanImageFiles(bRescan=True)
-		oTask = TaskDisplayImages(g_oHttpdWorker, oHtmlPage)
+		oTask = TaskDisplayImages(globs.s_oWorker, oHtmlPage)
 		if oTask.start():
 			oTask.wait()
 		return oHtmlPage
@@ -1724,7 +1722,7 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			
 			print("Output="+strOut+", Volume="+strVol)
 
-		oTask = TaskConfigSound(g_oHttpdWorker, oHtmlPage)
+		oTask = TaskConfigSound(globs.s_oWorker, oHtmlPage)
 		if oTask.start():
 			oTask.wait()
 		return oHtmlPage
@@ -1838,9 +1836,9 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				return oHtmlPage
 			strTarget = dictForm["target"][0]
 			# Modul installieren
-			TaskInstallModule(g_oHttpdWorker, strTarget).start()
-			TaskModuleInit(g_oHttpdWorker, strTarget).start()
-			TaskSaveSettings(g_oHttpdWorker).start()
+			TaskInstallModule(globs.s_oWorker, strTarget).start()
+			TaskModuleInit(globs.s_oWorker, strTarget).start()
+			TaskSaveSettings(globs.s_oWorker).start()
 		elif strAction == "enable" or strAction == "disable":
 			lstTarget = dictForm["target"]
 			bEnable = True
@@ -1848,22 +1846,22 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 				bEnable = False
 			# Module aktivieren oder deaktivieren
 			for strTarget in lstTarget:
-				TaskEnableModule(g_oHttpdWorker, strTarget, bEnable).start()
-				TaskModuleInit(g_oHttpdWorker, strTarget).start()
-			TaskSaveSettings(g_oHttpdWorker).start()
+				TaskEnableModule(globs.s_oWorker, strTarget, bEnable).start()
+				TaskModuleInit(globs.s_oWorker, strTarget).start()
+			TaskSaveSettings(globs.s_oWorker).start()
 		elif strAction == "delete":
 			lstTarget = dictForm["target"]
 			for strTarget in lstTarget:
-				TaskRemoveModule(g_oHttpdWorker, strTarget).start()
-				TaskModuleInit(g_oHttpdWorker, strTarget).start()
-			TaskSaveSettings(g_oHttpdWorker).start()
+				TaskRemoveModule(globs.s_oWorker, strTarget).start()
+				TaskModuleInit(globs.s_oWorker, strTarget).start()
+			TaskSaveSettings(globs.s_oWorker).start()
 		else:
 			oHtmlPage.createBox(
 				"Achtung",
 				"Der angeforderte Vorgang wird (noch) nicht unterstützt.",
 				strType="warning")
 			return oHtmlPage
-		oTask = TaskDisplayModules(g_oHttpdWorker, oHtmlPage)
+		oTask = TaskDisplayModules(globs.s_oWorker, oHtmlPage)
 		if oTask.start():
 			oTask.wait()
 		return oHtmlPage
@@ -1890,46 +1888,46 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 			if (not oHtmlPage):
 				if strPath == "/system/settings.html":
 					oHtmlPage = HtmlPage(strPath)
-					oFutureTask = TaskDisplaySettings(g_oHttpdWorker,
+					oFutureTask = TaskDisplaySettings(globs.s_oWorker,
 						oHtmlPage,
 						dictQuery=dictQuery,
 						dictForm=dictForm)
 				elif strPath == "/system/values.html":
 					oHtmlPage = HtmlPage(strPath)
-					oFutureTask = TaskDisplaySystem(g_oHttpdWorker,
+					oFutureTask = TaskDisplaySystem(globs.s_oWorker,
 						oHtmlPage,
 						dictQuery=dictQuery,
 						dictForm=dictForm)
 				elif strPath == "/system/modules.html":
 					oHtmlPage = HtmlPage(strPath)
-					oFutureTask = TaskDisplayModules(g_oHttpdWorker,
+					oFutureTask = TaskDisplayModules(globs.s_oWorker,
 						oHtmlPage,
 						dictQuery=dictQuery)
 				elif strPath == "/system/logging.html":
 					oHtmlPage = HtmlPage(strPath)
-					oFutureTask = TaskDisplayLogMem(g_oHttpdWorker,
+					oFutureTask = TaskDisplayLogMem(globs.s_oWorker,
 						oHtmlPage,
 						dictQuery=dictQuery,
 						dictForm=dictForm)
 				elif strPath == "/system/startpage.html":
 					oHtmlPage = HtmlPage(strPath)
-					oFutureTask = TaskStartPage(g_oHttpdWorker,
+					oFutureTask = TaskStartPage(globs.s_oWorker,
 						oHtmlPage,
 						dictQuery=dictQuery,
 						dictForm=dictForm)
 				elif strPath == "/sound/values.html":
 					oHtmlPage = HtmlPage(strPath)
-					oFutureTask = TaskDisplaySounds(g_oHttpdWorker,
+					oFutureTask = TaskDisplaySounds(globs.s_oWorker,
 						oHtmlPage,
 						dictQuery=dictQuery,
 						dictForm=dictForm)
 				elif strPath == "/sound/config.html":
 					oHtmlPage = HtmlPage(strPath)
-					oFutureTask = TaskConfigSound(g_oHttpdWorker,
+					oFutureTask = TaskConfigSound(globs.s_oWorker,
 						oHtmlPage)
 				elif strPath == "/image/values.html":
 					oHtmlPage = HtmlPage(strPath)
-					oFutureTask = TaskDisplayImages(g_oHttpdWorker,
+					oFutureTask = TaskDisplayImages(globs.s_oWorker,
 						oHtmlPage,
 						dictQuery=dictQuery,
 						dictForm=dictForm)
@@ -2034,37 +2032,37 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 		# Built-in sound and speak command processing for GET and POST
 		if (dictQuery and "sound" in dictQuery):
 			for strArg in dictQuery["sound"]:
-				TaskSound(g_oHttpdWorker, strArg).start()
+				TaskSound(globs.s_oWorker, strArg).start()
 		if (dictForm and "sound" in dictForm):
 			for strArg in dictForm["sound"]:
-				TaskSound(g_oHttpdWorker, strArg).start()
+				TaskSound(globs.s_oWorker, strArg).start()
 		if (dictQuery and "speak" in dictQuery):
 			for strArg in dictQuery["speak"]:
-				TaskSpeak(g_oHttpdWorker, strArg).start()
+				TaskSpeak(globs.s_oWorker, strArg).start()
 		if (dictForm and "speak" in dictForm):
 			for strArg in dictForm["speak"]:
-				TaskSpeak(g_oHttpdWorker, strArg).start()
+				TaskSpeak(globs.s_oWorker, strArg).start()
 		# External timer event from cron-job
 		if (re.match("/ext/evt\\.src", strPath)
 			and dictQuery
 			and "timer" in dictQuery
 			and dictQuery["timer"]
 			and dictQuery["timer"][0] == "cron"):
-			TaskModuleEvt(g_oHttpdWorker, strPath, dictQuery=dictQuery).start()
+			TaskModuleEvt(globs.s_oWorker, strPath, dictQuery=dictQuery).start()
 			return HtmlPage(strPath)
 		# System or program termination
 		if (re.match("/exit/(exit|halt|boot)\\.html", strPath)
 			and dictQuery
 			and "exit" in dictQuery
 			and dictQuery["exit"]):
-			TaskExit(g_oHttpdWorker, dictQuery["exit"][0]).start()
+			TaskExit(globs.s_oWorker, dictQuery["exit"][0]).start()
 			return None
 		globs.log("doCommand: '%s'" % strPath)
 		# Commands being passed to installed modules
 		if (re.match("/modules/.+\\.(cmd|htm|html)", strPath)):
 			globs.log("Modulkommando: '%s'" % strPath)
 			oHtmlPage = HtmlPage(strPath)
-			oFutureTask = TaskModuleCmd(g_oHttpdWorker,
+			oFutureTask = TaskModuleCmd(globs.s_oWorker,
 				strPath,
 				oHtmlPage,
 				dictForm=dictForm,

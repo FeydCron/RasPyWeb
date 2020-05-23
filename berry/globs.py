@@ -253,6 +253,7 @@ s_oLogMemLock = threading.RLock()
 s_oSettingsLock = threading.RLock()
 
 s_oHttpd = None
+s_oWorker = None
 s_lstSnapshot = None
 s_oStartPage = StartPage()
 
@@ -279,18 +280,27 @@ def shutdown():
 
 def stop():
 	log("stop('%s')" % (s_strExitMode))
+
+	if s_oWorker:
+		for (oInstance, _) in s_oWorker.m_dictModules.values():
+			if (oInstance):
+				oInstance.moduleExit()
+		s_oWorker.m_dictModules.clear()
+	
+	saveSettings()
+
 	if s_oHttpd:
-		s_oHttpd.shutdown()
-		s_oHttpd.server_close()
+		s_oHttpd.m_oServer.shutdown()
+		s_oHttpd.m_oServer.server_close()
 		try:
-			s_oHttpd.socket.shutdown(socket.SHUT_RDWR)
-			s_oHttpd.socket.close()
+			s_oHttpd.m_oServer.socket.shutdown(socket.SHUT_RDWR)
+			s_oHttpd.m_oServer.socket.close()
 		except Exception as ex:
 			print("Schließen des Sockets sicherstellen: %r" % (ex))
 	return
 
 def getVersion():
-	return float(0.9)
+	return float(0.8)
 
 def getWatchDogInterval():
 	return float(10.0)

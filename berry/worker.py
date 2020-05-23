@@ -34,11 +34,11 @@ class TaskExit(FastTask):
 	
 	def do(self):
 		globs.s_strExitMode = self.m_strMode
-		for (oInstance, _) in self.m_oWorker.m_dictModules.values():
-			if (oInstance):
-				oInstance.moduleExit()
-		self.m_oWorker.m_dictModules.clear()
-		globs.saveSettings()
+		# for (oInstance, _) in self.m_oWorker.m_dictModules.values():
+		# 	if (oInstance):
+		# 		oInstance.moduleExit()
+		# self.m_oWorker.m_dictModules.clear()
+		# globs.saveSettings()
 		globs.shutdown()
 		return
 		

@@ -16,7 +16,7 @@ from io import BytesIO
 from zipfile import ZipFile
 
 from .. import globs
-from ..sdk import ModuleBase, TaskModuleEvt, TaskSpeak, WebClient
+from ..sdk import ModuleBase, TaskDelegateFast, TaskDelegateLong, TaskModuleEvt, TaskSpeak, WebClient
 from ..worker import TaskExit
 
 
@@ -49,9 +49,13 @@ class Updater(ModuleBase):
 		self.m_strUpdateToken = uuid.uuid4().hex
 		self.m_strCheckToken = uuid.uuid4().hex
 		
+		self.m_oManualUpdateIO = None
+		self.m_oOnlineUpdateIO = None
 		self.m_oSystemUpdateIO = None
-		self.m_bUpdateComplete = False
+
 		self.m_bUpdateOffline = False
+		self.m_bUpdInProgress = False
+		
 		self.m_fUpdVersion = float(0.0)
 		self.m_fChkVersion = float(0.0)
 		
@@ -179,68 +183,396 @@ class Updater(ModuleBase):
 		print("%r::moduleExec(strPath=%s, oHtmlPage=%s, dictQuery=%s, dictForm=%s) [%s]" % (
 			self, strPath, oHtmlPage, dictQueryKeys, dictFormKeys, datetime.today().strftime("%X")))
 		
+		self.updateContext()
+		
 		if (re.match(r"/modules/Updater\.html", strPath)
 			and not oHtmlPage == None):
 			return self.serveHtmlPage(oHtmlPage, dictQuery, dictForm)
-			
-		self.updateContext()
 			
 		if not dictQuery:
 			return False
 			
 		# Zyklische Prüfung
-		bCheck = False
-		bFetch = False
-		bSetup = False
 		for (strCmd, lstArg) in dictQuery.items():
-			if (strCmd == "timer" and lstArg and lstArg[0] == "cron"):
+			if (strCmd == "timer" and "cron" in lstArg):
 				# Aktualisierungszeitpunkt erreicht?
-				if (not self.m_nHour24h == self.m_nUpdateHour or not self.m_nMinutes == 0):
+				if (not self.m_nHour24h == self.m_nUpdateHour
+					or not self.m_nMinutes == 0
+					or self.m_bUpdInProgress):
 					return True
-				bCheck = True
-				break
-			if (strCmd == "token" and self.m_strDownloadToken in lstArg):
-				if (self.m_fChkVersion <= globs.getVersion()):
-					# Jetzt auf Aktualisierung prüfen!
-					globs.log("Jetzt auf Aktualisierung prüfen.")
-					bCheck = True
-					break
-				if (self.m_fChkVersion > globs.getVersion()):
-					# Jetzt Aktualisierung herunterladen!
-					globs.log("Jetzt Aktualisierung herunterladen.")
-					bFetch = True
-					break
-			if (strCmd == "token" and self.m_strUpdateToken in lstArg):
-				# Jetzt ausstehende Installation ausführen!
-				globs.log("Jetzt ausstehende Installation ausführen.")
-				bSetup = True
-				break
-			globs.log("Keine Funktion mit Cmd=%s und Arg=%s" % (strCmd, lstArg))
 
-		if bCheck or bFetch or bSetup:
-			# Aktualisierung verfügbar?
-			if (not self.doCheckUpdate()):
-				return True
-			# Automatische Aktualisierung aktiviert?
-			if (not self.m_bAutoUpdate and not bFetch and not bSetup):
+				if (TaskDelegateLong(self.getWorker(),
+					self.doUpdateSequence, bFetch=False, bSetup=False).start()):
+					return True
+
 				TaskSpeak(self.getWorker(),
-				"Eine neue Version steht zur Verfügung und kann heruntergeladen werden.").start()
-				return True
-			if (not self.doDownloadUpdate()):
-				TaskSpeak(self.getWorker(),
-				"Beim Herunterladen der neuen Version sind Probleme aufgetreten.").start()
+					"Die automatische Aktualisierung konnte nicht gestartet werden.").start()
+
 				return False
-			if (not self.m_bAutoReboot and not bSetup):
-				TaskSpeak(self.getWorker(),
+
+		return True
+
+	def doUpdateSequence(self,
+		bFetch,
+		bSetup):
+
+		# Auf Aktualisierung prüfen
+		if (not self.doCheckUpdate()):
+			self.m_bUpdInProgress = False
+			return
+		
+		# Schrittkette beenden?
+		if (not self.m_bAutoUpdate and not bFetch and not bSetup):
+			TaskSpeak(self.getWorker(),
+				"Eine neue Version steht zur Verfügung und kann heruntergeladen werden.").start()
+			self.m_bUpdInProgress = False
+			return
+
+		# Aktualisierung herunterladen
+		if (not self.doDownloadUpdate()):
+			TaskSpeak(self.getWorker(),
+				"Beim Herunterladen der neuen Version sind Probleme aufgetreten.").start()
+			self.m_bUpdInProgress = False
+			return
+		
+		# Schrittkette beenden?
+		if (not self.m_bAutoReboot and not bSetup):
+			TaskSpeak(self.getWorker(),
 				"Eine neue Version steht zur Verfügung und kann installiert werden.").start()
-				return True
-			if (not self.doInstallUpdate()):
-				TaskSpeak(self.getWorker(),
+			self.m_bUpdInProgress = False
+			return
+
+		# Aktualisierung installieren
+		if (not self.doInstallUpdate()):
+			TaskSpeak(self.getWorker(),
 				"Beim Installieren der neuen Version sind Probleme aufgetreten.").start()
+			self.m_bUpdInProgress = False
+			return
+
+		self.m_bUpdInProgress = False
+		return
+
+	def serveUpdaterCommand(self,
+		oHtmlPage,
+		dictQuery,
+		dictForm):
+
+		globs.log("Updater::serveUpdaterCommand()")
+
+		if (self.m_bUpdInProgress):
+			# Updater-Status aufbereiten lassen
+			return False
+
+		if (self.m_strUploadToken in dictQuery["token"]):
+			return self.serveCommandUpload(oHtmlPage, dictQuery, dictForm)
+
+		if (self.m_strDownloadToken in dictQuery["token"]):
+			return self.serveCommandDownload(oHtmlPage, dictQuery, dictForm)
+		
+		if (self.m_strUpdateToken in dictQuery["token"]):
+			return self.serveCommandUpdate(oHtmlPage, dictQuery, dictForm)
+
+		# Updater-Status aufbereiten lassen
+		return False
+	
+	def serveCommandUpload(self,
+		oHtmlPage,
+		dictQuery,
+		dictForm):
+
+		self.m_strUploadToken = uuid.uuid4().hex
+
+		# Hochgeladene manuelle Aktualisierungsdatei entgegen nehmen
+		if (dictForm and "SystemFile" in dictForm):
+			oSystemFile = dictForm["SystemFile"][0]
+			if not oSystemFile.filename or not oSystemFile.file:
+				
+				oHtmlPage.createBox(
+					"Systemaktualisierung",
+					"Die Aktualisierungsdatei konnte nicht hochgeladen werden.",
+					strType="warning")
+				oHtmlPage.setAutoRefresh(
+					nAutoRefresh=5,
+					strUrl="/modules/Updater.html")
+				
+				return True
+
+			self.m_oManualUpdateIO = BytesIO(oSystemFile.file.read())
+			self.m_strUpdateToken = uuid.uuid4().hex
+			self.m_bUpdateOffline = True
+			self.m_bUpdInProgress = True
+
+			if (TaskDelegateLong(self.getWorker(),
+				self.doUpdateSequence, bFetch=False, bSetup=True).start()):
+				
+				# Updater-Status aufbereiten lassen
 				return False
 				
-		return True
+			oHtmlPage.createBox(
+				"Systemaktualisierung",
+				"Die manuelle Aktualisierung konnte nicht gestartet werden.",
+				strType="error")
+			oHtmlPage.setAutoRefresh(
+				nAutoRefresh=5,
+				strUrl="/modules/Updater.html")
+
+			self.m_bUpdInProgress = False
+
+			return True
 		
+		# Hochladen einer manuellen Aktualisierungsdatei anbieten
+		oHtmlPage.createBox(
+			"Systemaktualisierung",
+			"Über diese Funktion kann eine manuelle Aktualisierung durchgeführt werden.",
+			bClose=False)
+		oHtmlPage.openForm(
+			dictQueries={"token" : self.m_strUploadToken})
+		oHtmlPage.appendForm("SystemFile",
+			strTitle="Datei für Systemaktualisierung",
+			strTip="Zip-Datei für die Systemaktualisierung angeben",
+			strTextType="file",
+			strTypePattern="accept=\"application/zip\"")
+		oHtmlPage.closeForm(strUrlCancel="/system/settings.html")
+		oHtmlPage.closeBox()
+
+		return True
+
+	def serveCommandDownload(self,
+		oHtmlPage,
+		dictQuery,
+		dictForm):
+
+		bFetch = self.m_fChkVersion > globs.getVersion()
+
+		self.m_strDownloadToken = uuid.uuid4().hex
+		self.m_fChkVersion = 0.0
+		self.m_bUpdInProgress = True
+
+		if (TaskDelegateLong(self.getWorker(),
+			self.doUpdateSequence, bFetch=bFetch, bSetup=False).start()):
+			# Updater-Status aufbereiten lassen
+			return False
+			
+		oHtmlPage.createBox(
+			"Systemaktualisierung",
+			"Das Herunterladen der Aktualisierung konnte nicht gestartet werden.",
+			strType="error")
+		oHtmlPage.setAutoRefresh(
+			nAutoRefresh=5,
+			strUrl="/modules/Updater.html")
+
+		self.m_bUpdInProgress = False
+
+		return True
+
+	def serveCommandUpdate(self,
+		oHtmlPage,
+		dictQuery,
+		dictForm):
+
+		self.m_strUpdateToken = uuid.uuid4().hex
+		self.m_bUpdInProgress = True
+		
+		if (TaskDelegateLong(self.getWorker(),
+			self.doUpdateSequence, bFetch=False, bSetup=True).start()):
+			# Updater-Status aufbereiten lassen
+			return False
+			
+		oHtmlPage.createBox(
+			"Systemaktualisierung",
+			"Die Installation der Aktualisierung konnte nicht gestartet werden.",
+			strType="error")
+		oHtmlPage.setAutoRefresh(
+			nAutoRefresh=5,
+			strUrl="/modules/Updater.html")
+
+		self.m_bUpdInProgress = False
+
+		return True
+
+	def serveUpdaterStatus(self,
+		oHtmlPage,
+		dictQuery,
+		dictForm):
+
+		# Eine Systemaktualisierung ist aktiv
+		if (self.m_bUpdInProgress
+			or globs.s_strExitMode):
+			return self.serveStatusBusy(oHtmlPage, dictQuery, dictForm)
+		
+		# Eine neuere Version ist zur Installation bereit
+		if (self.m_fUpdVersion > globs.getVersion()):
+			return self.serveStatusCanInstall(oHtmlPage, dictQuery, dictForm)
+		
+		# Eine neuere Version ist verfügbar
+		if (self.m_fChkVersion > globs.getVersion()):
+			return self.serveStatusCanDownload(oHtmlPage, dictQuery, dictForm)
+		
+		# Default
+		return self.serveStatusCanCheck(oHtmlPage, dictQuery, dictForm)
+
+	def serveStatusBusy(self,
+		oHtmlPage,
+		dictQuery,
+		dictForm):
+
+		if (globs.s_strExitMode):
+
+			if (globs.s_strExitMode == "boot"):
+
+				oHtmlPage.createBox(
+					"Systemaktualisierung",
+					"Das System wird neu gestartet - Bitte warten Sie bis es wieder online ist.",
+					strType="warning")
+				oHtmlPage.setAutoRefresh(
+					nAutoRefresh=60,
+					strUrl="/modules/Updater.html")
+
+			else:
+
+				oHtmlPage.createBox(
+					"Systemaktualisierung",
+					"Das System wird beendet bzw. heruntergefahren - Bitte starten Sie es anschließend neu.",
+					strType="warning")
+
+			return True
+
+		oHtmlPage.createBox(
+			"Systemaktualisierung",
+			"Derzeit ist die Version %s installiert." % (
+				globs.getVersion()),
+			strType="warning", bClose=False)
+
+		if (self.m_bUpdateOffline and self.m_oSystemUpdateIO):
+			oHtmlPage.createText(
+				"Die manuelle Installation läuft ...")
+		elif (self.m_fUpdVersion != 0.0 and self.m_oSystemUpdateIO):
+			oHtmlPage.createText(
+				"Die Aktualisierung auf die Version %s läuft ..." % (
+					self.m_fUpdVersion))
+		elif (self.m_bUpdateOffline and self.m_oManualUpdateIO):
+			oHtmlPage.createText(
+				"Die manuelle Installation wird vorbereitet ...")
+		elif (self.m_fUpdVersion != 0.0 and self.m_oOnlineUpdateIO):
+			oHtmlPage.createText(
+				"Die Aktualisierung auf die Version %s wird vorbereitet ..." % (
+					self.m_fUpdVersion))
+		elif (self.m_fChkVersion > self.m_fUpdVersion):
+			oHtmlPage.createText(
+				"Die Aktualisierung auf die Version %s wird heruntergeladen ..." % (
+					self.m_fChkVersion))
+		else:
+			oHtmlPage.createText(
+				"Es wird nach einer Aktualisierung gesucht ...")
+
+		oHtmlPage.closeBox()
+		oHtmlPage.setAutoRefresh(
+			nAutoRefresh=1,
+			strUrl="/modules/Updater.html")
+
+		return True
+
+	def serveStatusCanInstall(self,
+		oHtmlPage,
+		dictQuery,
+		dictForm):
+
+		oHtmlPage.createBox(
+			"Systemaktualisierung",
+			"Derzeit ist die Version %s installiert." % (
+				globs.getVersion()),
+			strType="warning", bClose=False)
+
+		if (self.m_fUpdVersion != 0.0 and self.m_oOnlineUpdateIO):
+			oHtmlPage.createText(
+				"Eine Aktualisierung auf die Version %s wurde heruntergeladen und kann installiert werden." % (
+					self.m_fUpdVersion))
+
+		if (self.m_bAutoReboot):
+			oHtmlPage.createText(
+				"Die automatische Aktualisierung erfolgt um %s Uhr." % (
+					self.m_nUpdateHour))
+		else:
+			oHtmlPage.createText(
+				"Die automatische Aktualisierung ist ausgeschaltet.")
+		
+		oHtmlPage.createButton(
+			"Jetzt aktualisieren",
+			strClass="ym-warning",
+			strHRef="/modules/Updater.html?token=%s" % (self.m_strUpdateToken))
+		oHtmlPage.closeBox()
+
+		return True
+
+	def serveStatusCanDownload(self,
+		oHtmlPage,
+		dictQuery,
+		dictForm):
+
+		oHtmlPage.createBox(
+			"Systemaktualisierung",
+			"Derzeit ist die Version %s installiert." % (
+				globs.getVersion()),
+			strType="warning", bClose=False)
+
+		if (self.m_fChkVersion > self.m_fUpdVersion):
+			oHtmlPage.createText(
+				"Eine Aktualisierung auf die Version %s ist verfügbar und kann heruntergeladen werden." % (
+					self.m_fChkVersion))
+
+		if (self.m_bAutoReboot):
+			oHtmlPage.createText(
+				"Die automatische Aktualisierung erfolgt um %s Uhr." % (
+					self.m_nUpdateHour))
+			oHtmlPage.createButton(
+				"Jetzt aktualisieren",
+				strClass="ym-warning",
+				strHRef="/modules/Updater.html?token=%s" % (self.m_strDownloadToken))
+		else:
+			if (self.m_bAutoUpdate):
+				oHtmlPage.createText(
+					"Die Aktualisierung wird um %s Uhr automatisch heruntergeladen und kann dann installiert werden." % (
+						self.m_nUpdateHour))
+			else:
+				oHtmlPage.createText(
+					"Die automatische Aktualisierung ist ausgeschaltet.")
+
+			oHtmlPage.createButton(
+				"Jetzt herunterladen",
+				strClass="ym-warning",
+				strHRef="/modules/Updater.html?token=%s" % (self.m_strDownloadToken))
+		
+		oHtmlPage.closeBox()
+		return True
+
+	def serveStatusCanCheck(self,
+		oHtmlPage,
+		dictQuery,
+		dictForm):
+
+		if (self.m_fChkVersion == globs.getVersion()):
+			oHtmlPage.createBox(
+				"Systemaktualisierung",
+				"Derzeit ist die Version %s installiert." % (globs.getVersion()),
+				strType="success", bClose=False)
+			oHtmlPage.createText(
+				"Das System ist auf dem aktuellen Stand. Es sind keine Aktualisierungen verfügbar.")
+		else:
+			oHtmlPage.createBox(
+				"Systemaktualisierung",
+				"Derzeit ist die Version %s installiert." % (globs.getVersion()),
+				strType="info", bClose=False)
+		
+		oHtmlPage.createButton(
+			"Aktualisierung suchen",
+			strHRef="/modules/Updater.html?token=%s" % (self.m_strDownloadToken))
+		oHtmlPage.createButton(
+			"Aktualisierung hochladen",
+			strHRef="/modules/Updater.html?token=%s" % (self.m_strUploadToken))
+
+		oHtmlPage.closeBox()
+		return True
+
 	## 
 	#  @brief Bereitstellung der HTML-Seite für eine manuelle Aktualisierung.
 	#  
@@ -257,175 +589,16 @@ class Updater(ModuleBase):
 		oHtmlPage,
 		dictQuery,
 		dictForm):
-		
+
 		globs.log("Updater::serveHtmlPage()")
-		
+
+		# Anforderung einer Seite mit Kommando-Token
 		if (dictQuery and "token" in dictQuery):
-			if (self.m_strUploadToken in dictQuery["token"]):
-				self.m_strUploadToken = uuid.uuid4().hex
-				
-				if (dictForm and "SystemFile" in dictForm):
-					oSystemFile = dictForm["SystemFile"][0]
-					if not oSystemFile.filename or not oSystemFile.file:
-						oHtmlPage.createBox(
-							"Systemaktualisierung",
-							"Es konnte keine gültige Aktualisierungsdatei hochgeladen werden.",
-							strType="warning")
-						return True						
-					self.m_oSystemUpdateIO = BytesIO(oSystemFile.file.read())
-					self.m_strUpdateToken = uuid.uuid4().hex
-					self.m_bUpdateOffline = True
-					TaskModuleEvt(self.getWorker(),
-						"/modules/Updater.cmd",
-						dictQuery={"token" : self.m_strUpdateToken}).start()
-					oHtmlPage.createBox(
-						"Systemaktualisierung",
-						"Die Aktualisierung wird jetzt durchgeführt. Danach wird das System neu "+
-						"gestartet. Dieser Vorgang kann einige Zeit in Anspruch nehmen.",
-						strType="info")
-					return True
-				
-				oHtmlPage.createBox(
-					"Systemaktualisierung",
-					"Über diese Funktion kann eine manuelle Aktualisierung durchgeführt werden.",
-					bClose=False)
-				oHtmlPage.openForm(
-					dictQueries={"token" : self.m_strUploadToken})
-				oHtmlPage.appendForm("SystemFile",
-					strTitle="Datei für Systemaktualisierung",
-					strTip="Zip-Datei für die Systemaktualisierung angeben",
-					strTextType="file",
-					strTypePattern="accept=\"application/zip\"")
-				oHtmlPage.closeForm(strUrlCancel="/system/settings.html")
-				oHtmlPage.closeBox()
+			if (self.serveUpdaterCommand(oHtmlPage, dictQuery, dictForm)):
 				return True
-				
-			if (self.m_strDownloadToken in dictQuery["token"]):
-				self.m_strDownloadToken = uuid.uuid4().hex
-				
-				TaskModuleEvt(self.getWorker(),
-					"/modules/Updater.cmd",
-					dictQuery={"token" : self.m_strDownloadToken}).start()
-				oHtmlPage.createBox(
-					"Systemaktualisierung",
-					"Es wird nach einer Aktualisierung gesucht. Dieser Vorgang kann einige Zeit "+
-					"in Anspruch nehmen.",
-					strType="info")
-				return True
-				
-			if (self.m_strUpdateToken in dictQuery["token"]):
-				self.m_strUpdateToken = uuid.uuid4().hex
-				
-				TaskModuleEvt(self.getWorker(),
-					"/modules/Updater.cmd",
-					dictQuery={"token" : self.m_strUpdateToken}).start()
-				oHtmlPage.createBox(
-					"Systemaktualisierung",
-					"Die Installation der Aktualisierung wurde angefordert. Dieser Vorgang kann "+
-					"einige Zeit in Anspruch nehmen.",
-					strType="info")
-				return True
-			
-		# Wenn die automatische Installation von Aktualisierungen deaktiviert wurde und eine neuere
-		# Version bereitgestellt wurde, dann anbieten, die Installation anzufordern.
-		if ((not self.m_bAutoReboot) and (self.m_fUpdVersion > globs.getVersion())):
-			oHtmlPage.createBox(
-				"Systemaktualisierung",
-				"Die automatische Installation von Aktualisierungen ist ausgeschaltet aber es "+
-				"steht eine neuere Version zur Installation bereit.",
-				strType="warning", bClose=False)
-			oHtmlPage.createText(
-				"Derzeit ist die Version %s installiert und Version %s steht bereit" % (
-					globs.getVersion(), self.m_fUpdVersion))
-			oHtmlPage.createButton(
-				"Jetzt installieren",
-				strClass="ym-warning",
-				strHRef="/modules/Updater.html?token=%s" % (self.m_strUpdateToken))
-			oHtmlPage.closeBox()
-			return True
 		
-		# Wenn das automatische Herunterladen von Aktualisierungen deaktiviert wurde und online
-		# eine neuere Version zur Verfügung steht, dann anbieten, das Herunterladen anzufordern. 
-		if ((not self.m_bAutoUpdate) and (self.m_fChkVersion > globs.getVersion())):
-			oHtmlPage.createBox(
-				"Systemaktualisierung",
-				"Das automatische Herunterladen von Aktualisierungen ist ausgeschaltet aber es "+
-				"steht eine neuere Version zum Herunterladen bereit.",
-				strType="warning", bClose=False)
-			oHtmlPage.createText(
-				"Derzeit ist die Version %s installiert und Version %s ist verfügbar." % (
-					globs.getVersion(), self.m_fChkVersion))
-			oHtmlPage.createButton(
-				"Jetzt herunterladen",
-				strClass="ym-warning",
-				strHRef="/modules/Updater.html?token=%s" % (self.m_strDownloadToken))
-			oHtmlPage.closeBox()
-			return True
-			
-		# Wenn eine neuere Version bereitsteht, die Versionsinformationen anzeigen
-		if (self.m_fUpdVersion > globs.getVersion()):
-			oHtmlPage.createBox(
-				"Systemaktualisierung",
-				"Es steht eine neuere Version zur Installation bereit, die zum nächsten "+
-				"Aktualisierungszeitpunkt automatisch installiert wird.",
-				strType="info", bClose=False)
-			oHtmlPage.createText(
-				"Derzeit ist die Version %s installiert und Version %s steht bereit" % (
-					globs.getVersion(), self.m_fUpdVersion))
-			oHtmlPage.createButton(
-				"Aktualisierung hochladen",
-				strHRef="/modules/Updater.html?token=%s" % (self.m_strUploadToken))
-			oHtmlPage.closeBox()
-			return True
-		
-		# Wenn eine neuere Version gefunden wurde, die Versionsinformationen anzeigen
-		if (self.m_fChkVersion > globs.getVersion()):
-			oHtmlPage.createBox(
-				"Systemaktualisierung",
-				"Es steht eine neuere Version zum Herunterladen bereit, die zum nächsten "+
-				"Aktualisierungszeitpunkt automatisch heruntergeladen wird.",
-				strType="info", bClose=False)
-			oHtmlPage.createText(
-				"Derzeit ist die Version %s installiert und Version %s ist verfügbar." % (
-					globs.getVersion(), self.m_fChkVersion))
-			oHtmlPage.createButton(
-				"Aktualisierung hochladen",
-				strHRef="/modules/Updater.html?token=%s" % (self.m_strUploadToken))
-			oHtmlPage.closeBox()
-			return True
-		
-		# Es ist keine Aktualisierung verfügbar
-		if (self.m_fChkVersion == globs.getVersion()):
-			oHtmlPage.createBox(
-				"Systemaktualisierung",
-				"Das System ist auf dem aktuellen Stand. Es sind keine Aktualisierungen verfügbar.",
-				strType="success", bClose=False)
-			oHtmlPage.createText(
-				"Derzeit ist die Version %s installiert." % (globs.getVersion()))
-			oHtmlPage.createButton(
-				"Aktualisierung suchen",
-				strHRef="/modules/Updater.html?token=%s" % (self.m_strDownloadToken))
-			oHtmlPage.createButton(
-				"Aktualisierung hochladen",
-				strHRef="/modules/Updater.html?token=%s" % (self.m_strUploadToken))
-			oHtmlPage.closeBox()
-			return True
-		
-		# Default, noch nicht nach Aktualisierungen gesucht oder keine Aktualisierungen verfügbar.
-		oHtmlPage.createBox(
-			"Systemaktualisierung",
-			"Es wurde noch nicht nach Aktualisierungen gesucht.",
-			strType="info", bClose=False)
-		oHtmlPage.createText(
-			"Derzeit ist die Version %s installiert." % (globs.getVersion()))
-		oHtmlPage.createButton(
-			"Aktualisierung suchen",
-			strHRef="/modules/Updater.html?token=%s" % (self.m_strDownloadToken))
-		oHtmlPage.createButton(
-			"Aktualisierung hochladen",
-			strHRef="/modules/Updater.html?token=%s" % (self.m_strUploadToken))
-		oHtmlPage.closeBox()
-		return True
+		# Updater-Status aufbereiten
+		return self.serveUpdaterStatus(oHtmlPage, dictQuery, dictForm)
 		
 	# Aktuelle Zeit holen und in globalen Variablen speichern
 	def updateContext(self):
@@ -442,25 +615,64 @@ class Updater(ModuleBase):
 			
 		globs.setSetting("Updater", "fChkVersion", self.m_fChkVersion)
 		return
+
+	def resetPendingUpdate(self):
+
+		self.m_bUpdInProgress = False
+		if (self.m_bUpdateOffline):
+			# Manuelle Aktualisierung zurücksetzen
+			self.m_bUpdateOffline = False
+			if (self.m_oManualUpdateIO):
+				del self.m_oManualUpdateIO
+			self.m_oManualUpdateIO = None
+		else:
+			# Online Aktualisierung zurücksetzen
+			self.m_fChkVersion = float(0.0)
+			self.m_fUpdVersion = float(0.0)
+			if (self.m_oOnlineUpdateIO):
+				del self.m_oOnlineUpdateIO
+			self.m_oOnlineUpdateIO = None
+		
+			globs.wrn("Wiederherstellung der Standardeinstellungen für die Aktualisierung")
+			globs.setSetting("Updater", "strChkUpdUrl", Updater.s_strChkUpdUrl)
+			globs.setSetting("Updater", "strSystemUrl", Updater.s_strSystemUrl)
+
+		if (self.m_oSystemUpdateIO):
+			del self.m_oSystemUpdateIO
+		self.m_oSystemUpdateIO = None
+
+		return
 		
 	def doCheckUpdate(self):
-		oClient = WebClient()
-		
-		if (not self.m_strChkUpdUrl):
-			globs.err("Die URL für die Aktualisierungsinformation ('%s') ist ungültig" % (
-				self.m_strChkUpdUrl))
-			if (not self.m_oSystemUpdateIO):
+
+		# Offline oder manuelle Aktualisierung
+		if (self.m_bUpdateOffline):
+			if (not self.m_oManualUpdateIO):
+				globs.err("Fehler bei der Bereitstellung der manuellen Aktualisierungsdatei")
+				self.resetPendingUpdate()
 				return False
-			
+			return True
+
+		# Online Aktualisierung
+		oClient = WebClient()
+
+		# Aktualisierungs-URL prüfen		
+		if (not self.m_strChkUpdUrl):
+			globs.err("Die URL für die Aktualisierungsinformation ('%s') ist ungültig - Wiederherstellung der Standardeinstellung" % (
+				self.m_strChkUpdUrl))
+			self.resetPendingUpdate()
+			return False
+
+		# Aktualisierungsinformation herunterladen	
 		oResp = oClient.GET(self.m_strChkUpdUrl)
 		if (not oResp or not oResp.m_bOK):
 			globs.err("Fehler (%s) beim Herunterladen der Aktualisierungsinformation '%s'" % (
 				oResp, self.m_strChkUpdUrl))
-			if (not self.m_oSystemUpdateIO):
-				return False
-			
-		strUpdInf = oResp.m_oData.decode()
+			self.resetPendingUpdate()
+			return False
 		
+		# Aktualisierungsinformation auswerten
+		strUpdInf = oResp.m_oData.decode()		
 		try:
 			strUpdInf = strUpdInf[:10] + (strUpdInf[10:] and "..")
 			self.m_fChkVersion = float(strUpdInf)
@@ -468,18 +680,21 @@ class Updater(ModuleBase):
 		except:
 			globs.exc("Fehler beim Auswerten der Aktualisierungsinformation '%s'" % (
 				strUpdInf))
-			globs.setSetting("Updater", "strChkUpdUrl", Updater.s_strChkUpdUrl)
-			if (not self.m_oSystemUpdateIO):
-				return False
-			
-		if (self.m_oSystemUpdateIO):
+			self.resetPendingUpdate()
+			return False
+
+		# Gültigkeit einer bereits heruntergeladenen Aktualisierung überprüfen
+		if (self.m_oOnlineUpdateIO):
 			if (self.m_fChkVersion > self.m_fUpdVersion):
 				globs.log("Neuere Aktualisierung '%s' als bereitgestellte '%s' verfügbar" % (
 					self.m_fChkVersion, self.m_fUpdVersion))
+				self.m_fUpdVersion = float(0.0)
+				del self.m_oOnlineUpdateIO
+				self.m_oOnlineUpdateIO = None
 			else:
 				globs.log("Eine Aktualisierung '%s' wurde bereitgestellt." % (
 					self.m_fUpdVersion))
-			return True
+				return True
 		
 		if (self.m_fChkVersion <= globs.getVersion()):
 			globs.log("Keine Aktualisierung für Version '%s' verfügbar" % (
@@ -492,29 +707,35 @@ class Updater(ModuleBase):
 		return True
 		
 	def doDownloadUpdate(self):
+
+		if (self.m_bUpdateOffline):
+			if (not self.m_oManualUpdateIO):
+				self.resetPendingUpdate()
+				return False
+			return True
+
 		oClient = WebClient()
-		oRespSys = None
+		oResp = None
 		
 		if (not self.m_strSystemUrl):
 			globs.err("Die URL für die Systemaktualisierung ist ungültig")
-			globs.setSetting("Updater", "strSystemUrl", Updater.s_strSystemUrl)
-			if (not self.m_oSystemUpdateIO):
-				return False
+			self.resetPendingUpdate()
+			return False
 		
-		if (not self.m_oSystemUpdateIO
-			or (self.m_fChkVersion > self.m_fUpdVersion and not self.m_bUpdateOffline)):
-			oRespSys = oClient.GET(self.m_strSystemUrl)
-			if (not oRespSys or not oRespSys.m_bOK):
+		if (not self.m_oOnlineUpdateIO):
+
+			oResp = oClient.GET(self.m_strSystemUrl)
+			if (not oResp or not oResp.m_bOK):
 				globs.err("Fehler (%s) beim Herunterladen der Systemaktualisierungsdatei '%s'" % (
-					oRespSys, self.m_strSystemUrl))
+					oResp, self.m_strSystemUrl))
 				globs.setSetting("Updater", "strSystemUrl", Updater.s_strSystemUrl)
 				return False
 			
-			self.m_oSystemUpdateIO = BytesIO(oRespSys.m_oData)
+			self.m_oOnlineUpdateIO = BytesIO(oResp.m_oData)
 			self.m_fUpdVersion = self.m_fChkVersion
 			return True
 		
-		if (self.m_oSystemUpdateIO):
+		if (self.m_oOnlineUpdateIO):
 			globs.log("Eine Aktualisierung wurde bereitgestellt.")
 			return True
 		
@@ -522,17 +743,21 @@ class Updater(ModuleBase):
 		
 	def doInstallUpdate(self):
 		
+		if (self.m_bUpdateOffline):
+			if (self.m_oManualUpdateIO):
+				self.m_oSystemUpdateIO = self.m_oManualUpdateIO
+				self.m_oManualUpdateIO = None
+		elif (self.m_oOnlineUpdateIO):
+			self.m_oSystemUpdateIO = self.m_oOnlineUpdateIO
+			self.m_oOnlineUpdateIO = None
+		
 		if (not self.m_oSystemUpdateIO):
-			self.m_fUpdVersion = float(0.0)
-			self.m_bUpdateOffline = False
+			self.resetPendingUpdate()
 			return False
 		
 		if (not zipfile.is_zipfile(self.m_oSystemUpdateIO)):
 			globs.err("Die Systemaktualisierungsdatei ist keine gültige Zip-Datei")
-			del self.m_oSystemUpdateIO
-			self.m_oSystemUpdateIO = None
-			self.m_fUpdVersion = float(0.0)
-			self.m_bUpdateOffline = False
+			self.resetPendingUpdate()
 			return False
 		
 		dictSysUpdate = OrderedDict()
@@ -549,9 +774,7 @@ class Updater(ModuleBase):
 					if (os.path.isabs(oZipInfo.filename)):
 						globs.err("Absolute Pfadangabe in Zip-Datei: '%s'" % (
 							oZipInfo.filename))
-						del self.m_oSystemUpdateIO
-						self.m_oSystemUpdateIO = None
-						self.m_fUpdVersion = float(0.0)
+						self.resetPendingUpdate()
 						return False
 					if (not re.match("\\A" + re.escape(Updater.s_strPrefix) + "\\w+.+", oZipInfo.filename)):
 						continue
@@ -564,9 +787,7 @@ class Updater(ModuleBase):
 					if (not os.path.isfile(strFilename)):
 						globs.err("Die extrahierte Systemdatei '%s' wurde nicht gefunden" % (
 							strFilename))
-						del self.m_oSystemUpdateIO
-						self.m_oSystemUpdateIO = None
-						self.m_fUpdVersion = float(0.0)
+						self.resetPendingUpdate()
 						return False
 					globs.dbg("Das extrahierte Element '%s' liegt unter '%s'" % (
 						strEntryName, strFilename))
@@ -604,17 +825,11 @@ class Updater(ModuleBase):
 						foSource.close()
 						globs.dbg("Update von Modul '%s' installiert." % (strDstFile))
 				bUpdateComplete = True
-				del self.m_oSystemUpdateIO
-				self.m_oSystemUpdateIO = None
-				self.m_fUpdVersion = float(0.0)
-				self.m_bUpdateOffline = False
+				self.resetPendingUpdate()
 				TaskExit(self.getWorker(), "boot").start()
 		except:
 			globs.exc("Ausnahmefall während der Aktualisierung - Wiederherstellung ausführen")
-			del self.m_oSystemUpdateIO
-			self.m_oSystemUpdateIO = None
-			self.m_fUpdVersion = float(0.0)
-			self.m_bUpdateOffline = False
+			self.resetPendingUpdate()
 		
 		try:
 			if (not bUpdateComplete):
@@ -624,10 +839,7 @@ class Updater(ModuleBase):
 				globs.err("Die Aktualisierung ist fehlgeschlagen - Wiederherstellung erfolgreich")
 		except:
 			globs.exc("Ausnahmefall während der Wiederherstellung nach Fehler bei Aktualisierung")
-			del self.m_oSystemUpdateIO
-			self.m_oSystemUpdateIO = None
-			self.m_fUpdVersion = float(0.0)
-			self.m_bUpdateOffline = False
+			self.resetPendingUpdate()
 		
 		return True
 		

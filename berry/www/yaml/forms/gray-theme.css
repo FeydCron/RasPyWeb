@@ -174,7 +174,7 @@
 	cursor: pointer;
 	font: normal 1em/2em Arial, Helvetica;
 	margin: 0 0.75em 0 0;
-	padding: 0 1.5em;
+  padding: 0 1.5em;
 	overflow: visible;
 	text-decoration: none !important;
 	background-image: linear-gradient(to bottom, #eeeeee,#cccccc);
@@ -197,13 +197,14 @@
     background: #fafafa;
   }
 
-  /* Button size-scaling classes */
+  /** Button size-scaling classes
   .ym-button {
-    /* 21px */
-    /* 18px */
-    /* 12px */
-    /* 10px */
+    /* 21px
+    /* 18px
+    /* 12px
+    /* 10px
   }
+  */
   .ym-button.ym-xlarge {
     font-size: 1.5em;
   }
@@ -332,116 +333,282 @@
   
 /* Eigene Symbolerweiterungen */
   
-.ym-forbid:before {
+.ym-prohibited:before {
   content: "\1F6AB";
+  padding: 0 0.4em 0 0;
 }
 .ym-ok:before {
   content: "\1F197";
+  padding: 0 0.4em 0 0;
 }
 .ym-noentry:before {
   content: "\26D4";
+}
+.ym-new:before {
+  content: "\1F195";
+  padding: 0 0.4em 0 0;
+}
+.ym-id:before {
+  content: "\1F194";
+  padding: 0 0.4em 0 0;
+}
+.ym-information:before {
+  content: "\2139";
+}
+.ym-sos:before {
+  content: "\1F198";
+  padding: 0 0.4em 0 0;
+}
+.ym-up:before {
+  content: "\1F199";
+  padding: 0 0.4em 0 0;
 }
 .ym-check:before {
   content: "\2705";
 }
 .ym-refresh:before {
-  content: "\1F501";
-}
-.ym-refresh1:before {
-  content: "\1F502";
+  content: "\1F504";
+  padding: 0 0.4em 0 0;
 }
 .ym-exchange:before {
   content: "\1F500";
+  padding: 0 0.4em 0 0;
 }
 .ym-trash:before {
   content: "\1F6AE";
+  padding: 0 0.4em 0 0;
 }
 .ym-volumemax:before {
   content: "\1F50A";
+  padding: 0 0.4em 0 0;
 }
 .ym-volumemid:before {
   content: "\1F509";
+  padding: 0 0.4em 0 0;
 }
 .ym-volumemin:before {
   content: "\1F508";
+  padding: 0 0.4em 0 0;
 }
 .ym-volumeoff:before {
   content: "\1F507";
+  padding: 0 0.4em 0 0;
 }
 .ym-bell:before {
   content: "\1F514";
+  padding: 0 0.4em 0 0;
 }
 .ym-belloff:before {
   content: "\1F515";
+  padding: 0 0.4em 0 0;
 }
 .ym-details:before {
   content: "\1F50D";
+  padding: 0 0.4em 0 0;
 }
 .ym-brightmax:before {
   content: "\1F506";
+  padding: 0 0.4em 0 0;
 }
 .ym-brightmin:before {
   content: "\1F505";
+  padding: 0 0.4em 0 0;
 }
 .ym-wrench:before {
   content: "\1F527";
+  padding: 0 0.4em 0 0;
 }
 .ym-inbox:before {
   content: "\1F4E5";
+  padding: 0 0.4em 0 0;
 }
 .ym-outbox:before {
   content: "\1F4E4";
+  padding: 0 0.4em 0 0;
 }
 .ym-page:before {
   content: "\1F4C4";
+  padding: 0 0.4em 0 0;
 }
 .ym-curl:before {
   content: "\1F4C3";
+  padding: 0 0.4em 0 0;
 }
 .ym-scroll:before {
   content: "\1F4DC";
+  padding: 0 0.4em 0 0;
 }
 .ym-calendar:before {
   content: "\1F4C5";
+  padding: 0 0.4em 0 0;
 }
 .ym-tomato:before {
   content: "\1F345";
+  padding: 0 0.4em 0 0;
 }
 .ym-banana:before {
   content: "\1F34C";
+  padding: 0 0.4em 0 0;
 }
 .ym-pear:before {
   content: "\1F350";
+  padding: 0 0.4em 0 0;
 }
 .ym-peach:before {
   content: "\1F351";
+  padding: 0 0.4em 0 0;
 }
 .ym-strawberry:before {
   content: "\1F353";
+  padding: 0 0.4em 0 0;
 }
 .ym-grapes:before {
   content: "\1F347";
+  padding: 0 0.4em 0 0;
 }
 .ym-cherries:before {
   content: "\1F352";
+  padding: 0 0.4em 0 0;
 }
 .ym-lemon:before {
   content: "\1F34B";
+  padding: 0 0.4em 0 0;
 }
 .ym-redapple:before {
   content: "\1F34E";
+  padding: 0 0.4em 0 0;
 }
 .ym-greenapple:before {
   content: "\1F34F";
+  padding: 0 0.4em 0 0;
 }
 .ym-sleep:before {
   content: "\1F4A4";
+  padding: 0 0.4em 0 0;
 }
 .ym-warnsign:before {
   content: "\026A0";
+  padding: 0 0.4em 0 0;
 }
 .ym-handstop:before {
   content: "\0270B";
+  padding: 0 0.4em 0 0;
+}
+.ym-videogame:before {
+  content: "\1F3AE";
+  padding: 0 0.4em 0 0;
+}
+.ym-joystick:before {
+  content: "\1F579";
+  padding: 0 0.4em 0 0;
+}
+.ym-slotmachine:before {
+  content: "\1F3B0";
+  padding: 0 0.4em 0 0;
+}
+.ym-gamedie:before {
+  content: "\1F3B2";
+  padding: 0 0.4em 0 0;
+}
+.ym-puzzlepiece:before {
+  content: "\1F9E9";
+  padding: 0 0.4em 0 0;
+}
+.ym-teddybear:before {
+  content: "\1F9F8";
+  padding: 0 0.4em 0 0;
+}
+.ym-pictureframe:before {
+  content: "\1F5BC";
+  padding: 0 0.4em 0 0;
+}
+.ym-colourpalette:before {
+  content: "\1F3A8";
+  padding: 0 0.4em 0 0;
+}
+.ym-thread:before {
+  content: "\1F9F5";
+  padding: 0 0.4em 0 0;
+}
+.ym-yarn:before {
+  content: "\1F9F6";
+  padding: 0 0.4em 0 0;
+}
+.ym-yarn:before {
+  content: "\1F9F6";
+  padding: 0 0.4em 0 0;
+}
+.ym-glasses:before {
+  content: "\1F453";
+  padding: 0 0.4em 0 0;
+}
+.ym-sunglasses:before {
+  content: "\1F576";
+  padding: 0 0.4em 0 0;
+}
+.ym-crown:before {
+  content: "\1F451";
+  padding: 0 0.4em 0 0;
+}
+.ym-graduationcap:before {
+  content: "\1F393";
+  padding: 0 0.4em 0 0;
+}
+.ym-billedcap:before {
+  content: "\1F9E2";
+  padding: 0 0.4em 0 0;
+}
+.ym-gemstone:before {
+  content: "\1F48E";
+  padding: 0 0.4em 0 0;
+}
+.ym-postalhorn:before {
+  content: "\1F4EF";
+  padding: 0 0.4em 0 0;
+}
+.ym-loudspeaker:before {
+  content: "\1F4E2";
+  padding: 0 0.4em 0 0;
+}
+.ym-megaphone:before {
+  content: "\1F4E3";
+  padding: 0 0.4em 0 0;
+}
+.ym-musicalscore:before {
+  content: "\1F3BC";
+  padding: 0 0.4em 0 0;
+}
+.ym-musicalnote:before {
+  content: "\1F3B5";
+  padding: 0 0.4em 0 0;
+}
+.ym-musicalnotes:before {
+  content: "\1F3B6";
+  padding: 0 0.4em 0 0;
+}
+.ym-studiomicrophone:before {
+  content: "\1F399";
+  padding: 0 0.4em 0 0;
+}
+.ym-levelslider:before {
+  content: "\1F39A";
+  padding: 0 0.4em 0 0;
+}
+.ym-controlknobs:before {
+  content: "\1F39B";
+  padding: 0 0.4em 0 0;
+}
+.ym-microphone:before {
+  content: "\1F3A4";
+  padding: 0 0.4em 0 0;
+}
+.ym-headphone:before {
+  content: "\1F3A7";
+  padding: 0 0.4em 0 0;
+}
+.ym-radio:before {
+  content: "\1F4FB";
+  padding: 0 0.4em 0 0;
 }
 
 /* Eigene Symbolerweiterungen (ENDE) */
@@ -579,13 +746,13 @@
     text-shadow: none;
     position: static;
   }
-  * html .ym-button {
-    /* Button size-scaling classes */
-    /* 21px */
-    /* 18px */
-    /* 12px */
-    /* 10px */
-  }
+  /* * html .ym-button {
+    /* Button size-scaling classes
+    /* 21px
+    /* 18px
+    /* 12px
+    /* 10px
+  } */
   * html .ym-button.ym-primary {
     filter: progid:DXImageTransform.Microsoft.gradient(startColorStr='#8888ee', EndColorStr='#6666cc');
   }

@@ -729,8 +729,9 @@ class Weather(ModuleBase):
 							strClass="ym-close",
 							strHRef="/modules/Weather.html")
 						oHtmlPage.closeBox()
-						oHtmlPage.setAutoRefresh(nAutoRefresh=1, strUrl="/modules/Weather.html?Location=%s" % (
-							strLocation))
+						oHtmlPage.setAutoRefresh(
+							nAutoRefresh=1,
+							strUrl="/modules/Weather.html?Location=%s" % (strLocation))
 						return True
 
 				# oReg = self.m_oWeatherApi.city_id_registry()
@@ -816,8 +817,7 @@ class Weather(ModuleBase):
 		# Default, Startseite für Einrichtung der Wettervorhersage
 		oHtmlPage.createBox(
 			"Wettervorhersage einrichten",
-			"""Die Wettervorhersage kann in wenigen Schritten eingerichtet werden.
-			Für die Einrichtung ist eine Internet-Verbindung erforderlich.""",
+			"""Für die Einrichtung der Wettervorhersage ist eine Internet-Verbindung erforderlich.""",
 			strType="info", bClose=False)
 		# App-Key anfordern bzw. hinterlegen
 		if (not globs.getSetting("Weather", "strApiKey", r".+", "")):

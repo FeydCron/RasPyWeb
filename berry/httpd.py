@@ -22,9 +22,105 @@ from .worker import TaskModuleInit, TaskExit
 
 from . import sdk
 from .sdk import TaskSpeak, TaskSound, FastTask, ImageObject, HtmlPage, TaskModuleEvt, TaskSaveSettings
+
+class StartPageEntity(OrderedDict):
+
+	def getIndexOf(self,
+		oEntity):
+		nIdx = -1
+		for oObj in self.values():
+			nIdx += 1
+			if (oObj is oEntity):
+				return nIdx
+		return -1
+
+	def isMemberOf(self,
+		oEntity):
+		return self.getIndexOf(oEntity) >= 0
+
+	def getEntityAt(self,
+		nIndex):
+		if ((nIndex >= 0)
+			and (nIndex < len(self))):
+			return list(self.values())[nIndex]
+		return None
+
+	def removeEntityAt(self,
+		nIndex):
+		oEntity = self.getEntityAt(nIndex)
+		if (not oEntity is None):
+			self.pop(oEntity.m_strName)
+			return True
+		return False
+
+	def removeEntity(self,
+		oEntity):
+		return self.removeEntityAt(self.getIndexOf(oEntity))
+
+	def isFirstEntity(self,
+		oEntity,
+		bPopItem=False):
+		bResult = False
+		if (next(iter(self.values())) is oEntity):
+			if (bPopItem):
+				self.pop(oEntity.m_strName)
+			bResult = True
+		globs.log(("isFirst(PopItem=%s) = %s\n"
+			+ "\toEntity=%s\n") % (
+				bPopItem,
+				bResult,
+				oEntity
+		))
+		return bResult
+
+	def isLastEntity(self,
+		oEntity,
+		bPopItem=False):
+		bResult = False
+		if (next(iter(reversed(self.values()))) is oEntity):
+			if (bPopItem):
+				self.pop(oEntity.m_strName)
+			bResult = True
+		globs.log(("isLast(PopItem=%s) = %s\n"
+			+ "\toEntity=%s\n") % (
+				bPopItem,
+				bResult,
+				oEntity
+		))
+		return bResult
+
+	def setEntityNextTo(self,
+		oEntity,
+		strAnchor=None,
+		bAfter=True):		
+		if (oEntity is None):
+			return False
+		if (strAnchor and strAnchor in self):
+			oAnchor = self[strAnchor]
+			nIdx = self.getIndexOf(oAnchor)
+			if (self.removeEntity(oEntity)):
+				if (oAnchor is oEntity):
+					nIdx -= (0 if bAfter else 1)
+				else:
+					nIdx = self.getIndexOf(oAnchor)
+			nIdx += (1 if bAfter else 0)
+			nIdx = max(0, min(len(self), nIdx))
+			lstObj = list(self.values())
+			lstObj.insert(nIdx, oEntity)
+			self.clear()
+			for oObj in lstObj:
+				self[oObj.m_strName] = oObj
+			lstObj.clear()
+			return True
+		self[oEntity.m_strName] = oEntity
+		self.move_to_end(oEntity.m_strName, bAfter)
+		return True
 	
 # {<name> : <Section>}
-class StartPage(OrderedDict):
+class StartPage(StartPageEntity):
+
+	def __str__(self):
+		return "StartPage"
 
 	def writeToPage(self,
 		oHtmlPage,		# HTML-Seite, in welche zu schreiben ist
@@ -41,10 +137,11 @@ class StartPage(OrderedDict):
 		if bEdit:
 			self.editStartPage(oHtmlPage)
 			return
+
 		if self.editTarget(oHtmlPage, secEdt, artEdt, btnEdt):
 			return
-		bIsEmpty = True
 		
+		bIsEmpty = True		
 		for (_, oSection) in self.items():
 			oSection.writeToPage(oHtmlPage)
 			bIsEmpty = False
@@ -59,42 +156,26 @@ class StartPage(OrderedDict):
 	def editStartPage(self,
 		oHtmlPage
 		):
-		oHtmlPage.createBox("Startseite bearbeiten",
-			"Ein Element aus der Strukturansicht auswählen und bearbeiten " +
-			"oder ein neues Element hinzufügen.", bClose=False)
-		oHtmlPage.extend([
-			"<div class=\"nav-wrapper\">",
-			"<nav class=\"ym-vlist\">",
-			"<h6 class=\"ym-vtitle\">Strukturansicht</h6>"
-		])
-		oHtmlPage.append("<ul>")
+
 		for (strSecName, oSection) in self.items():
-			strType = "Nebenaufgaben"
-			if oSection.m_bPrimary:
-				strType = "Hauptaufgaben"
-			oHtmlPage.append(
-				"<li><a href=\"%s?secEdt=%s\">%s Abschnitt \"%s\"</a>" % (
-					globs.s_strStartPageUrl, strSecName, "&#x0270E;", strType))
-			oHtmlPage.append("<ul>")
-			for (strArtName, oArticle) in oSection.items():
-				oHtmlPage.append(
-					"<li><a href=\"%s?sec=%s&artEdt=%s\">%s Aufgabe \"%s\"</a></li>" % (
-						globs.s_strStartPageUrl, strSecName, strArtName, "&#x0270E;", oArticle.m_strTitle))
-			oHtmlPage.append(
-				"<li><a href=\"%s?sec=%s&artAdd=%s\">%s Neue Aufgabe erstellen</a></li>" % (
-					globs.s_strStartPageUrl, strSecName, uuid.uuid1().hex, "&#x0271A;"))
-			oHtmlPage.append("</ul>")
-			oHtmlPage.append("</li>")
-		oHtmlPage.append(
-			"<li><a href=\"%s?secAdd=%s\">%s Neuen Abschnitt anlegen</a></li>" % (
-				globs.s_strStartPageUrl, uuid.uuid1().hex, "&#x0271A;"))
+			oSection.writeToPage(oHtmlPage, secEdt=strSecName)
+		
 		oHtmlPage.extend([
-			"</ul>",
-			"</nav>",
-			"</div>"
+			"<article>",
+			"<div class=\"ym-gbox\"><hr/>",
+			"<div class=\"flexible float-right\">",
+		])
+		# Section einfügen (add)
+		oHtmlPage.append("<a class=\"bordered\" href=\"%s?secAdd=%s\">&#x02795;</a>" % (
+			globs.s_strStartPageUrl, uuid.uuid4().hex
+		))
+		oHtmlPage.extend([
+			"</div>",
+			"<p class=\"dimmed\">Neuer Abschnitt</p>",
+			"</div>",
+			"</article>"
 		])
 		oHtmlPage.createButton("Fertig", strClass="ym-save")
-		oHtmlPage.closeBox()
 		return
 		
 	def editTarget(self,
@@ -140,7 +221,7 @@ class StartPage(OrderedDict):
 			oTarget = oArticle
 			dictButtons.update({
 				"del" 		: ["art", "Aufgabe löschen", "ym-delete ym-danger"],
-				"btnAdd"	: [uuid.uuid1().hex, "Neue Schaltfläche", "ym-add"]
+				"btnAdd"	: [uuid.uuid4().hex, "Neue Schaltfläche", "ym-add"]
 			})
 		elif oSection != None:
 			dictQueries.update({"edit" 	: "startpage"})
@@ -167,7 +248,12 @@ class StartPage(OrderedDict):
 		return False
 
 # {<name> : <Article>}
-class Section(OrderedDict):
+class Section(StartPageEntity):
+
+	def __str__(self):
+		return "Section (%s)" % (
+			self.m_strName
+		)
 
 	def setSection(self,
 		strName,
@@ -179,40 +265,92 @@ class Section(OrderedDict):
 	
 	def writeToPage(self,
 		oHtmlPage,		# HTML-Seite, in welche zu schreiben ist
-		bEdit=False		# True, um den Aufgabentyp zu editieren
+		bEdit=False,	# True, um den Aufgabentyp zu editieren
+		secEdt="",		# Name der zu editierenden Sektion
+		artEdt="",		# Name des zu editierenden Artikels
+		btnEdt=""		# Name des zu editierenden Buttons
 		):
+
 		if bEdit:
 			oHtmlPage.appendForm("secPrimary", strInput="primary",
 				strTitle="Hauptaufgaben", bCheck=True,
 				bSelected=self.m_bPrimary)
 			return
+		
+		bEditMode = (secEdt and secEdt == self.m_strName)
+
 		strClass = "" # Alternating "ym-gl" and "ym-gr"
 		if self.m_bPrimary:
-			oHtmlPage.append("<section>")
+			oHtmlPage.append("<section class=\"ym-grid linearize-level-1\">")
 		else:
 			oHtmlPage.append("<section class=\"ym-grid linearize-level-2\">")
-		for (_, oArticle) in self.items():
+
+		if (bEditMode):
+			oHtmlPage.extend([
+				"<article>",
+				"<div class=\"ym-gbox\"><hr/>",
+				"<div class=\"flexible float-right\">",
+			])
+			# Section anpassen (wrench)
+			oHtmlPage.append("<a class=\"bordered\" href=\"%s?secEdt=%s\">&#x1f527;</a>" % (
+				globs.s_strStartPageUrl, secEdt
+			))
+			# Section einfügen (add)
+			oHtmlPage.append("<a class=\"bordered\" href=\"%s?sec=%s&secAdd=%s\">&#x02795;</a>" % (
+				globs.s_strStartPageUrl, secEdt, uuid.uuid4().hex
+			))
+			oHtmlPage.extend([
+				"</div>"
+				"<p class=\"dimmed\">Abschnitt</p>",
+				"</div>",
+				"</article>"
+			])
+
+		for (strArtName, oArticle) in self.items():
 			if self.m_bPrimary:
-				oHtmlPage.append(
-					"<article>")
+				oHtmlPage.append("<article>")
 			else:
 				if strClass == "ym-gl":
 					strClass = "ym-gr"
 				else:
 					strClass = "ym-gl"
-				oHtmlPage.append(
-					"<article class=\"ym-g50 %s\">" % (strClass))
+				oHtmlPage.append("<article class=\"ym-g50 %s\">" % (strClass))
 			oHtmlPage.append("<div class=\"ym-gbox\">")
-			oArticle.writeToPage(oHtmlPage)
+			oArticle.writeToPage(oHtmlPage, secEdt=secEdt, artEdt=(strArtName if bEditMode else ""))
 			oHtmlPage.extend([
 				"</div>",
 				"</article>"
 			])
+
+		if bEditMode:
+			oNewArt = Article()
+			oNewArt.setArticle("", strTitle="Neue Aufgabe")
+			if self.m_bPrimary:
+				oHtmlPage.append("<article>")
+			else:
+				if strClass == "ym-gl":
+					strClass = "ym-gr"
+				else:
+					strClass = "ym-gl"
+				oHtmlPage.append("<article class=\"ym-g50 %s\">" % (strClass))
+			oHtmlPage.append("<div class=\"ym-gbox dimmed\">")
+			oNewArt.writeToPage(oHtmlPage, secEdt=secEdt)
+			oHtmlPage.extend([
+				"</div>",
+				"</article>"
+			])
+
 		oHtmlPage.append("</section>")
+
 		return
 
 # {<name> : <Button>}		
-class Article(OrderedDict):
+class Article(StartPageEntity):
+
+	def __str__(self):
+		return "Article (%s)" % (
+			self.m_strTitle
+		)
 
 	def setArticle(self,
 		strName,
@@ -228,9 +366,13 @@ class Article(OrderedDict):
 
 	def writeToPage(self,
 		oHtmlPage,		# HTML-Seite, in welche zu schreiben ist
-		bEdit=False		# True, um den Artikel zu editieren
+		bEdit=False,	# True, um den Artikel zu editieren
+		secEdt="",		# Name der zu editierenden Sektion
+		artEdt="",		# Name des zu editierenden Artikels
+		btnEdt=""		# Name des zu editierenden Buttons
 		):
-		if bEdit:
+
+		if (bEdit):
 			oHtmlPage.appendForm("artTitle",
 				strInput=self.m_strTitle, strTitle="Titelzeile")
 			oHtmlPage.appendForm("artContent",
@@ -243,21 +385,63 @@ class Article(OrderedDict):
 					"Info" 		: "info",
 					"Neutral"	: ""})
 			oHtmlPage.append("<div class=\"ym-fbox\"><span class=\"ym-label\">Schaltflächen bearbeiten</span></div>")
-			for (btnName, oButton) in self.items():
+			for (strBtnName, oButton) in self.items():
 				oHtmlPage.appendForm("btnEdt",
-					strInput=btnName,
+					strInput=strBtnName,
 					strTitle=(oButton.m_strTitle),
 					bButton=True,
 					strClass=("%s %s" % (oButton.m_strIcon, oButton.m_strColor)))
-		else:
-			oHtmlPage.createBox(self.m_strTitle, self.m_strMsg,
-				strType=self.m_strType, bClose = False)
-			for (btnName, oButton) in self.items():
-				oButton.writeToPage(oHtmlPage)
-			oHtmlPage.closeBox()
+			return
+
+		bEditMode = (secEdt and artEdt and artEdt == self.m_strName)
+
+		if (bEditMode):
+			oHtmlPage.append("<div class=\"flexible float-right\">")
+			# # Section anpassen (wrench)
+			# oHtmlPage.append("<a class=\"bordered\" href=\"%s?secEdt=%s\">&#x1f527;</a>" % (
+			# 	globs.s_strStartPageUrl, secEdt
+			# ))
+			# Aufgabe verschieben (up)
+			oHtmlPage.append("<a class=\"bordered\" href=\"%s?sec=%s&artUp=%s&edit=startpage\">&#x023f6;</a>" % (
+				globs.s_strStartPageUrl, secEdt, artEdt
+			))
+			# Aufgabe verschieben (down)
+			oHtmlPage.append("<a class=\"bordered\" href=\"%s?sec=%s&artDn=%s&edit=startpage\">&#x023f7;</a>" % (
+				globs.s_strStartPageUrl, secEdt, artEdt
+			))
+			# Aufgabe ändern (edit)
+			oHtmlPage.append("<a class=\"bordered\" href=\"%s?sec=%s&artEdt=%s\">&#x1f4dd;</a>" % (
+				globs.s_strStartPageUrl, secEdt, artEdt
+			))
+			# Aufgabe einfügen (add)
+			oHtmlPage.append("<a class=\"bordered\" href=\"%s?sec=%s&art=%s&artAdd=%s\">&#x02795;</a>" % (
+				globs.s_strStartPageUrl, secEdt, self.m_strName, uuid.uuid4().hex
+			))
+			oHtmlPage.append("</div>")
+
+		if (self.m_strName == ""):
+			oHtmlPage.append("<div class=\"flexible float-right\">")
+			if (secEdt):
+				oHtmlPage.append("<a class=\"bordered\" href=\"%s?sec=%s&artAdd=%s\">&#x02795;</a>" % (
+					globs.s_strStartPageUrl, secEdt, uuid.uuid4().hex
+				))
+			oHtmlPage.append("</div>")
+
+		oHtmlPage.createBox(self.m_strTitle, self.m_strMsg, strType=self.m_strType, bClose=False)
+
+		for (strBtnName, oButton) in self.items():
+			oButton.writeToPage(oHtmlPage, secEdt=secEdt, artEdt=artEdt, btnEdt=(strBtnName if bEditMode else ""))
+
+		oHtmlPage.closeBox()
+
 		return
 		
 class Button:
+
+	def __str__(self):
+		return "Button (%s)" % (
+			self.m_strTitle
+		)
 
 	def setButton(self,
 		strName,
@@ -277,7 +461,10 @@ class Button:
 		
 	def writeToPage(self,
 		oHtmlPage,		# HTML-Seite, in welche zu schreiben ist
-		bEdit=False		# True, um die Schaltfläche zu editieren
+		bEdit=False,	# True, um die Schaltfläche zu editieren
+		secEdt="",		# Name der zu editierenden Sektion
+		artEdt="",		# Name des zu editierenden Artikels
+		btnEdt=""		# Name des zu editierenden Buttons
 		):
 		if bEdit:
 			oHtmlPage.appendForm("btnTitle",
@@ -354,17 +541,20 @@ class Button:
 					"Gelb" 		: "ym-warning",
 					"Blau" 		: "ym-primary",
 					"Neutral"	: ""})
+			
+			return
+
+		strRedirect = ""
+		if "?" in self.m_strHRef:
+			strRedirect = "&redirect2="
 		else:
-			strRedirect = ""
-			if "?" in self.m_strHRef:
-				strRedirect = "&redirect2="
-			else:
-				strRedirect = "?redirect2="
-			strRedirect += self.m_strRedirect
-			oHtmlPage.createButton(
-				self.m_strTitle,
-				"%s%s" % (self.m_strHRef, strRedirect),
-				"%s %s" % (self.m_strIcon, self.m_strColor))
+			strRedirect = "?redirect2="
+		strRedirect += self.m_strRedirect
+		oHtmlPage.createButton(
+			self.m_strTitle,
+			"%s%s" % (self.m_strHRef, strRedirect),
+			"%s %s" % (self.m_strIcon, self.m_strColor))
+
 		return
 		
 class TaskModuleCmd(FastTask):
@@ -825,7 +1015,7 @@ class TaskDisplaySettings(FastTask):
 				globs.exc("Ändern der Konfiguration")
 				varVal = None
 		# <<< Critical Section
-		if varVal == None:
+		if varVal is None:
 			return False
 		if strDesc:
 			strDesc += " "
@@ -1059,7 +1249,6 @@ class TaskDisplaySounds(FastTask):
 			dictSounds = globs.s_dictSettings["Sounds"]
 			# Standardklänge darstellen
 			if "Default" in dictSounds:
-				strAnchor = uuid.uuid1().hex
 				self.m_oHtmlPage.append("<li><span>Standard</span>")
 				self.m_oHtmlPage.append("<ul>")
 				for (strName, strFile) in sorted(dictSounds["Default"].items()):
@@ -1072,16 +1261,20 @@ class TaskDisplaySounds(FastTask):
 					_, strExt = os.path.splitext(strTail)
 					
 					self.m_oHtmlPage.append(
-						"<li id=\"%s\"><a href=\"%s?sound=%s&token=%s#%s\">%s %s [%s]</a></li>" % (
-							strName, "/sound/values.html", strName, strAnchor, strName,
-							strActive, strName, strExt.strip(".").upper()))
+						"<li id=\"%s\"><a href=\"%s?sound=%s#%s\">%s %s [%s]</a></li>" % (
+							strName,
+							"/sound/values.html",
+							strName,
+							strName,
+							strActive,
+							strName,
+							strExt.strip(".").upper()))
 				self.m_oHtmlPage.append("</ul>")
 				self.m_oHtmlPage.append("</li>")
 			# Alle übrigen Klänge darstellen
 			for (strCategory, dictSounds) in sorted(globs.s_dictSettings["Sounds"].items()):
 				if strCategory == "Default":
 					continue
-				strAnchor = uuid.uuid1().hex
 				self.m_oHtmlPage.append("<li><span>%s</span>" % (strCategory))
 				self.m_oHtmlPage.append("<ul>")
 				for (strName, strFile) in sorted(dictSounds.items()):
@@ -1094,9 +1287,14 @@ class TaskDisplaySounds(FastTask):
 					_, strExt = os.path.splitext(strTail)
 
 					self.m_oHtmlPage.append(
-						"<li id=\"%s\"><a href=\"%s?sound=%s&token=%s#%s\">%s %s [%s]</a></li>" % (
-							strName, "/sound/values.html", strName, strAnchor, strName,
-							strActive, strName, strExt.strip(".").upper()))
+						"<li id=\"%s\"><a href=\"%s?sound=%s#%s\">%s %s [%s]</a></li>" % (
+							strName,
+							"/sound/values.html",
+							strName,
+							strName,
+							strActive,
+							strName,
+							strExt.strip(".").upper()))
 				self.m_oHtmlPage.append("</ul>")
 				self.m_oHtmlPage.append("</li>")
 		self.m_oHtmlPage.extend([
@@ -1151,11 +1349,10 @@ class TaskDisplayImages(FastTask):
 			dictImages = globs.s_dictSettings["Images"]
 			# Standard-Bilder darstellen
 			if "Default" in dictImages:
-				strAnchor = uuid.uuid1().hex
 				self.m_oHtmlPage.append("<li><span>Standard</span>")
 				self.m_oHtmlPage.append("<ul>")
 				for (strName, strFile) in sorted(dictImages["Default"].items()):
-
+					
 					_, strTail = os.path.split(strFile)
 					_, strExt = os.path.splitext(strTail)
 
@@ -1171,16 +1368,20 @@ class TaskDisplayImages(FastTask):
 						strActive = "&#x1F441;"
 					
 					self.m_oHtmlPage.append(
-						"<li id=\"%s\"><a href=\"%s?image=%s&token=%s#%s\">%s %s [%s]</a></li>" % (
-							strName, "/image/values.html", strName, strAnchor, strName,
-							strActive, strName, strExt.strip(".").upper()))
+						"<li id=\"%s\"><a href=\"%s?image=%s#%s\">%s %s [%s]</a></li>" % (
+							strName,
+							"/image/values.html",
+							strName,
+							strName,
+							strActive,
+							strName,
+							strExt.strip(".").upper()))
 				self.m_oHtmlPage.append("</ul>")
 				self.m_oHtmlPage.append("</li>")
 			# Alle übrigen Bilder darstellen
 			for (strCategory, dictImages) in sorted(globs.s_dictSettings["Images"].items()):
 				if strCategory == "Default":
 					continue
-				strAnchor = uuid.uuid1().hex
 				self.m_oHtmlPage.append("<li><span>%s</span>" % (strCategory))
 				self.m_oHtmlPage.append("<ul>")
 				for (strName, strFile) in sorted(dictImages.items()):
@@ -1200,9 +1401,14 @@ class TaskDisplayImages(FastTask):
 						strActive = "&#x1F441;"
 
 					self.m_oHtmlPage.append(
-						"<li id=\"%s\"><a href=\"%s?image=%s&token=%s#%s\">%s %s [%s]</a></li>" % (
-							strName, "/image/values.html", strName, strAnchor, strName,
-							strActive, strName, strExt.strip(".").upper()))
+						"<li id=\"%s\"><a href=\"%s?image=%s#%s\">%s %s [%s]</a></li>" % (
+							strName,
+							"/image/values.html",
+							strName,
+							strName,
+							strActive,
+							strName,
+							strExt.strip(".").upper()))
 				self.m_oHtmlPage.append("</ul>")
 				self.m_oHtmlPage.append("</li>")
 		self.m_oHtmlPage.extend([
@@ -1324,13 +1530,13 @@ class TaskStartPage(FastTask):
 				self.doSubmit()
 				bEdit = False
 		if self.m_dictQuery:
-			if "secEdt" in self.m_dictQuery:
+			if ("secEdt" in self.m_dictQuery):
 				secEdt = self.m_dictQuery["secEdt"][0]
 			if ("artEdt" in self.m_dictQuery
 				and "sec" in self.m_dictQuery):
 				secEdt = self.m_dictQuery["sec"][0]
 				artEdt = self.m_dictQuery["artEdt"][0]
-			if "secAdd" in self.m_dictQuery:
+			if ("secAdd" in self.m_dictQuery):
 				secEdt = self.m_dictQuery["secAdd"][0]
 				self.doAdd(addSec=secEdt)
 			if ("artAdd" in self.m_dictQuery
@@ -1338,51 +1544,123 @@ class TaskStartPage(FastTask):
 				secEdt = self.m_dictQuery["sec"][0]
 				artEdt = self.m_dictQuery["artAdd"][0]
 				self.doAdd(addArt=artEdt)
+			if ("artUp" in self.m_dictQuery
+				and "sec" in self.m_dictQuery):
+				sec = self.m_dictQuery["sec"][0]
+				art = self.m_dictQuery["artUp"][0]
+				self.doMove(globs.s_oStartPage, sec, art, bAfter=False)
+			if ("artDn" in self.m_dictQuery
+				and "sec" in self.m_dictQuery):
+				sec = self.m_dictQuery["sec"][0]
+				art = self.m_dictQuery["artDn"][0]
+				self.doMove(globs.s_oStartPage, sec, art, bAfter=True)
+
 			
 		globs.s_oStartPage.writeToPage(self.m_oHtmlPage, bEdit, secEdt, artEdt, btnEdt)
 		return
 		
-	def doAdd(self, addSec="", addArt="", addBtn=""):
+	def doAdd(self, addSec="", addArt="", addBtn=""):		
 		
 		strSec = ""
 		strArt = ""
+		strBtn = ""
+		strAnchor = ""
+		bAfter = True
+		oParent = None
+		oEntity = None
 		
 		globs.dbg(
 			"doAdd(addSec=\"%s\", addArt=\"%s\", addBtn=\"%s\")" % (
 			addSec, addArt, addBtn))
 		
-		if addBtn and self.m_dictForm:
-			if "sec" in self.m_dictForm:
-				strSec = self.m_dictForm["sec"][0]
-				if "art" in self.m_dictForm:
-					strArt = self.m_dictForm["art"][0]
-		elif addSec:
-			oSection = Section()
-			oSection.setSection(addSec, True)
-			globs.s_oStartPage.update({addSec : oSection})
-			return
+		if (addSec):
+			if ("sec" in self.m_dictQuery):
+				strSec = self.m_dictQuery["sec"][0]
+			oParent = globs.s_oStartPage
+			oEntity = Section()
+			oEntity.setSection(addSec, True)
+			bAfter = (False if strSec else True)
+			strAnchor = strSec
 		elif (addArt and self.m_dictQuery
 			and "sec" in self.m_dictQuery):
 			strSec = self.m_dictQuery["sec"][0]
+			if ("art" in self.m_dictQuery):
+				strArt = self.m_dictQuery["art"][0]
+			if (strSec in globs.s_oStartPage):
+				oParent = globs.s_oStartPage[strSec]
+				oEntity = Article()
+				oEntity.setArticle(addArt)
+				bAfter = (False if strArt else True)
+				strAnchor = strArt
+		elif (addBtn and self.m_dictForm
+			and "sec" in self.m_dictForm
+			and "art" in self.m_dictForm):
+			strSec = self.m_dictForm["sec"][0]
+			strArt = self.m_dictForm["art"][0]
+			if ("btn" in self.m_dictForm):
+				strBtn = self.m_dictForm["btn"][0]
+			if (strSec in globs.s_oStartPage):
+				oObj = globs.s_oStartPage[strSec]
+			if (strArt in oObj):
+				oParent = oObj[strArt]
+				oEntity = Button()
+				oEntity.setButton(addBtn)
+				bAfter = (False if strBtn else True)
+				strAnchor = strBtn
 		else:
-			return
+			return False
 		
-		for (strName, oSection) in globs.s_oStartPage.items():
-			if strName == strSec:
-				if addArt:
-					oArticle = Article()
-					oArticle.setArticle(addArt)
-					oSection.update({addArt : oArticle})
-					return
-				for (strName, oArticle) in oSection.items():
-					if strName == strArt:
-						if addBtn:
-							oButton = Button()
-							oButton.setButton(addBtn)
-							oArticle.update({addBtn : oButton})
-						return	
-				return	
-		return
+		if ((not oParent is None)
+			and (not oEntity is None)):
+			return oParent.setEntityNextTo(oEntity, strAnchor=strAnchor, bAfter=bAfter)
+		return False
+
+	def doMove(self,
+		oRoot,
+		strParent,
+		strItem,
+		bAfter=True):
+
+		oParent = None
+		oItem = None
+
+		if (oRoot and strParent and strParent in oRoot):
+			oParent = oRoot[strParent]
+		if (oParent and strItem and strItem in oParent):
+			oItem = oParent[strItem]
+
+		if ((oParent is None)
+			or (oItem is None)):
+			return False
+
+		oPrev = None
+		oNext = None
+
+		nIdx = oRoot.getIndexOf(oParent)
+		if (nIdx > 0):
+			oPrev = oRoot.getEntityAt(nIdx - 1)
+		if ((nIdx + 1) < len(oRoot)):
+			oNext = oRoot.getEntityAt(nIdx + 1)
+
+		globs.log(("doMove()\n"
+			+ "\toParent=%s\n"
+			+ "\toItem=%s\n"
+			+ "\toPrev=%s\n"
+			+ "\toNext=%s") % (
+				oParent,
+				oItem,
+				(oPrev if oPrev != None else "None"),
+				(oNext if oNext != None else "None")
+		))
+
+		if (bAfter):
+			if((not oNext is None)
+				and oParent.isLastEntity(oItem, bPopItem=True)):
+				return oNext.setEntityNextTo(oItem, bAfter=False)
+		elif ((not oPrev is None)
+			and oParent.isFirstEntity(oItem, bPopItem=True)):
+			return oPrev.setEntityNextTo(oItem, bAfter=True)
+		return oParent.setEntityNextTo(oItem, strAnchor=strItem, bAfter=bAfter)
 		
 	def doDelete(self, strType):
 		

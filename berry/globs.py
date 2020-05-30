@@ -300,7 +300,7 @@ def stop():
 	return
 
 def getVersion():
-	return float(0.8)
+	return float(0.9)
 
 def getWatchDogInterval():
 	return float(10.0)

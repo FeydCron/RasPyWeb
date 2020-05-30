@@ -395,21 +395,10 @@ class Updater(ModuleBase):
 		dictQuery,
 		dictForm):
 
-		# Eine Systemaktualisierung ist aktiv
-		if (self.m_bUpdInProgress
-			or globs.s_strExitMode):
+		if (self.m_bUpdInProgress or globs.s_strExitMode):
 			return self.serveStatusBusy(oHtmlPage, dictQuery, dictForm)
-		
-		# Eine neuere Version ist zur Installation bereit
-		if (self.m_fUpdVersion > globs.getVersion()):
-			return self.serveStatusCanInstall(oHtmlPage, dictQuery, dictForm)
-		
-		# Eine neuere Version ist verfügbar
-		if (self.m_fChkVersion > globs.getVersion()):
-			return self.serveStatusCanDownload(oHtmlPage, dictQuery, dictForm)
-		
-		# Default
-		return self.serveStatusCanCheck(oHtmlPage, dictQuery, dictForm)
+
+		return self.serveStatusIdle(oHtmlPage, dictQuery, dictForm)
 
 	def serveStatusBusy(self,
 		oHtmlPage,
@@ -472,103 +461,63 @@ class Updater(ModuleBase):
 
 		return True
 
-	def serveStatusCanInstall(self,
+	def serveStatusIdle(self,
 		oHtmlPage,
 		dictQuery,
 		dictForm):
+
+		strIcon = "ym-refresh"
+		strType = "info"
+		strText = ""
+
+		if (self.m_fUpdVersion > globs.getVersion() and self.m_oOnlineUpdateIO):
+			strIcon = "ym-spark"
+			strType = "warning"
+			strText = "Eine Aktualisierung auf die Version %s wurde heruntergeladen und kann jetzt installiert werden." % (
+				self.m_fUpdVersion)
+		elif (self.m_fChkVersion > globs.getVersion()):
+			strIcon = "ym-inbox"
+			strType = "warning"
+			strText = "Eine Aktualisierung auf die Version %s ist verfügbar und kann jetzt heruntergeladen werden." % (
+				self.m_fChkVersion)
+		elif (self.m_fChkVersion == globs.getVersion()):
+			strType = "success"
+			strText = "Das System ist auf dem aktuellen Stand. Es sind keine Aktualisierungen verfügbar."
+		elif (self.m_fChkVersion == 0.0):
+			strText = "Es wurde noch nicht nach einer Aktualisierung gesucht."
 
 		oHtmlPage.createBox(
 			"Systemaktualisierung",
-			"Derzeit ist die Version %s installiert." % (
-				globs.getVersion()),
-			strType="warning", bClose=False)
+			"Derzeit ist die Version %s installiert." % (globs.getVersion()),
+			strType=strType, bClose=False)
 
-		if (self.m_fUpdVersion != 0.0 and self.m_oOnlineUpdateIO):
-			oHtmlPage.createText(
-				"Eine Aktualisierung auf die Version %s wurde heruntergeladen und kann installiert werden." % (
-					self.m_fUpdVersion))
+		if (strText):
+			oHtmlPage.createText(strText)
 
 		if (self.m_bAutoReboot):
 			oHtmlPage.createText(
-				"Die automatische Aktualisierung erfolgt um %s Uhr." % (
+				"Aktualisierungen werden jeweils um %s Uhr automatisch gesucht, heruntergeladen und installiert." % (
+					self.m_nUpdateHour))
+		elif (self.m_bAutoUpdate):
+			oHtmlPage.createText(
+				"Aktualisierungen werden jeweils um %s Uhr automatisch gesucht und heruntergeladen aber nicht installiert." % (
 					self.m_nUpdateHour))
 		else:
 			oHtmlPage.createText(
-				"Die automatische Aktualisierung ist ausgeschaltet.")
+				"Aktualisierungen werden nicht automatisch gesucht, heruntergeladen oder installiert.")
 		
 		oHtmlPage.createButton(
-			"Jetzt aktualisieren",
-			strClass="ym-warning",
-			strHRef="/modules/Updater.html?token=%s" % (self.m_strUpdateToken))
-		oHtmlPage.closeBox()
-
-		return True
-
-	def serveStatusCanDownload(self,
-		oHtmlPage,
-		dictQuery,
-		dictForm):
-
-		oHtmlPage.createBox(
-			"Systemaktualisierung",
-			"Derzeit ist die Version %s installiert." % (
-				globs.getVersion()),
-			strType="warning", bClose=False)
-
-		if (self.m_fChkVersion > self.m_fUpdVersion):
-			oHtmlPage.createText(
-				"Eine Aktualisierung auf die Version %s ist verfügbar und kann heruntergeladen werden." % (
-					self.m_fChkVersion))
-
-		if (self.m_bAutoReboot):
-			oHtmlPage.createText(
-				"Die automatische Aktualisierung erfolgt um %s Uhr." % (
-					self.m_nUpdateHour))
-			oHtmlPage.createButton(
-				"Jetzt aktualisieren",
-				strClass="ym-warning",
-				strHRef="/modules/Updater.html?token=%s" % (self.m_strDownloadToken))
-		else:
-			if (self.m_bAutoUpdate):
-				oHtmlPage.createText(
-					"Die Aktualisierung wird um %s Uhr automatisch heruntergeladen und kann dann installiert werden." % (
-						self.m_nUpdateHour))
-			else:
-				oHtmlPage.createText(
-					"Die automatische Aktualisierung ist ausgeschaltet.")
-
-			oHtmlPage.createButton(
-				"Jetzt herunterladen",
-				strClass="ym-warning",
-				strHRef="/modules/Updater.html?token=%s" % (self.m_strDownloadToken))
-		
-		oHtmlPage.closeBox()
-		return True
-
-	def serveStatusCanCheck(self,
-		oHtmlPage,
-		dictQuery,
-		dictForm):
-
-		if (self.m_fChkVersion == globs.getVersion()):
-			oHtmlPage.createBox(
-				"Systemaktualisierung",
-				"Derzeit ist die Version %s installiert." % (globs.getVersion()),
-				strType="success", bClose=False)
-			oHtmlPage.createText(
-				"Das System ist auf dem aktuellen Stand. Es sind keine Aktualisierungen verfügbar.")
-		else:
-			oHtmlPage.createBox(
-				"Systemaktualisierung",
-				"Derzeit ist die Version %s installiert." % (globs.getVersion()),
-				strType="info", bClose=False)
-		
-		oHtmlPage.createButton(
-			"Aktualisierung suchen",
+			"Aktualisieren",
+			strClass=strIcon,
 			strHRef="/modules/Updater.html?token=%s" % (self.m_strDownloadToken))
 		oHtmlPage.createButton(
-			"Aktualisierung hochladen",
+			"Hochladen",
+			strClass="ym-outbox",
 			strHRef="/modules/Updater.html?token=%s" % (self.m_strUploadToken))
+		oHtmlPage.createButton(
+			"Schließen",
+			strClass="ym-close",
+			strHRef="/system/settings.html")
 
 		oHtmlPage.closeBox()
 		return True

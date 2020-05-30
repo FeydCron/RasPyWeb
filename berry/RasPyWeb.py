@@ -1,20 +1,20 @@
 ﻿from . import globs
 
-# Try to import from module "ptvsd" which might not be installed on the target system
+# Try to import from module "debugpy" which might not be installed on the target system
 #
 g_bPackageMissing = True
 try:
-	import ptvsd
+	import debugpy
 
-	globs.dbg("Modul <ptvsd> scheint verfügbar zu sein")
+	globs.dbg("Modul <debugpy> scheint verfügbar zu sein")
 	g_bPackageMissing = False
 
-	#ptvsd.wait_for_attach()
+	#debugpy.wait_for_client()
 except:
-	globs.exc("Modul <ptvsd> scheint nicht verfügbar zu sein")
+	globs.exc("Modul <debugpy> scheint nicht verfügbar zu sein")
 
 globs.registerPipPackage(
-	g_bPackageMissing, "ptvsd", "Python Visual Studio Debugger engine",
+	g_bPackageMissing, "debugpy", "Python Visual Studio Debugger engine",
 	"""Das Paket kann verwendet werden, um Python-Programme mit Visual Studio oder
 	Visual Studio Code zu debuggen.""")
 
@@ -134,8 +134,8 @@ class Berry:
 
 def main():
 
-	if (not globs.isMissingPipPackage("ptvsd")):
-		ptvsd.enable_attach(address=("0.0.0.0", 5678))
+	if (not globs.isMissingPipPackage("debugpy")):
+		debugpy.listen(("0.0.0.0", 5678))
 
 	oBerry = Berry()
 	oBerry.run()

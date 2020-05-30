@@ -535,10 +535,23 @@ class HtmlPage(HttpContent):
 		self.m_bAct = False
 		self.m_strQueries = ""
 		self.m_strAutoRefresh = ""
+		self.m_strAnchor = ""
 		self.m_nId = 0
 		
 		self.setAutoRefresh(nAutoRefresh)
 		return
+
+	def setAnchor(self,
+		strAnchor):
+		self.m_strAnchor = strAnchor
+		return
+
+	def nextID(self):
+		self.m_nId += 1
+		return self.m_nId
+
+	def getID(self):
+		return self.m_nId
 		
 	## 
 	#  @brief Brief
@@ -917,6 +930,8 @@ class HtmlPage(HttpContent):
 			else:
 				self.m_strQueries += "?"
 			self.m_strQueries += "%s=%s" % (strName, strValue)
+		if (self.m_strAnchor):
+			self.m_strQueries += "#%s" % (self.m_strAnchor)
 		self.append(
 			"<form class=\"%s\" method=\"%s\" enctype=\"%s\" action=\"%s%s\">" % (
 				"ym-form ym-full", "post", "multipart/form-data", self.m_strPath, self.m_strQueries))
@@ -979,7 +994,6 @@ class HtmlPage(HttpContent):
 					if (type(oValue) is list or type(oValue) is tuple):
 						self.append("<p>%s</p>" % (oName))
 						for oItem in sorted(oValue):
-							self.m_nId += 1
 							if (bSelected or strInput == "%s" % oItem):
 								strSelected = "checked"
 							else:
@@ -987,13 +1001,12 @@ class HtmlPage(HttpContent):
 							self.extend([
 								"<div class=\"ym-fbox-check\">",
 								"<input type=\"%s\" name=\"%s\" value=\"%s\" id=\"%s\" %s/>" % (
-									strType, strName, oItem, self.m_nId, strSelected),
+									strType, strName, oItem, self.nextID(), strSelected),
 								"<label for=\"%s\">%s</label>" % (
-									self.m_nId, html.escape("%s" % oItem)),
+									self.getID(), html.escape("%s" % oItem)),
 								"</div>"
 							])
 					else:
-						self.m_nId += 1
 						if (bSelected or strInput == "%s" % oValue):
 							strSelected = "checked"
 						else:
@@ -1001,9 +1014,9 @@ class HtmlPage(HttpContent):
 						self.extend([
 							"<div class=\"ym-fbox-check\">",
 							"<input type=\"%s\" name=\"%s\" value=\"%s\" id=\"%s\" %s/>" % (
-								strType, strName, oValue, self.m_nId, strSelected),
+								strType, strName, oValue, self.nextID(), strSelected),
 							"<label for=\"%s\">%s</label>" % (
-								self.m_nId, oName),
+								self.getID(), oName),
 							"</div>"
 						])
 				self.append("</div>")
@@ -1016,17 +1029,16 @@ class HtmlPage(HttpContent):
 				if nLines:
 					nSize = nLines
 				if strTitle:
-					self.m_nId += 1
+					self.nextID()
 					self.append(
 						"<label for=\"%s\">%s</label>" % (
-						self.m_nId, strTitle))
+						self.getID(), strTitle))
 				self.append(
 					"<select name=\"%s\" size=\"%s\" id=\"%s\">" % (
-						strName, nSize, self.m_nId))
+						strName, nSize, self.getID()))
 				for (oName, oValue) in sorted(dictChoice.items()):
 					if bEscape:
 						oName = html.escape("%s" % oName)
-					self.m_nId += 1
 					if (isinstance(oValue, dict)):
 						self.append("<optgroup label=\"%s\">" % (oName))
 						for (oName, oItem) in sorted(oValue.items()):
@@ -1061,13 +1073,13 @@ class HtmlPage(HttpContent):
 			# Textarea
 			self.append("<div class=\"ym-fbox ym-fbox-text\">")
 			if strTitle:
-				self.m_nId += 1
+				self.nextID()
 				self.append(
 					"<label for=\"%s\">%s</label>" % (
-					self.m_nId, strTitle))
+					self.getID(), strTitle))
 			self.append(
 				"<textarea id=\"%s\" rows=\"%s\" name=\"%s\">%s</textarea>" % (
-				self.m_nId, nLines, strName, html.escape("%s" % strInput)))
+				self.getID(), nLines, strName, html.escape("%s" % strInput)))
 			self.append("</div>")
 		elif bCheck:
 			# Einzelne Check-Box
@@ -1080,12 +1092,12 @@ class HtmlPage(HttpContent):
 				strTitle = strInput
 				if strTitle and bEscape:
 					strTitle = html.escape("%s" % strTitle)
-			self.m_nId += 1
+			self.nextID()
 			self.extend([
 				"<input type=\"checkbox\" name=\"%s\" value=\"%s\" id=\"%s\" %s/>" % (
-					strName, strInput, self.m_nId, strSelected),
+					strName, strInput, self.getID(), strSelected),
 				"<label for=\"%s\">%s</label>" % (
-					self.m_nId, strTitle),
+					self.getID(), strTitle),
 				"</div>"
 			])
 		elif bButton:
@@ -1098,12 +1110,12 @@ class HtmlPage(HttpContent):
 		else:
 			# Textfeld
 			self.append("<div class=\"ym-fbox ym-fbox-text\">")
-			self.m_nId += 1
+			self.nextID()
 			self.extend([
 				"<label for=\"%s\">%s</label>" % (
-					self.m_nId, strTitle),
+					self.getID(), strTitle),
 				"<input type=\"%s\" name=\"%s\" value=\"%s\" id=\"%s\" %s placeholder=\"%s\"/>" % (
-					strTextType, strName, strInput, self.m_nId, strTypePattern, html.escape("%s" % strInput)),
+					strTextType, strName, strInput, self.getID(), strTypePattern, html.escape("%s" % strInput)),
 				"</div>"
 			])
 		return

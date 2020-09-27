@@ -161,19 +161,19 @@ class StartPage(StartPageEntity):
 			oSection.writeToPage(oHtmlPage, secEdt=strSecName)
 		
 		oHtmlPage.extend([
+			"<div class=\"section-edit\">",
 			"<article id=\"%s\">" % (oHtmlPage.nextID()),
-			"<div class=\"ym-gbox\"><hr/>",
-			"<div class=\"flexible float-right\">",
+			"<div class=\"toolbar-right\">",
 		])
 		# Section einfügen (add)
-		oHtmlPage.append("<a class=\"bordered\" href=\"%s?secAdd=%s&anchor=%s\">&#x02795;</a>" % (
+		oHtmlPage.append("<a class=\"ym-button toolbar-button icon-add\" href=\"%s?secAdd=%s&anchor=%s\"></a>" % (
 			globs.s_strStartPageUrl, uuid.uuid4().hex, oHtmlPage.getID()
 		))
 		oHtmlPage.extend([
 			"</div>",
 			"<p class=\"dimmed\">Neuer Abschnitt</p>",
-			"</div>",
-			"</article>"
+			"</article>",
+			"</div>"
 		])
 		oHtmlPage.createButton("Fertig", strClass="ym-save")
 		return
@@ -271,6 +271,8 @@ class Section(StartPageEntity):
 		btnEdt=""		# Name des zu editierenden Buttons
 		):
 
+		oHtmlPage.nextID()
+
 		if bEdit:
 			oHtmlPage.appendForm("secPrimary", strInput="primary",
 				strTitle="Hauptaufgaben", bCheck=True,
@@ -279,42 +281,50 @@ class Section(StartPageEntity):
 		
 		bEditMode = (secEdt and secEdt == self.m_strName)
 
+		if (bEditMode):
+			oHtmlPage.append("<div class=\"section-edit %s\">" % ("horizontal" if self.m_bPrimary else "vertical"))
+
 		strClass = "" # Alternating "ym-gl" and "ym-gr"
 		if self.m_bPrimary:
-			oHtmlPage.append("<section id=\"%s\" class=\"ym-grid linearize-level-1\">" % (oHtmlPage.nextID()))
+			oHtmlPage.append("<section class=\"ym-grid\">")
 		else:
-			oHtmlPage.append("<section id=\"%s\" class=\"ym-grid linearize-level-2\">" % (oHtmlPage.nextID()))
+			oHtmlPage.append("<section class=\"ym-grid\">")
 
 		if (bEditMode):
 			oHtmlPage.extend([
-				"<article id=\"%s\">" % (oHtmlPage.nextID()),
-				"<div class=\"ym-gbox\"><hr/>",
-				"<div class=\"flexible float-right\">",
+				"<article>",
+				"<div class=\"toolbar-right\">",
 			])
 			# Section anpassen (wrench)
-			oHtmlPage.append("<a class=\"bordered\" href=\"%s?secEdt=%s&anchor=%s\">&#x1f527;</a>" % (
+			# oHtmlPage.append("<a class=\"bordered\" href=\"%s?secEdt=%s&anchor=%s\">&#x1f527;</a>" % (
+			# 	globs.s_strStartPageUrl, secEdt, oHtmlPage.getID()
+			# ))
+			oHtmlPage.append("<a class=\"toolbar-button icon-wrench ym-button\" href=\"%s?secEdt=%s&anchor=%s\"></a>" % (
 				globs.s_strStartPageUrl, secEdt, oHtmlPage.getID()
 			))
 			# Section einfügen (add)
-			oHtmlPage.append("<a class=\"bordered\" href=\"%s?sec=%s&secAdd=%s&anchor=%s\">&#x02795;</a>" % (
+			# oHtmlPage.append("<a class=\"bordered\" href=\"%s?sec=%s&secAdd=%s&anchor=%s\">&#x02795;</a>" % (
+			# 	globs.s_strStartPageUrl, secEdt, uuid.uuid4().hex, oHtmlPage.getID()
+			# ))
+			oHtmlPage.append("<a class=\"toolbar-button icon-add ym-button\" href=\"%s?sec=%s&secAdd=%s&anchor=%s\"></a>" % (
 				globs.s_strStartPageUrl, secEdt, uuid.uuid4().hex, oHtmlPage.getID()
 			))
 			oHtmlPage.extend([
-				"</div>"
-				"<p class=\"dimmed\">Abschnitt</p>",
 				"</div>",
+				"<p class=\"dimmed\">Abschnitt</p>",
 				"</article>"
 			])
 
 		for (strArtName, oArticle) in self.items():
+			oHtmlPage.nextID()
 			if self.m_bPrimary:
-				oHtmlPage.append("<article id=\"%s\">" % (oHtmlPage.nextID()))
+				oHtmlPage.append("<article id=\"%s\">" % (oHtmlPage.getID()))
 			else:
 				if strClass == "ym-gl":
 					strClass = "ym-gr"
 				else:
 					strClass = "ym-gl"
-				oHtmlPage.append("<article id=\"%s\" class=\"ym-g50 %s\">" % (strClass, oHtmlPage.nextID()))
+				oHtmlPage.append("<article id=\"%s\" class=\"ym-g50 %s\">" % (oHtmlPage.getID(), strClass))
 			oHtmlPage.append("<div class=\"ym-gbox\">")
 			oArticle.writeToPage(oHtmlPage, secEdt=secEdt, artEdt=(strArtName if bEditMode else ""))
 			oHtmlPage.extend([
@@ -326,13 +336,13 @@ class Section(StartPageEntity):
 			oNewArt = Article()
 			oNewArt.setArticle("", strTitle="Neue Aufgabe")
 			if self.m_bPrimary:
-				oHtmlPage.append("<article id=\"%s\">" % (oHtmlPage.nextID()))
+				oHtmlPage.append("<article id=\"%s\">" % (oHtmlPage.getID()))
 			else:
 				if strClass == "ym-gl":
 					strClass = "ym-gr"
 				else:
 					strClass = "ym-gl"
-				oHtmlPage.append("<article id=\"%s\" class=\"ym-g50 %s\">" % (strClass, oHtmlPage.nextID()))
+				oHtmlPage.append("<article id=\"%s\" class=\"ym-g50 %s\">" % (oHtmlPage.getID(), strClass))
 			oHtmlPage.append("<div class=\"ym-gbox dimmed\">")
 			oNewArt.writeToPage(oHtmlPage, secEdt=secEdt)
 			oHtmlPage.extend([
@@ -341,6 +351,9 @@ class Section(StartPageEntity):
 			])
 
 		oHtmlPage.append("</section>")
+
+		if (bEditMode):
+			oHtmlPage.append("</div>")
 
 		return
 
@@ -396,29 +409,37 @@ class Article(StartPageEntity):
 		bEditMode = (secEdt and artEdt and artEdt == self.m_strName)
 
 		if (bEditMode):
-			oHtmlPage.append("<div class=\"flexible float-right\">")
-			# Aufgabe verschieben (up)
-			oHtmlPage.append("<a class=\"bordered\" href=\"%s?sec=%s&artUp=%s&edit=startpage#%s\">&#x023f6;</a>" % (
-				globs.s_strStartPageUrl, secEdt, artEdt, oHtmlPage.getID() - 1
+			oHtmlPage.append("<div class=\"toolbar-right\">")
+			# Aufgabe verschieben (up) x023f6
+			oHtmlPage.append("<a class=\"ym-button toolbar-button icon-moveup\" href=\"%s?sec=%s&artUp=%s&edit=startpage&token=%s#%s\"></a>" % (
+				globs.s_strStartPageUrl,
+				secEdt,
+				artEdt,
+				uuid.uuid4().hex,
+				oHtmlPage.getID() - 1
 			))
-			# Aufgabe verschieben (down)
-			oHtmlPage.append("<a class=\"bordered\" href=\"%s?sec=%s&artDn=%s&edit=startpage#%s\">&#x023f7;</a>" % (
-				globs.s_strStartPageUrl, secEdt, artEdt, oHtmlPage.getID() + 1
+			# Aufgabe verschieben (down) x023f7
+			oHtmlPage.append("<a class=\"ym-button toolbar-button icon-movedown\" href=\"%s?sec=%s&artDn=%s&edit=startpage&token=%s#%s\"></a>" % (
+				globs.s_strStartPageUrl,
+				secEdt,
+				artEdt,
+				uuid.uuid4().hex,
+				oHtmlPage.getID() + 1
 			))
-			# Aufgabe ändern (edit)
-			oHtmlPage.append("<a class=\"bordered\" href=\"%s?sec=%s&artEdt=%s&anchor=%s\">&#x1f4dd;</a>" % (
+			# Aufgabe ändern (edit) x1f4dd
+			oHtmlPage.append("<a class=\"ym-button toolbar-button icon-wrench\" href=\"%s?sec=%s&artEdt=%s&anchor=%s\"></a>" % (
 				globs.s_strStartPageUrl, secEdt, artEdt, oHtmlPage.getID()
 			))
-			# Aufgabe einfügen (add)
-			oHtmlPage.append("<a class=\"bordered\" href=\"%s?sec=%s&art=%s&artAdd=%s&anchor=%s\">&#x02795;</a>" % (
+			# Aufgabe einfügen (add) x02795
+			oHtmlPage.append("<a class=\"ym-button toolbar-button icon-add\" href=\"%s?sec=%s&art=%s&artAdd=%s&anchor=%s\"></a>" % (
 				globs.s_strStartPageUrl, secEdt, self.m_strName, uuid.uuid4().hex, oHtmlPage.getID()
 			))
 			oHtmlPage.append("</div>")
 
 		if (self.m_strName == ""):
-			oHtmlPage.append("<div class=\"flexible float-right\">")
+			oHtmlPage.append("<div class=\"toolbar-right\">")
 			if (secEdt):
-				oHtmlPage.append("<a class=\"bordered\" href=\"%s?sec=%s&artAdd=%s&anchor=%s\">&#x02795;</a>" % (
+				oHtmlPage.append("<a class=\"ym-button toolbar-button icon-add\" href=\"%s?sec=%s&artAdd=%s&anchor=%s\"></a>" % (
 					globs.s_strStartPageUrl, secEdt, uuid.uuid4().hex, oHtmlPage.getID()
 				))
 			oHtmlPage.append("</div>")
@@ -1258,10 +1279,11 @@ class TaskDisplaySounds(FastTask):
 					_, strExt = os.path.splitext(strTail)
 					
 					self.m_oHtmlPage.append(
-						"<li id=\"%s\"><a href=\"%s?sound=%s#%s\">%s %s [%s]</a></li>" % (
+						"<li id=\"%s\"><a href=\"%s?sound=%s&token=%s#%s\">%s %s [%s]</a></li>" % (
 							strName,
 							"/sound/values.html",
 							strName,
+							uuid.uuid4().hex,
 							strName,
 							strActive,
 							strName,
@@ -1284,10 +1306,11 @@ class TaskDisplaySounds(FastTask):
 					_, strExt = os.path.splitext(strTail)
 
 					self.m_oHtmlPage.append(
-						"<li id=\"%s\"><a href=\"%s?sound=%s#%s\">%s %s [%s]</a></li>" % (
+						"<li id=\"%s\"><a href=\"%s?sound=%s&token=%s#%s\">%s %s [%s]</a></li>" % (
 							strName,
 							"/sound/values.html",
 							strName,
+							uuid.uuid4().hex,
 							strName,
 							strActive,
 							strName,
@@ -1365,10 +1388,11 @@ class TaskDisplayImages(FastTask):
 						strActive = "&#x1F441;"
 					
 					self.m_oHtmlPage.append(
-						"<li id=\"%s\"><a href=\"%s?image=%s#%s\">%s %s [%s]</a></li>" % (
+						"<li id=\"%s\"><a href=\"%s?image=%s&token=%s#%s\">%s %s [%s]</a></li>" % (
 							strName,
 							"/image/values.html",
 							strName,
+							uuid.uuid4().hex,
 							strName,
 							strActive,
 							strName,
@@ -1398,10 +1422,11 @@ class TaskDisplayImages(FastTask):
 						strActive = "&#x1F441;"
 
 					self.m_oHtmlPage.append(
-						"<li id=\"%s\"><a href=\"%s?image=%s#%s\">%s %s [%s]</a></li>" % (
+						"<li id=\"%s\"><a href=\"%s?image=%s&token=%s#%s\">%s %s [%s]</a></li>" % (
 							strName,
 							"/image/values.html",
 							strName,
+							uuid.uuid4().hex,
 							strName,
 							strActive,
 							strName,
@@ -2212,10 +2237,11 @@ class BerryHttpHandler(SimpleHTTPRequestHandler):
 					pass
 			
 			if oFutureTask:
-				if ((not oHtmlPage is None)
-					and dictQuery
-					and ("anchor" in dictQuery)):
-					oHtmlPage.setAnchor(dictQuery["anchor"][0])
+				if (not oHtmlPage is None):
+					if (dictQuery and ("anchor" in dictQuery)):
+						oHtmlPage.setAnchor(dictQuery["anchor"][0])
+					elif (dictForm and ("anchor" in dictForm)):
+						oHtmlPage.setAnchor(dictForm["anchor"][0])
 				if oFutureTask.start():
 					oFutureTask.wait()
 				else:

@@ -1,0 +1,103 @@
+@media all {
+  /* Abschnitt Edit-Mode */
+  .section-edit {
+    line-height: 1.5em;
+    border: 2px solid #e0e7b8 !important;
+    padding: 5px 5px 5px 5px !important;
+    border-radius: 8px;
+    -moz-border-radius: 8px;
+    -webkit-border-radius: 8px;
+    margin: 0 0 1.5em 0 !important;
+    /* small IE-Fix for background images */
+    zoom: 1;
+    background-color: #f8f8ec;
+    background-repeat: no-repeat;
+    background-position: 5px 5px;
+  }
+
+  .section-edit p {
+      padding: 0 0 0 22px
+  }
+
+  .vertical {
+    background-image: url(horizontal.png);
+  }
+
+  .horizontal {
+    background-image: url(vertical.png);
+  }
+
+  .toolbar-right {
+    float: right;
+    display: inline;
+    max-width: 100%;
+    height: auto;
+  }
+
+  .toolbar-left {
+    float: left;
+    display: inline;
+    max-width: 100%;
+    height: auto;
+  }
+
+  .toolbar-button {
+    display: inline-block;
+    height: 16px;
+    width: 16px;
+    margin: 2px;
+    padding: 2px;
+    zoom: 1;
+    background-color: #f8f8ec;
+    background-repeat: no-repeat;
+    background-position: center;
+    position: relative;
+  }
+
+  .toolbar-button:hover {
+    box-shadow: 2px 2px 3px rgba(0, 0, 0, 0.2);
+    background-color: #fafafa;
+    top: -1px;
+  }
+
+  .toolbar-button:active {
+    box-shadow: inset 2px 2px 3px rgba(0, 0, 0, 0.2);
+    background-color: #cccccc;
+    top: 0px;
+  }
+
+  .toolbar-button:focus {
+    outline: 0;
+    background-color: #fafafa;
+  }
+
+  .icon-wrench, .icon-wrench:hover, .icon-wrench:active, .icon-wrench:focus {
+    background-repeat: no-repeat;
+    background-position: center;
+    background-image: url(wrench.png);
+  }
+
+  .icon-add, .icon-add:hover, .icon-add:active, .icon-add:focus {
+    background-repeat: no-repeat;
+    background-position: center;
+    background-image: url(add.png);
+  }
+
+  .icon-delete, .icon-delete:hover, .icon-delete:active, .icon-delete:focus {
+    background-repeat: no-repeat;
+    background-position: center;
+    background-image: url(delete.png);
+  }
+
+  .icon-moveup, .icon-moveup:hover, .icon-moveup:active, .icon_moveup:focus {
+    background-repeat: no-repeat;
+    background-position: center;
+    background-image: url(move_up.png);
+  }
+
+  .icon-movedown, .icon-movedown:hover, .icon-movedown:active, .icon-movedown:focus {
+    background-repeat: no-repeat;
+    background-position: center;
+    background-image: url(move_down.png);
+  }
+}

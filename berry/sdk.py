@@ -931,6 +931,7 @@ class HtmlPage(HttpContent):
 				self.m_strQueries += "?"
 			self.m_strQueries += "%s=%s" % (strName, strValue)
 		if (self.m_strAnchor):
+			globs.log("openForm - anchor=%s" % (self.m_strAnchor))
 			self.m_strQueries += "#%s" % (self.m_strAnchor)
 		self.append(
 			"<form class=\"%s\" method=\"%s\" enctype=\"%s\" action=\"%s%s\">" % (
